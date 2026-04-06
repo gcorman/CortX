@@ -14,6 +14,29 @@ interface ChatState {
   undoActions: (commitHash: string, messageId: string) => Promise<void>
 }
 
+function rewriteSlashCommand(input: string): string {
+  const trimmed = input.trim()
+  if (!trimmed.startsWith('/')) return input
+
+  const match = trimmed.match(/^\/(\w+)\s*(.*)$/s)
+  if (!match) return input
+  const cmd = match[1].toLowerCase()
+  const rest = match[2].trim()
+
+  switch (cmd) {
+    case 'ask':
+      return `[INSTRUCTION: Type d'input = QUESTION. Reponds UNIQUEMENT en JSON avec input_type="question", actions=[], et le champ "response" contenant la reponse complete et detaillee basee sur les fichiers du contexte ci-dessus. NE DIS JAMAIS "je vais chercher" ou "je consulte" — donne directement la reponse maintenant. Cite les sources via le champ "sources".]\n\nQuestion: ${rest}`
+    case 'brief':
+      return `[INSTRUCTION: Prepare un briefing structure sur le sujet ci-dessous, base sur les fichiers du contexte. input_type="question", actions=[], reponse complete dans "response" (sections : Identite, Historique, Contexte, Points a creuser). Donne directement le briefing, ne dis pas que tu vas le preparer.]\n\nSujet du briefing: ${rest}`
+    case 'status':
+      return `[INSTRUCTION: input_type="question". Donne dans "response" un resume de l'etat actuel de la base de connaissances : nombre de fichiers, entites principales, derniers ajouts, tags les plus utilises.]`
+    case 'digest':
+      return `[INSTRUCTION: input_type="question". Genere dans "response" un digest des activites recentes de la base : ajouts, modifications, connexions notables.]`
+    default:
+      return input
+  }
+}
+
 export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   isProcessing: false,
@@ -28,8 +51,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     set((s) => ({ messages: [...s.messages, userMessage], isProcessing: true }))
 
+    // Intercept slash commands and rewrite them as explicit directives for the LLM
+    const sent = rewriteSlashCommand(content)
+
     try {
-      const response: AgentResponse = await window.cortx.agent.process(content)
+      const response: AgentResponse = await window.cortx.agent.process(sent)
 
       const agentMessage: ChatMessage = {
         id: Date.now().toString(36) + 'a',

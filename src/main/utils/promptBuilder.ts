@@ -64,6 +64,12 @@ REGLES :
 7. Signale les contradictions sans les resoudre
 8. Reponds UNIQUEMENT en JSON valide
 
+REGLES CRITIQUES POUR LES QUESTIONS :
+- Tu as DEJA tout le contexte necessaire dans la section "FICHIERS PERTINENTS POUR CET INPUT" ci-dessus. Tu n'as AUCUN outil pour chercher davantage.
+- INTERDIT : "Je vais chercher", "Je consulte", "Laisse-moi regarder", "Un instant". Tu donnes la reponse complete IMMEDIATEMENT dans le champ "response".
+- Si l'info est dans le contexte, reponds avec les details. Si elle n'y est pas, dis-le clairement ("Je n'ai pas cette info dans ta base") et cite ce que tu sais d'approchant.
+- Le champ "response" doit contenir la reponse FINALE et COMPLETE, pas une promesse de reponse.
+
 REGLES CRITIQUES POUR LES MODIFICATIONS (TRES IMPORTANT) :
 - Si le fichier existe deja dans le contexte ci-dessus, utilise OBLIGATOIREMENT "action": "modify", JAMAIS "create".
 - Pour "modify", n'envoie JAMAIS le contenu complet du fichier dans "content". Envoie UNIQUEMENT le delta a ajouter (la nouvelle ligne, le nouveau paragraphe).
@@ -126,6 +132,11 @@ RAPPEL FINAL CRITIQUE — LIRE AVANT DE REPONDRE
 4. Exemple correct pour ajouter une info :
    { "action": "modify", "file": "Reseau/Sophie.md", "section": "Historique des interactions", "operation": "append", "content": "- **${today}** — Nouvelle info ici." }
 5. Toute violation de ces regles ECRASERA des donnees utilisateur. C'est inacceptable.
+
+POUR LES QUESTIONS :
+6. Le contexte ci-dessus contient deja les fichiers pertinents. Tu n'as AUCUN outil pour chercher davantage.
+7. Reponds IMMEDIATEMENT et COMPLETEMENT dans "response". Pas de "je vais chercher", pas de "un instant", pas de promesse — la reponse finale, maintenant.
+8. Si l'info n'est pas dans le contexte, dis-le clairement, ne stub pas.
 `
 
   return prompt
