@@ -1,0 +1,96 @@
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-cortx-border;
+  }
+
+  body {
+    @apply bg-cortx-bg text-cortx-text-primary font-sans antialiased;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    user-select: none;
+  }
+
+  #root {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #475569;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+  }
+
+  /* Selection */
+  ::selection {
+    background: rgba(13, 148, 136, 0.3);
+    color: #F8FAFC;
+  }
+}
+
+@layer components {
+  /* Panel resize handle styling */
+  .resize-handle {
+    @apply relative flex items-center justify-center;
+    transition: background-color 150ms ease;
+  }
+
+  .resize-handle:hover,
+  .resize-handle[data-resize-handle-active] {
+    background-color: rgba(13, 148, 136, 0.3);
+  }
+
+  .resize-handle::after {
+    content: '';
+    @apply absolute rounded-full bg-cortx-border;
+    transition: background-color 150ms ease;
+  }
+
+  .resize-handle:hover::after,
+  .resize-handle[data-resize-handle-active]::after {
+    @apply bg-cortx-accent;
+  }
+
+  /* Vertical resize handle */
+  .resize-handle[data-panel-group-direction='horizontal']::after {
+    width: 2px;
+    height: 32px;
+  }
+
+  /* Drag region for macOS title bar */
+  .drag-region {
+    -webkit-app-region: drag;
+  }
+
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

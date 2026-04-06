@@ -1,0 +1,77 @@
+{
+  "name": "cortx",
+  "version": "1.0.0",
+  "description": "Un second cerveau piloté par IA. Du vibe coding au vibe learning.",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "dist": "electron-vite build && electron-builder --win",
+    "postinstall": "electron-builder install-app-deps",
+    "rebuild": "electron-rebuild -f -w better-sqlite3"
+  },
+  "build": {
+    "appId": "com.cortx.app",
+    "productName": "CortX",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "resources/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "CortX"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gcorman/CortX.git"
+  },
+  "keywords": ["knowledge-management", "ai", "electron", "markdown"],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/gcorman/CortX/issues"
+  },
+  "homepage": "https://github.com/gcorman/CortX#readme",
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.3",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "autoprefixer": "^10.4.27",
+    "electron": "^41.1.1",
+    "electron-builder": "^26.0.12",
+    "electron-vite": "^5.0.0",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^6.0.2",
+    "vite": "^7.3.2"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.82.0",
+    "better-sqlite3": "^12.8.0",
+    "cytoscape": "^3.33.1",
+    "cytoscape-cose-bilkent": "^4.1.0",
+    "gray-matter": "^4.0.3",
+    "isomorphic-git": "^1.37.4",
+    "lucide-react": "^1.7.0",
+    "react": "^19.2.4",
+    "react-cytoscapejs": "^2.0.0",
+    "react-dom": "^19.2.4",
+    "react-markdown": "^10.1.0",
+    "react-resizable-panels": "^4.9.0",
+    "remark-gfm": "^4.0.1",
+    "zustand": "^5.0.12"
+  }
+}

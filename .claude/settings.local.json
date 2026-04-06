@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(node -e \"const m = require\\(''react-resizable-panels''\\); console.log\\(Object.keys\\(m\\).join\\('', ''\\)\\)\")",
+      "Bash(npx electron-vite:*)",
+      "Bash(node -e \"const p = require\\(''react-resizable-panels/package.json''\\); console.log\\(''Version:'', p.version\\)\")",
+      "Bash(node -e \"const m = require\\(''react-resizable-panels''\\); console.log\\(''Panel keys:'', Object.keys\\(m.Panel || {}\\).length\\); console.log\\(''All exports:'', Object.keys\\(m\\).join\\('', ''\\)\\)\")",
+      "Bash(taskkill /f /im electron.exe)",
+      "Bash(node -e \"const Database = require\\(''better-sqlite3''\\); const db = new Database\\(''C:/Users/gauti/Documents/CortX-Base/_System/cortx.db''\\); console.log\\(''FILES:'', JSON.stringify\\(db.prepare\\(''SELECT path, type, title, tags FROM files''\\).all\\(\\)\\)\\); console.log\\(''ENTITIES:'', JSON.stringify\\(db.prepare\\(''SELECT * FROM entities''\\).all\\(\\)\\)\\); console.log\\(''RELATIONS:'', JSON.stringify\\(db.prepare\\(''SELECT * FROM relations''\\).all\\(\\)\\)\\); db.close\\(\\)\")",
+      "Bash(sqlite3 \"C:/Users/gauti/Documents/CortX-Base/_System/cortx.db\" \"SELECT path, type, title, tags FROM files;\")",
+      "Bash(python3 -c \"import sqlite3; c=sqlite3.connect\\(r''C:\\\\Users\\\\gauti\\\\Documents\\\\CortX-Base\\\\_System\\\\cortx.db''\\); [print\\(r\\) for r in c.execute\\(''SELECT path,type,title,tags FROM files''\\)]; [print\\(''ENTITY:'',r\\) for r in c.execute\\(''SELECT * FROM entities''\\)]; c.close\\(\\)\")",
+      "Bash(python -c \"import sqlite3; c=sqlite3.connect\\(r''C:\\\\Users\\\\gauti\\\\Documents\\\\CortX-Base\\\\_System\\\\cortx.db''\\); [print\\(r\\) for r in c.execute\\(''SELECT path,type,title,tags FROM files''\\)]; [print\\(''ENTITY:'',r\\) for r in c.execute\\(''SELECT * FROM entities''\\)]; c.close\\(\\)\")",
+      "Bash(python -c \"import sqlite3; c=sqlite3.connect\\(r''C:\\\\Users\\\\gauti\\\\Documents\\\\CortX-Base\\\\_System\\\\cortx.db''\\); [print\\(''REL:'',r\\) for r in c.execute\\(''SELECT * FROM relations''\\)]; print\\(''Graph nodes type:'', [r for r in c.execute\\(''SELECT id,name,type FROM entities''\\)]\\); c.close\\(\\)\")",
+      "Bash(grep -r \"localStorage\\\\|sessionStorage\\\\|fs\\\\.write\\\\|writeFile\\\\|electron-store\\\\|config.json\\\\|settings.json\" /c/Users/gauti/Documents/GitHub/CortX/src --include=*.ts)"
+    ]
+  }
+}
