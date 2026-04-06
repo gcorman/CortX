@@ -14,7 +14,8 @@
       "Bash(python3 -c \"import sqlite3; c=sqlite3.connect\\(r''C:\\\\Users\\\\gauti\\\\Documents\\\\CortX-Base\\\\_System\\\\cortx.db''\\); [print\\(r\\) for r in c.execute\\(''SELECT path,type,title,tags FROM files''\\)]; [print\\(''ENTITY:'',r\\) for r in c.execute\\(''SELECT * FROM entities''\\)]; c.close\\(\\)\")",
       "Bash(python -c \"import sqlite3; c=sqlite3.connect\\(r''C:\\\\Users\\\\gauti\\\\Documents\\\\CortX-Base\\\\_System\\\\cortx.db''\\); [print\\(r\\) for r in c.execute\\(''SELECT path,type,title,tags FROM files''\\)]; [print\\(''ENTITY:'',r\\) for r in c.execute\\(''SELECT * FROM entities''\\)]; c.close\\(\\)\")",
       "Bash(python -c \"import sqlite3; c=sqlite3.connect\\(r''C:\\\\Users\\\\gauti\\\\Documents\\\\CortX-Base\\\\_System\\\\cortx.db''\\); [print\\(''REL:'',r\\) for r in c.execute\\(''SELECT * FROM relations''\\)]; print\\(''Graph nodes type:'', [r for r in c.execute\\(''SELECT id,name,type FROM entities''\\)]\\); c.close\\(\\)\")",
-      "Bash(grep -r \"localStorage\\\\|sessionStorage\\\\|fs\\\\.write\\\\|writeFile\\\\|electron-store\\\\|config.json\\\\|settings.json\" /c/Users/gauti/Documents/GitHub/CortX/src --include=*.ts)"
+      "Bash(grep -r \"localStorage\\\\|sessionStorage\\\\|fs\\\\.write\\\\|writeFile\\\\|electron-store\\\\|config.json\\\\|settings.json\" /c/Users/gauti/Documents/GitHub/CortX/src --include=*.ts)",
+      "Bash(npm run:*)"
     ]
   }
 }

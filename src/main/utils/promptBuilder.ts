@@ -64,12 +64,22 @@ REGLES :
 7. Signale les contradictions sans les resoudre
 8. Reponds UNIQUEMENT en JSON valide
 
+REGLES CRITIQUES POUR LES MODIFICATIONS (TRES IMPORTANT) :
+- Si le fichier existe deja dans le contexte ci-dessus, utilise OBLIGATOIREMENT "action": "modify", JAMAIS "create".
+- Pour "modify", n'envoie JAMAIS le contenu complet du fichier dans "content". Envoie UNIQUEMENT le delta a ajouter (la nouvelle ligne, le nouveau paragraphe).
+- Specifie TOUJOURS "section" (le titre de la section ou tu ajoutes, ex: "Historique des interactions") et "operation" ("append", "prepend", "replace_line", ou "add_item").
+- Si tu veux remplacer une ligne precise, utilise "operation": "replace_line" avec "old_content" contenant la ligne exacte a remplacer.
+- Pour ajouter un wikilink dans le frontmatter related : "section": "frontmatter.related", "operation": "add_item", "content": "\"[[Nom]]\"".
+- Ne JAMAIS recopier le contenu existant du fichier dans "content" — uniquement la nouvelle info.
+
 FORMAT DE REPONSE :
 Pour capture/commande : { "input_type": "capture", "actions": [...], "summary": "...", "conflicts": [], "ambiguities": [], "suggestions": [] }
 Pour question : { "input_type": "question", "actions": [], "response": "...", "sources": [...], "suggestions": [] }
 Pour reflexion : { "input_type": "reflexion", "actions": [], "response": "...", "proposed_actions": [...], "suggestions": [] }
 
-Actions possibles : "create" (file + content complet) ou "modify" (file + section + operation + content)
+Actions possibles :
+- "create" → uniquement pour les fichiers QUI N'EXISTENT PAS. content = contenu complet.
+- "modify" → pour tous les fichiers existants. content = uniquement le delta. section + operation OBLIGATOIRES.
 
 La date du jour est : {{today}}
 L'heure actuelle est : {{now}}`
@@ -102,6 +112,21 @@ export function buildSystemPrompt(
   for (const [key, value] of Object.entries(variables)) {
     prompt = prompt.replaceAll(key, value)
   }
+
+  // Append a final critical reminder. Repeated instructions at the end of the
+  // prompt are far better respected by LLMs than instructions buried in the middle.
+  prompt += `
+
+==================================================
+RAPPEL FINAL CRITIQUE — LIRE AVANT DE REPONDRE
+==================================================
+1. Si un fichier apparait dans "FICHIERS PERTINENTS POUR CET INPUT" ci-dessus, il EXISTE DEJA. Tu DOIS utiliser "action": "modify", PAS "create".
+2. Pour "modify", "content" doit contenir UNIQUEMENT la nouvelle information a ajouter (1 ligne, 1 paragraphe, 1 puce). NE JAMAIS recopier le contenu existant.
+3. Specifie TOUJOURS "section" (nom de la section markdown) et "operation" ("append" par defaut).
+4. Exemple correct pour ajouter une info :
+   { "action": "modify", "file": "Reseau/Sophie.md", "section": "Historique des interactions", "operation": "append", "content": "- **${today}** — Nouvelle info ici." }
+5. Toute violation de ces regles ECRASERA des donnees utilisateur. C'est inacceptable.
+`
 
   return prompt
 }

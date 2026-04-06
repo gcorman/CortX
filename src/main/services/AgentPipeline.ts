@@ -146,12 +146,15 @@ export class AgentPipeline {
    * Returns { before, after } content strings.
    */
   async preview(action: AgentAction): Promise<{ before: string; after: string }> {
-    if (action.action === 'create') {
+    const existing = await this.fileService.readFile(action.file)
+    const before = existing?.raw || ''
+
+    // Pure creation — file doesn't exist yet
+    if (action.action === 'create' && !existing) {
       return { before: '', after: action.content }
     }
 
-    const existing = await this.fileService.readFile(action.file)
-    const before = existing?.raw || ''
+    // Either modify, or "create" on a file that already exists — always safe-merge
     const after = this.computeModifiedContent(before, action)
     return { before, after }
   }
@@ -221,10 +224,11 @@ export class AgentPipeline {
     else if (action.section && action.section !== 'root') {
       body = this.modifySection(body, action.section, action.content, operation || 'append')
     }
-    // No section, no operation — smart append:
-    // Try to merge by detecting sections in the new content and appending under matching sections
+    // No section, no operation — SAFE APPEND only:
+    // Strip frontmatter from incoming content, dedupe lines that already exist,
+    // and append the rest. NEVER overwrites existing content.
     else {
-      body = this.smartMerge(body, action.content)
+      body = this.safeAppend(body, action.content)
     }
 
     if (hasFrontmatter) {
@@ -235,61 +239,88 @@ export class AgentPipeline {
   }
 
   /**
-   * Smart merge: if the new content has sections that already exist in the body,
-   * append new lines under those existing sections. Otherwise, append at the end.
+   * Safe append: never overwrites. Strips frontmatter from incoming content,
+   * dedupes any line that already exists in the body, and merges the remainder.
+   *
+   * If the new content contains headings matching existing ones, the lines under
+   * each heading are appended under the corresponding existing section.
+   * Otherwise the deduped remainder is appended at the end.
    */
-  private smartMerge(existingBody: string, newContent: string): string {
-    const newLines = newContent.split('\n')
+  private safeAppend(existingBody: string, newContent: string): string {
+    // Strip frontmatter from incoming content if present
+    let clean = newContent
+    if (clean.trimStart().startsWith('---')) {
+      try {
+        clean = matter(clean).content
+      } catch { /* keep as-is */ }
+    }
+    clean = clean.trim()
+    if (!clean) return existingBody
+
+    // Build a set of trimmed non-empty lines already present in the body
+    const existingLineSet = new Set(
+      existingBody.split('\n').map((l) => l.trim()).filter(Boolean)
+    )
+
+    // Parse incoming content into sections by heading
+    const lines = clean.split('\n')
+    const sections: Array<{ heading: string | null; lines: string[] }> = []
+    let current: { heading: string | null; lines: string[] } = { heading: null, lines: [] }
+    for (const line of lines) {
+      const headingMatch = line.match(/^(#{1,6})\s+(.+?)\s*$/)
+      if (headingMatch) {
+        if (current.lines.length || current.heading) sections.push(current)
+        current = { heading: headingMatch[2].trim(), lines: [] }
+      } else {
+        current.lines.push(line)
+      }
+    }
+    if (current.lines.length || current.heading) sections.push(current)
+
     let result = existingBody
 
-    // Check if new content has section headings that match existing ones
-    const newSections: Array<{ heading: string; content: string[] }> = []
-    let currentHeading: string | null = null
-    let currentContent: string[] = []
-
-    for (const line of newLines) {
-      const headingMatch = line.match(/^(#{1,6})\s+(.+)$/)
-      if (headingMatch) {
-        if (currentHeading) {
-          newSections.push({ heading: currentHeading, content: currentContent })
+    for (const sec of sections) {
+      // Drop top-level H1 that just repeats an existing H1 (LLMs often re-emit it)
+      if (sec.heading && /^#\s+/.test(`# ${sec.heading}`)) {
+        const h1Existing = new RegExp(`^#\\s+${sec.heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'mi')
+        if (h1Existing.test(result) && sec.lines.every((l) => !l.trim() || existingLineSet.has(l.trim()))) {
+          continue
         }
-        currentHeading = headingMatch[2].trim()
-        currentContent = []
-      } else if (currentHeading) {
-        currentContent.push(line)
       }
-    }
-    if (currentHeading) {
-      newSections.push({ heading: currentHeading, content: currentContent })
-    }
 
-    if (newSections.length > 0) {
-      // Merge each section's content into existing body
-      let merged = false
-      for (const sec of newSections) {
-        const contentToAdd = sec.content.join('\n').trim()
-        if (!contentToAdd) continue
+      // Dedupe: keep only lines that don't already exist in the body
+      const dedupedLines: string[] = []
+      for (const ln of sec.lines) {
+        const t = ln.trim()
+        if (!t) {
+          dedupedLines.push(ln)
+        } else if (!existingLineSet.has(t)) {
+          dedupedLines.push(ln)
+          existingLineSet.add(t)
+        }
+      }
+      const addition = dedupedLines.join('\n').trim()
+      if (!addition && !sec.heading) continue
 
-        // Check if this section exists in the existing body
-        const sectionRegex = new RegExp(`^(#{1,6})\\s+${sec.heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'mi')
+      if (sec.heading) {
+        // Look for an existing section with the same heading
+        const sectionRegex = new RegExp(
+          `^(#{1,6})\\s+${sec.heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`,
+          'mi'
+        )
         if (sectionRegex.test(result)) {
-          // Section exists — append content under it
-          result = this.modifySection(result, sec.heading, contentToAdd, 'append')
-          merged = true
+          if (addition) {
+            result = this.modifySection(result, sec.heading, addition, 'append')
+          }
         } else {
-          // Section doesn't exist — append the whole section at the end
-          result = result.trimEnd() + `\n\n## ${sec.heading}\n${contentToAdd}`
-          merged = true
+          // New section — append at the end
+          result = result.trimEnd() + `\n\n## ${sec.heading}\n${addition}`.trimEnd()
+          existingLineSet.add(`## ${sec.heading}`.trim())
         }
+      } else if (addition) {
+        // Loose lines with no heading — append to the end of the body
+        result = result.trimEnd() + '\n\n' + addition
       }
-      if (merged) return result
-    }
-
-    // No sections detected in new content — just append at the end
-    // But avoid duplicating content that already exists
-    const trimmedNew = newContent.trim()
-    if (trimmedNew && !existingBody.includes(trimmedNew)) {
-      result = existingBody.trimEnd() + '\n\n' + trimmedNew
     }
 
     return result
@@ -381,11 +412,25 @@ export class AgentPipeline {
     for (const action of actions) {
       try {
         if (action.action === 'create') {
-          await this.fileService.writeFile(action.file, action.content)
+          // Guard: if the file already exists, never overwrite — treat as a modification.
+          // LLMs often emit "create" with a full re-render of an existing file.
+          const existing = await this.fileService.readFile(action.file)
+          if (existing) {
+            console.warn(`[AgentPipeline] create on existing file ${action.file} — routing to safe modify`)
+            await this.applyModification(action)
+          } else {
+            await this.fileService.writeFile(action.file, action.content)
+          }
         } else if (action.action === 'modify') {
           await this.applyModification(action)
         } else {
-          await this.fileService.writeFile(action.file, action.content)
+          // Unknown action type — be safe, never overwrite an existing file
+          const existing = await this.fileService.readFile(action.file)
+          if (existing) {
+            await this.applyModification(action)
+          } else {
+            await this.fileService.writeFile(action.file, action.content)
+          }
         }
         console.log(`[AgentPipeline] Executed ${action.action} on ${action.file}`)
       } catch (err) {
