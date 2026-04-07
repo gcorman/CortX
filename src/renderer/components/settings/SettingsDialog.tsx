@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Server, Cloud, Cpu, Check, AlertCircle, FolderOpen } from 'lucide-react'
+import { X, Server, Cloud, Cpu, Check, AlertCircle, FolderOpen, Sun, Moon } from 'lucide-react'
 import { useUIStore } from '../../stores/uiStore'
 import type { LLMConfig } from '../../../shared/types'
 
@@ -42,7 +42,7 @@ const LOCAL_MODEL_EXAMPLES = [
 ]
 
 export function SettingsDialog(): React.JSX.Element {
-  const { settingsOpen, toggleSettings, addToast } = useUIStore()
+  const { settingsOpen, toggleSettings, addToast, theme, setTheme } = useUIStore()
   const [provider, setProvider] = useState<Provider>('anthropic')
   const [apiKey, setApiKey] = useState('')
   const [model, setModel] = useState('')
@@ -182,6 +182,31 @@ export function SettingsDialog(): React.JSX.Element {
         </div>
 
         <div className="px-6 py-5 space-y-6">
+          {/* Theme toggle */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-cortx-text-secondary uppercase tracking-wider">
+              Apparence
+            </label>
+            <div className="flex gap-2">
+              {([['dark', 'Sombre', Moon], ['light', 'Clair', Sun]] as const).map(([val, label, Icon]) => (
+                <button
+                  key={val}
+                  onClick={() => setTheme(val)}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-card border text-sm transition-all cursor-pointer ${
+                    theme === val
+                      ? 'border-cortx-accent bg-cortx-accent/10 text-cortx-accent'
+                      : 'border-cortx-border text-cortx-text-secondary hover:border-cortx-elevated hover:text-cortx-text-primary'
+                  }`}
+                >
+                  <Icon size={14} />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-cortx-border" />
+
           {/* Base Path */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-cortx-text-secondary uppercase tracking-wider">

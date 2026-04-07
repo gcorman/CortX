@@ -1,23 +1,26 @@
 import type { Config } from 'tailwindcss'
 
+// Reference a CSS variable with Tailwind opacity modifier support
+const v = (name: string): string => `rgb(var(${name}) / <alpha-value>)`
+
 const config: Config = {
   content: ['./src/renderer/**/*.{ts,tsx,html}'],
   theme: {
     extend: {
       colors: {
         cortx: {
-          bg: '#0F172A',
-          surface: '#1E293B',
-          elevated: '#334155',
-          border: '#475569',
-          'text-primary': '#F8FAFC',
-          'text-secondary': '#94A3B8',
-          accent: '#0D9488',
-          'accent-light': '#14B8A6',
-          cta: '#F97316',
-          success: '#22C55E',
-          error: '#EF4444',
-          warning: '#F59E0B'
+          bg:               v('--cortx-bg'),
+          surface:          v('--cortx-surface'),
+          elevated:         v('--cortx-elevated'),
+          border:           v('--cortx-border'),
+          'text-primary':   v('--cortx-text-primary'),
+          'text-secondary': v('--cortx-text-secondary'),
+          accent:           v('--cortx-accent'),
+          'accent-light':   v('--cortx-accent-light'),
+          cta:              v('--cortx-cta'),
+          success:          v('--cortx-success'),
+          error:            v('--cortx-error'),
+          warning:          v('--cortx-warning')
         }
       },
       fontFamily: {
@@ -25,7 +28,7 @@ const config: Config = {
         mono: ['Fira Code', 'Consolas', 'monospace']
       },
       borderRadius: {
-        card: '8px',
+        card:  '8px',
         input: '6px',
         panel: '12px'
       },

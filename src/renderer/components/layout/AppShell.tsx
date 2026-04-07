@@ -10,11 +10,15 @@ import { useUIStore } from '../../stores/uiStore'
 import { useFileStore } from '../../stores/fileStore'
 
 export function AppShell(): React.JSX.Element {
-  const { rightPanelVisible, toggleRightPanel } = useUIStore()
+  const { rightPanelVisible, toggleRightPanel, theme } = useUIStore()
   const loadFiles = useFileStore((s) => s.loadFiles)
 
+  // Apply theme attribute to <html> on mount and whenever it changes
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [theme])
+
   // Keep the file list loaded so wikilink resolution works everywhere.
-  // Refresh periodically to catch files created by the agent.
   useEffect(() => {
     loadFiles()
     const id = setInterval(loadFiles, 5000)

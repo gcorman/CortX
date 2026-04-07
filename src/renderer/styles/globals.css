@@ -4,6 +4,41 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Theme tokens (space-separated RGB so Tailwind opacity modifiers work) ─── */
+:root, [data-theme="dark"] {
+  --cortx-bg:           15 23 42;
+  --cortx-surface:      30 41 59;
+  --cortx-elevated:     51 65 85;
+  --cortx-border:       71 85 105;
+  --cortx-text-primary: 248 250 252;
+  --cortx-text-secondary: 148 163 184;
+  --cortx-accent:       13 148 136;
+  --cortx-accent-light: 20 184 166;
+  --cortx-cta:          249 115 22;
+  --cortx-success:      34 197 94;
+  --cortx-error:        239 68 68;
+  --cortx-warning:      245 158 11;
+  --scrollbar-thumb:    #475569;
+  --scrollbar-hover:    #64748B;
+}
+
+[data-theme="light"] {
+  --cortx-bg:           241 245 249;
+  --cortx-surface:      255 255 255;
+  --cortx-elevated:     248 250 252;
+  --cortx-border:       226 232 240;
+  --cortx-text-primary: 15 23 42;
+  --cortx-text-secondary: 100 116 139;
+  --cortx-accent:       13 148 136;
+  --cortx-accent-light: 20 184 166;
+  --cortx-cta:          234 88 12;
+  --cortx-success:      22 163 74;
+  --cortx-error:        220 38 38;
+  --cortx-warning:      217 119 6;
+  --scrollbar-thumb:    #CBD5E1;
+  --scrollbar-hover:    #94A3B8;
+}
+
 @layer base {
   * {
     @apply border-cortx-border;
@@ -35,23 +70,22 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #475569;
+    background: var(--scrollbar-thumb);
     border-radius: 3px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #64748b;
+    background: var(--scrollbar-hover);
   }
 
   /* Selection */
   ::selection {
     background: rgba(13, 148, 136, 0.3);
-    color: #F8FAFC;
+    color: inherit;
   }
 }
 
 @layer components {
-  /* Panel resize handle styling */
   .resize-handle {
     @apply relative flex items-center justify-center;
     transition: background-color 150ms ease;
@@ -73,24 +107,15 @@
     @apply bg-cortx-accent;
   }
 
-  /* Vertical resize handle */
   .resize-handle[data-panel-group-direction='horizontal']::after {
     width: 2px;
     height: 32px;
   }
 
-  /* Drag region for macOS title bar */
-  .drag-region {
-    -webkit-app-region: drag;
-  }
-
-  .no-drag {
-    -webkit-app-region: no-drag;
-  }
+  .drag-region { -webkit-app-region: drag; }
+  .no-drag     { -webkit-app-region: no-drag; }
 }
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+  .text-balance { text-wrap: balance; }
 }
