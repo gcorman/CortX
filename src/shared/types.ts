@@ -75,6 +75,13 @@ export interface AgentAction {
   status: 'proposed' | 'pending' | 'validated' | 'undone' | 'rejected'
 }
 
+export interface AgentClarification {
+  question: string
+  options: string[]
+  /** Index of the option chosen by the user; undefined while pending */
+  answeredIndex?: number
+}
+
 export interface AgentResponse {
   inputType: InputType
   actions: AgentAction[]
@@ -84,6 +91,8 @@ export interface AgentResponse {
   conflicts: string[]
   ambiguities: string[]
   suggestions: string[]
+  /** Optional clarification: when present, the agent is asking the user to choose */
+  clarification?: AgentClarification
   proposedActions?: Array<{
     description: string
     action: AgentAction

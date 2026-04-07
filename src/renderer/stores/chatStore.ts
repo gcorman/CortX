@@ -13,6 +13,7 @@ interface ChatState {
   acceptActions: (messageId: string) => Promise<void>
   rejectActions: (messageId: string) => void
   undoActions: (commitHash: string, messageId: string) => Promise<void>
+  answerClarification: (messageId: string, optionIndex: number) => Promise<void>
 }
 
 interface SlashRewrite {
@@ -237,6 +238,77 @@ export const useChatStore = create<ChatState>((set, get) => ({
       })
     }))
     useUIStore.getState().addToast('Actions refusees', 'info')
+  },
+
+  answerClarification: async (messageId: string, optionIndex: number) => {
+    const state = get()
+    const msg = state.messages.find((m) => m.id === messageId)
+    const clar = msg?.agentResponse?.clarification
+    if (!clar || clar.answeredIndex !== undefined) return
+    const choice = clar.options[optionIndex]
+    if (!choice) return
+
+    // Mark the clarification as answered so the buttons disable immediately
+    set((s) => ({
+      messages: s.messages.map((m) => {
+        if (m.id !== messageId || !m.agentResponse?.clarification) return m
+        return {
+          ...m,
+          agentResponse: {
+            ...m.agentResponse,
+            clarification: { ...m.agentResponse.clarification, answeredIndex: optionIndex }
+          }
+        }
+      })
+    }))
+
+    // Find the original user message that triggered the clarification — it's
+    // the most recent user message before this one. We resend it together with
+    // the chosen answer so the agent has the context it needs.
+    const idx = state.messages.findIndex((m) => m.id === messageId)
+    let originalInput = ''
+    for (let i = idx - 1; i >= 0; i--) {
+      if (state.messages[i].role === 'user') {
+        originalInput = state.messages[i].content
+        break
+      }
+    }
+
+    // Display a clean user message (just the chosen option) but send the
+    // contextualized version to the agent so it can finish the original task.
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(36) + 'u',
+      role: 'user',
+      content: choice,
+      timestamp: new Date().toISOString()
+    }
+    set((s) => ({ messages: [...s.messages, userMessage], isProcessing: true }))
+
+    const followup = `[REPONSE A TA QUESTION « ${clar.question} »] ${choice}\n\n[Demande initiale: ${originalInput}]`
+
+    try {
+      const response: AgentResponse = await window.cortx.agent.process(followup)
+      const agentMessage: ChatMessage = {
+        id: Date.now().toString(36) + 'a',
+        role: 'agent',
+        content: response.summary || response.response || '',
+        timestamp: new Date().toISOString(),
+        agentResponse: response
+      }
+      set((s) => ({ messages: [...s.messages, agentMessage], isProcessing: false }))
+      if (response.actions.length > 0) {
+        useAgentStore.getState().addActions(response)
+      }
+    } catch (error) {
+      const errorMessage: ChatMessage = {
+        id: Date.now().toString(36) + 'e',
+        role: 'agent',
+        content: `Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`,
+        timestamp: new Date().toISOString()
+      }
+      set((s) => ({ messages: [...s.messages, errorMessage], isProcessing: false }))
+      useUIStore.getState().addToast('Erreur lors du traitement', 'error')
+    }
   },
 
   undoActions: async (commitHash: string, messageId: string) => {

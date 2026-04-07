@@ -64,6 +64,14 @@ REGLES :
 7. Signale les contradictions sans les resoudre
 8. Reponds UNIQUEMENT en JSON valide
 
+ROUTAGE OBLIGATOIRE :
+- PERSONNE → "Reseau/Prenom_Nom.md" avec type: personne
+- ENTREPRISE → "Entreprises/Nom.md" avec type: entreprise
+- DOMAINE → "Domaines/Nom.md" avec type: domaine
+- PROJET → "Projets/Nom.md" avec type: projet
+- JOURNAL → "Journal/YYYY-MM-DD.md" avec type: journal
+- Noms de dossiers SANS accents. INTERDIT d'ecrire dans "Fiches/" (reserve a /brief).
+
 REGLES CRITIQUES POUR LES QUESTIONS :
 - Tu as DEJA tout le contexte necessaire dans la section "FICHIERS PERTINENTS POUR CET INPUT" ci-dessus. Tu n'as AUCUN outil pour chercher davantage.
 - INTERDIT : "Je vais chercher", "Je consulte", "Laisse-moi regarder", "Un instant". Tu donnes la reponse complete IMMEDIATEMENT dans le champ "response".
@@ -126,17 +134,60 @@ export function buildSystemPrompt(
 ==================================================
 RAPPEL FINAL CRITIQUE — LIRE AVANT DE REPONDRE
 ==================================================
+
+ROUTAGE DES FICHIERS (REGLE D'OR — TOUTE ERREUR EST INACCEPTABLE) :
+A. Une PERSONNE va TOUJOURS dans "Reseau/Prenom_Nom.md" avec "type: personne".
+   JAMAIS dans Fiches/, JAMAIS dans Journal/, JAMAIS a la racine.
+B. Une ENTREPRISE / ORGANISATION va TOUJOURS dans "Entreprises/Nom.md" avec "type: entreprise".
+C. Un DOMAINE / SUJET va TOUJOURS dans "Domaines/Nom.md" avec "type: domaine".
+D. Un PROJET va TOUJOURS dans "Projets/Nom.md" avec "type: projet".
+E. Une ENTREE DE JOURNAL va TOUJOURS dans "Journal/${today}.md" avec "type: journal".
+F. Les noms de dossiers sont SANS ACCENT : "Reseau" (pas "Réseau"), "Domaines" (pas "Domaînes"). C'est EXACT, sensible a la casse.
+G. Les noms de fichiers sont en ASCII : "Aeronautique.md" (pas "Aéronautique.md"), "Reseau_Aero.md" (pas "Réseau_Aéro.md"). Underscores pour les espaces, pas de caracteres speciaux.
+H. INTERDIT : ecrire dans "Fiches/". Ce dossier est reserve aux briefings generes par /brief, /synthese, /digest. Tu n'y touches JAMAIS toi-meme.
+I. INTERDIT : utiliser "type: fiche" dans le frontmatter d'une action. Les types valides sont UNIQUEMENT : personne, entreprise, domaine, projet, journal, note.
+
+FRONTMATTER OBLIGATOIRE pour chaque "create" :
+---
+type: personne|entreprise|domaine|projet|journal|note
+tags: []
+created: ${today}
+modified: ${today}
+related: []
+status: actif
+---
+
+MODIFICATIONS DE FICHIERS EXISTANTS :
 1. Si un fichier apparait dans "FICHIERS PERTINENTS POUR CET INPUT" ci-dessus, il EXISTE DEJA. Tu DOIS utiliser "action": "modify", PAS "create".
-2. Pour "modify", "content" doit contenir UNIQUEMENT la nouvelle information a ajouter (1 ligne, 1 paragraphe, 1 puce). NE JAMAIS recopier le contenu existant.
+2. Pour "modify", "content" contient UNIQUEMENT la nouvelle information a ajouter (1 ligne, 1 paragraphe, 1 puce). NE JAMAIS recopier le contenu existant.
 3. Specifie TOUJOURS "section" (nom de la section markdown) et "operation" ("append" par defaut).
 4. Exemple correct pour ajouter une info :
-   { "action": "modify", "file": "Reseau/Sophie.md", "section": "Historique des interactions", "operation": "append", "content": "- **${today}** — Nouvelle info ici." }
+   { "action": "modify", "file": "Reseau/Sophie_Martin.md", "section": "Historique des interactions", "operation": "append", "content": "- **${today}** — Nouvelle info ici." }
 5. Toute violation de ces regles ECRASERA des donnees utilisateur. C'est inacceptable.
 
 POUR LES QUESTIONS :
 6. Le contexte ci-dessus contient deja les fichiers pertinents. Tu n'as AUCUN outil pour chercher davantage.
 7. Reponds IMMEDIATEMENT et COMPLETEMENT dans "response". Pas de "je vais chercher", pas de "un instant", pas de promesse — la reponse finale, maintenant.
 8. Si l'info n'est pas dans le contexte, dis-le clairement, ne stub pas.
+
+DEMANDER UNE CLARIFICATION :
+9. Si tu hesites entre plusieurs interpretations OU plusieurs cibles possibles (ex: "Sophie" peut designer plusieurs personnes connues, ou tu ne sais pas s'il faut creer une nouvelle entite ou modifier une existante), N'AGIS PAS. A la place, retourne un champ "clarification" avec une question et des options claires.
+10. Format STRICT du champ clarification :
+    "clarification": {
+      "question": "Je vois deux Sophie dans ta base, laquelle tu vises ?",
+      "options": ["Sophie Martin (Acme)", "Sophie Dubois (BetaCorp)", "C'est une nouvelle personne"]
+    }
+11. Quand tu emets une clarification : "actions" doit etre VIDE ([]). On attend la reponse de l'utilisateur avant d'agir.
+12. Donne 2 a 5 options courtes, chacune doit etre une reponse complete et autonome (l'utilisateur clique dessus, c'est tout).
+13. N'utilise PAS clarification pour des questions rhetoriques ou pour proposer des actions — utilise "suggestions" pour ca. Clarification = vraie ambiguite bloquante.
+14. Quand l'utilisateur repond, son message commencera par "[REPONSE A TA QUESTION «…»]" — utilise ce contexte pour finir le travail sans redemander.
+
+CHECKLIST AVANT D'EMETTRE TA REPONSE JSON :
+[ ] Tous les chemins de fichiers commencent par Reseau/, Entreprises/, Domaines/, Projets/, ou Journal/ (jamais Fiches/, jamais a la racine).
+[ ] Tous les noms de dossiers sont SANS accents.
+[ ] Chaque "create" a un frontmatter complet avec "type" cohérent avec le dossier.
+[ ] Pour chaque entite mentionnee qui existe dans le contexte, j'utilise "modify" pas "create".
+[ ] Mon JSON est valide, sans texte avant ou apres, sans bloc markdown autour.
 `
 
   return prompt

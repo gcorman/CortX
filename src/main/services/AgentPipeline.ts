@@ -29,6 +29,10 @@ interface RawAgentResponse {
   conflicts?: string[]
   ambiguities?: string[]
   suggestions?: string[]
+  clarification?: {
+    question?: string
+    options?: unknown[]
+  }
   proposed_actions?: Array<{
     description: string
     action: RawAction
@@ -83,6 +87,18 @@ export class AgentPipeline {
       status: 'proposed' as const
     }))
 
+    // Normalize clarification: only emit it if both a question and >=2 options are present.
+    // The LLM sometimes returns null/empty options or a single trivial option, which we ignore.
+    let clarification: AgentResponse['clarification']
+    if (parsed.clarification?.question && Array.isArray(parsed.clarification.options)) {
+      const opts = parsed.clarification.options
+        .map((o) => (typeof o === 'string' ? o.trim() : String(o ?? '').trim()))
+        .filter((o) => o.length > 0)
+      if (opts.length >= 2) {
+        clarification = { question: parsed.clarification.question.trim(), options: opts }
+      }
+    }
+
     return {
       inputType: inputType as AgentResponse['inputType'],
       actions,
@@ -92,6 +108,7 @@ export class AgentPipeline {
       conflicts: parsed.conflicts || [],
       ambiguities: parsed.ambiguities || [],
       suggestions: parsed.suggestions || [],
+      clarification,
       proposedActions: parsed.proposed_actions?.map((pa) => ({
         description: pa.description,
         action: {
@@ -514,6 +531,29 @@ export class AgentPipeline {
   private normalizeActions(rawActions: RawAction[]): Array<{
     action: string; file: string; content: string; section?: string; operation?: string; old_content?: string
   }> {
+    // Canonical directory names — must match FileService.BASE_DIRS exactly.
+    // The prompt sometimes shows "Réseau/" with an accent; the filesystem uses
+    // "Reseau/" without one. We MUST normalize, otherwise files end up in a
+    // ghost directory disconnected from the rest of the base.
+    const TYPE_TO_DIR: Record<string, string> = {
+      personne: 'Reseau',
+      entreprise: 'Entreprises',
+      domaine: 'Domaines',
+      projet: 'Projets',
+      journal: 'Journal',
+      note: 'Journal'
+    }
+    const KNOWN_DIRS = ['Reseau', 'Entreprises', 'Domaines', 'Projets', 'Journal', 'Fiches']
+    // Map every accent / casing variant the LLM might emit back to the canonical name.
+    const DIR_ALIASES: Record<string, string> = {
+      'reseau': 'Reseau', 'réseau': 'Reseau', 'network': 'Reseau', 'people': 'Reseau', 'contacts': 'Reseau',
+      'entreprises': 'Entreprises', 'entreprise': 'Entreprises', 'companies': 'Entreprises', 'organisations': 'Entreprises',
+      'domaines': 'Domaines', 'domaine': 'Domaines', 'topics': 'Domaines',
+      'projets': 'Projets', 'projet': 'Projets', 'projects': 'Projets',
+      'journal': 'Journal', 'daily': 'Journal', 'logs': 'Journal',
+      'fiches': 'Fiches', 'briefs': 'Fiches'
+    }
+
     return rawActions
       .map((a) => ({
         action: this.normalizeActionType(a.action || a.type || 'create'),
@@ -531,19 +571,52 @@ export class AgentPipeline {
         return true
       })
       .map((a) => {
+        // Strip Windows-illegal characters from the path, but keep separators.
+        a.file = a.file.replace(/\\/g, '/').replace(/[<>:"|?*]/g, '').trim()
         if (!a.file.endsWith('.md')) {
-          a.file = `${a.file.replace(/[<>:"|?*]/g, '').replace(/\s+/g, '_')}.md`
+          a.file = `${a.file.replace(/\s+/g, '_')}.md`
         }
-        if (!a.file.includes('/') && !a.file.includes('\\')) {
-          const typeMatch = a.content.match(/type:\s*['"]?(personne|entreprise|domaine|projet|journal|note)['"]?/i)
-          if (typeMatch) {
-            const typeToDir: Record<string, string> = {
-              personne: 'Reseau', entreprise: 'Entreprises', domaine: 'Domaines',
-              projet: 'Projets', journal: 'Journal', note: 'Journal'
-            }
-            a.file = `${typeToDir[typeMatch[1].toLowerCase()] || 'Journal'}/${a.file}`
-          }
+
+        // Detect the type from the frontmatter the LLM emitted.
+        const typeMatch = a.content.match(/^\s*type:\s*['"]?(personne|entreprise|domaine|projet|journal|note|fiche)['"]?/im)
+        const detectedType = typeMatch?.[1].toLowerCase()
+
+        // Split file into directory + filename.
+        const segments = a.file.split('/').filter(Boolean)
+        const filename = segments.pop() || a.file
+        const rawDir = segments.join('/')
+        const firstSegment = segments[0]?.toLowerCase()
+        const aliasedDir = firstSegment ? DIR_ALIASES[firstSegment] : undefined
+
+        // Authoritative routing rules (in priority order):
+        //  1. Known type → forced canonical directory. Type wins over what the LLM
+        //     said about the path. Fixes "personne in Fiches/" and accent ghost dirs.
+        //  2. No known type, but the directory is a known alias → normalize the alias.
+        //  3. No directory at all → fall back to Journal/ (a sensible default for
+        //     freeform notes the LLM didn't classify).
+        //  4. Otherwise keep what the LLM produced (safe for arbitrary subpaths).
+        if (detectedType && detectedType !== 'fiche' && TYPE_TO_DIR[detectedType]) {
+          a.file = `${TYPE_TO_DIR[detectedType]}/${filename}`
+        } else if (aliasedDir) {
+          // Replace the first segment with its canonical form, keep any deeper subpath.
+          const rest = segments.slice(1).join('/')
+          a.file = rest ? `${aliasedDir}/${rest}/${filename}` : `${aliasedDir}/${filename}`
+        } else if (!rawDir) {
+          a.file = `Journal/${filename}`
+        } else if (!KNOWN_DIRS.includes(segments[0])) {
+          // Unknown top-level dir — re-route to Journal to keep the base tidy.
+          a.file = `Journal/${filename}`
         }
+
+        // Final guard: NEVER let the LLM write to Fiches/ from a normal action.
+        // Fiches/ is reserved for the saveBrief pipeline (the /brief command).
+        if (a.file.startsWith('Fiches/')) {
+          // Re-route based on detected type, or default to Journal.
+          const fallback = detectedType && TYPE_TO_DIR[detectedType] ? TYPE_TO_DIR[detectedType] : 'Journal'
+          a.file = `${fallback}/${filename}`
+          console.warn(`[AgentPipeline] Re-routed Fiches/ write to ${a.file}`)
+        }
+
         return a
       })
   }

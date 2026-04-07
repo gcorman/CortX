@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { User, Brain, FilePlus, FileEdit, Copy, Check, Eye } from 'lucide-react'
+import { User, Brain, FilePlus, FileEdit, Copy, Check, Eye, HelpCircle } from 'lucide-react'
 import { ActionButtons } from './ActionButtons'
 import { ActionPreview } from './ActionPreview'
 import { WikiText } from '../../utils/wikilink'
+import { useChatStore } from '../../stores/chatStore'
 import type { ChatMessage as ChatMessageType, AgentAction } from '../../../shared/types'
 
 interface ChatMessageProps {
@@ -21,6 +22,7 @@ export function ChatMessage({ message }: ChatMessageProps): React.JSX.Element {
   const isUser = message.role === 'user'
   const [copied, setCopied] = useState(false)
   const [previewAction, setPreviewAction] = useState<AgentAction | null>(null)
+  const answerClarification = useChatStore((s) => s.answerClarification)
 
   function handleCopy(): void {
     const text = isUser
@@ -70,6 +72,42 @@ export function ChatMessage({ message }: ChatMessageProps): React.JSX.Element {
         <p className="text-sm text-cortx-text-primary leading-relaxed whitespace-pre-wrap">
           <WikiText text={response?.summary || response?.response || message.content} />
         </p>
+
+        {/* Clarification — agent is asking the user to choose */}
+        {response?.clarification && (
+          <div className="rounded-card border border-cortx-accent/30 bg-cortx-accent/5 p-3 space-y-2">
+            <div className="flex items-start gap-2">
+              <HelpCircle size={14} className="text-cortx-accent flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-cortx-text-primary leading-snug">
+                {response.clarification.question}
+              </p>
+            </div>
+            <div className="flex flex-col gap-1.5 pl-1">
+              {response.clarification.options.map((opt, i) => {
+                const answered = response.clarification!.answeredIndex
+                const isChosen = answered === i
+                const isDisabled = answered !== undefined
+                return (
+                  <button
+                    key={i}
+                    onClick={() => answerClarification(message.id, i)}
+                    disabled={isDisabled}
+                    className={`text-left text-xs px-3 py-2 rounded-card border transition-all ${
+                      isChosen
+                        ? 'border-cortx-accent bg-cortx-accent/15 text-cortx-accent font-medium'
+                        : isDisabled
+                          ? 'border-cortx-border bg-cortx-bg/30 text-cortx-text-secondary/40 cursor-not-allowed'
+                          : 'border-cortx-border bg-cortx-bg/50 text-cortx-text-primary hover:border-cortx-accent hover:bg-cortx-accent/10 cursor-pointer'
+                    }`}
+                  >
+                    {isChosen && <Check size={11} className="inline mr-1.5" />}
+                    {opt}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Actions list — clickable for preview */}
         {response?.actions && response.actions.length > 0 && (
