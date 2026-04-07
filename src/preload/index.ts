@@ -31,7 +31,13 @@ const api: CortxAPI = {
     process: (input: string) => ipcRenderer.invoke('agent:process', input),
     execute: (actions: unknown[], summary: string) => ipcRenderer.invoke('agent:execute', actions, summary),
     preview: (action: unknown) => ipcRenderer.invoke('agent:preview', action),
-    undo: (commitHash: string) => ipcRenderer.invoke('agent:undo', commitHash)
+    undo: (commitHash: string) => ipcRenderer.invoke('agent:undo', commitHash),
+    saveManualEdit: (filePath: string, content: string) =>
+      ipcRenderer.invoke('agent:saveManualEdit', filePath, content),
+    saveBrief: (subject: string, body: string, kind?: string) =>
+      ipcRenderer.invoke('agent:saveBrief', subject, body, kind),
+    listFiches: () => ipcRenderer.invoke('agent:listFiches'),
+    deleteFiche: (filePath: string) => ipcRenderer.invoke('agent:deleteFiche', filePath)
   },
   app: {
     getBasePath: () => ipcRenderer.invoke('app:getBasePath'),

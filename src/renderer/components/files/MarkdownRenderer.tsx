@@ -1,6 +1,8 @@
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useUIStore } from '../../stores/uiStore'
+import { useFileStore } from '../../stores/fileStore'
+import { resolveWikilink, wikilinkLabel } from '../../utils/wikilink'
 
 interface MarkdownRendererProps {
   content: string
@@ -8,11 +10,14 @@ interface MarkdownRendererProps {
 
 export function MarkdownRenderer({ content }: MarkdownRendererProps): React.JSX.Element {
   const openFilePreview = useUIStore((s) => s.openFilePreview)
+  const addToast = useUIStore((s) => s.addToast)
+  const files = useFileStore((s) => s.files)
 
-  // Transform wikilinks [[Name]] to clickable elements
+  // Transform wikilinks [[Name]] → [Label](cortx://link/Name). The label strips
+  // underscores and `.md`, so the brackets are never shown to the user.
   const processedContent = content.replace(
     /\[\[([^\]]+)\]\]/g,
-    '[$1](cortx://link/$1)'
+    (_, name: string) => `[${wikilinkLabel(name)}](cortx://link/${encodeURIComponent(name)})`
   )
 
   return (
@@ -40,12 +45,19 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps): React.JSX.
           ),
           a: ({ href, children }) => {
             if (href?.startsWith('cortx://link/')) {
-              const name = href.replace('cortx://link/', '')
+              const name = decodeURIComponent(href.replace('cortx://link/', ''))
               return (
                 <button
-                  onClick={() => {
-                    // Try to find the file — simplified lookup
-                    openFilePreview(name)
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    const resolved = resolveWikilink(name, files)
+                    if (resolved) {
+                      openFilePreview(resolved)
+                    } else {
+                      addToast(`Fichier "${wikilinkLabel(name)}" introuvable`, 'info')
+                    }
                   }}
                   className="text-cortx-accent hover:text-cortx-accent-light underline decoration-cortx-accent/30 hover:decoration-cortx-accent cursor-pointer transition-colors"
                 >

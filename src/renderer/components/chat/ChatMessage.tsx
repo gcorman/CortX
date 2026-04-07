@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { User, Brain, FilePlus, FileEdit, Copy, Check, Eye } from 'lucide-react'
 import { ActionButtons } from './ActionButtons'
 import { ActionPreview } from './ActionPreview'
+import { WikiText } from '../../utils/wikilink'
 import type { ChatMessage as ChatMessageType, AgentAction } from '../../../shared/types'
 
 interface ChatMessageProps {
@@ -38,7 +39,7 @@ export function ChatMessage({ message }: ChatMessageProps): React.JSX.Element {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm text-cortx-text-primary leading-relaxed whitespace-pre-wrap">
-            {message.content}
+            <WikiText text={message.content} />
           </p>
           <div className="flex items-center gap-2 mt-1">
             <span className="text-2xs text-cortx-text-secondary/40">
@@ -66,8 +67,8 @@ export function ChatMessage({ message }: ChatMessageProps): React.JSX.Element {
       </div>
       <div className="flex-1 min-w-0 space-y-2">
         {/* Summary */}
-        <p className="text-sm text-cortx-text-primary leading-relaxed">
-          {response?.summary || response?.response || message.content}
+        <p className="text-sm text-cortx-text-primary leading-relaxed whitespace-pre-wrap">
+          <WikiText text={response?.summary || response?.response || message.content} />
         </p>
 
         {/* Actions list — clickable for preview */}
@@ -112,7 +113,7 @@ export function ChatMessage({ message }: ChatMessageProps): React.JSX.Element {
                 key={i}
                 className="text-xs text-cortx-accent-light bg-cortx-accent/5 border border-cortx-accent/20 rounded px-2.5 py-1.5"
               >
-                {suggestion}
+                <WikiText text={suggestion} />
               </div>
             ))}
           </div>
@@ -126,7 +127,7 @@ export function ChatMessage({ message }: ChatMessageProps): React.JSX.Element {
                 key={i}
                 className="text-xs text-cortx-warning bg-cortx-warning/5 border border-cortx-warning/20 rounded px-2.5 py-1.5"
               >
-                {conflict}
+                <WikiText text={conflict} />
               </div>
             ))}
           </div>

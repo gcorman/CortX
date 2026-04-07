@@ -1,4 +1,5 @@
 import { ActivityFeed } from '../agent/ActivityFeed'
+import { FichePanel } from '../agent/FichePanel'
 import { Activity, PanelRightClose } from 'lucide-react'
 import { useUIStore } from '../../stores/uiStore'
 
@@ -23,6 +24,9 @@ export function RightPanel(): React.JSX.Element {
           </button>
         </div>
       </div>
+
+      {/* Fiches archive — high-value long-form syntheses produced by the agent */}
+      <FichePanel />
 
       {/* Activity Feed */}
       <ActivityFeed />

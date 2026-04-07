@@ -14,4 +14,16 @@ export function registerAgentHandlers(agent: AgentPipeline): void {
   )
 
   ipcMain.handle('agent:undo', (_event, commitHash: string) => agent.undo(commitHash))
+
+  ipcMain.handle('agent:saveManualEdit', (_event, filePath: string, content: string) =>
+    agent.saveManualEdit(filePath, content)
+  )
+
+  ipcMain.handle('agent:saveBrief', (_event, subject: string, body: string, kind?: string) =>
+    agent.saveBrief(subject, body, kind)
+  )
+
+  ipcMain.handle('agent:listFiches', () => agent.listFiches())
+
+  ipcMain.handle('agent:deleteFiche', (_event, filePath: string) => agent.deleteFiche(filePath))
 }

@@ -91,6 +91,14 @@ export interface AgentResponse {
   commitHash?: string
 }
 
+export interface Fiche {
+  path: string
+  subject: string
+  kind: string
+  created: string
+  excerpt: string
+}
+
 export interface AgentLogEntry {
   id: number
   timestamp: string
@@ -161,6 +169,10 @@ export interface CortxAPI {
     execute(actions: AgentAction[], summary: string): Promise<string>
     preview(action: AgentAction): Promise<{ before: string; after: string }>
     undo(commitHash: string): Promise<void>
+    saveManualEdit(filePath: string, content: string): Promise<string>
+    saveBrief(subject: string, body: string, kind?: string): Promise<string>
+    listFiches(): Promise<Fiche[]>
+    deleteFiche(filePath: string): Promise<void>
   }
   app: {
     getBasePath(): Promise<string>

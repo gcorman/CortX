@@ -7,9 +7,19 @@ import { Toast } from '../common/Toast'
 import { SettingsDialog } from '../settings/SettingsDialog'
 import { PanelRightOpen } from 'lucide-react'
 import { useUIStore } from '../../stores/uiStore'
+import { useFileStore } from '../../stores/fileStore'
 
 export function AppShell(): React.JSX.Element {
   const { rightPanelVisible, toggleRightPanel } = useUIStore()
+  const loadFiles = useFileStore((s) => s.loadFiles)
+
+  // Keep the file list loaded so wikilink resolution works everywhere.
+  // Refresh periodically to catch files created by the agent.
+  useEffect(() => {
+    loadFiles()
+    const id = setInterval(loadFiles, 5000)
+    return () => clearInterval(id)
+  }, [loadFiles])
 
   // Panel widths in pixels
   const containerRef = useRef<HTMLDivElement>(null)

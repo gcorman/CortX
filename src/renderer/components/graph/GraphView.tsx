@@ -72,7 +72,7 @@ export function GraphView(): React.JSX.Element {
             id: `e${i}`,
             source: edge.source,
             target: edge.target,
-            label: edge.label
+            label: (edge.label || 'lien').replace(/_/g, ' ')
           }
         }))
       ],

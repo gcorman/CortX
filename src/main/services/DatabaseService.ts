@@ -1,6 +1,130 @@
 import Database from 'better-sqlite3'
 import type { CortxFile, Entity, Relation, GraphData, FileContent, AgentLogEntry } from '../../shared/types'
 
+/**
+ * Infer the entity type from a file path when frontmatter doesn't declare one.
+ * Maps the standard CortX directories to their entity types.
+ */
+function inferTypeFromPath(filePath: string): string {
+  const lower = filePath.toLowerCase().replace(/\\/g, '/')
+  if (/(^|\/)reseau\//.test(lower) || /(^|\/)r[ée]seau\//.test(lower)) return 'personne'
+  if (/(^|\/)entreprises?\//.test(lower)) return 'entreprise'
+  if (/(^|\/)domaines?\//.test(lower)) return 'domaine'
+  if (/(^|\/)projets?\//.test(lower)) return 'projet'
+  if (/(^|\/)journal\//.test(lower)) return 'journal'
+  return 'note'
+}
+
+/**
+ * Infer a semantic relation type from context when a wikilink is found.
+ *
+ * Priority:
+ *  1. Verb/keyword hints in the line or enclosing heading (strong signal)
+ *  2. Source-type → target-type default (structural fallback)
+ *  3. Generic "lié à"
+ *
+ * Labels are stored with underscores (`travaille_chez`) and the renderer
+ * converts them to spaces for display (`travaille chez`).
+ */
+function inferRelationType(
+  sourceType: string,
+  targetType: string,
+  line: string,
+  heading: string
+): string {
+  const text = (line + ' ' + heading).toLowerCase()
+
+  // --- Keyword-driven inference (works regardless of entity types) ---
+  if (/\ba[ _]?quitt|ancien(?:ne)?[ _]?(?:poste|emploi|employeur)|anciennement|ex[- ]employ/.test(text)) {
+    return 'ancien_employé'
+  }
+  if (/\bdirige|pilote|chef\s+de|responsable\s+de|head\s+of|lead\b/.test(text)) {
+    if (sourceType === 'personne' && targetType === 'projet') return 'dirige'
+    if (sourceType === 'personne' && targetType === 'entreprise') return 'dirige'
+  }
+  if (/\bconcurrent|rival|competitor/.test(text)) {
+    return 'concurrent'
+  }
+  if (/\bfiliale|appartient\s+au?\s+groupe|maison[ _-]m[èe]re|rachet[ée]e?\s+par|acquise?\s+par/.test(text)) {
+    return 'filiale_de'
+  }
+  if (/\bpartenaire|alliance|collabor|fournisseur|client\b/.test(text)) {
+    if (sourceType === 'entreprise' && targetType === 'entreprise') return 'partenaire_de'
+  }
+  if (/\bpr[ée]sent[ée](?:e)?\s+par/.test(text)) {
+    return 'présenté_par'
+  }
+  if (/\brencontr[ée]|d[ée]jeuner|entretien|meeting|r[ée]union/.test(text)) {
+    if (sourceType === 'personne' && targetType === 'personne') return 'connaît'
+    if (sourceType === 'journal') return 'évoque'
+  }
+  if (/\bconna[iî]t|conna[iî]ssance|contact\s+(?:de|chez)|ami|coll[èe]gue/.test(text)) {
+    if (sourceType === 'personne' && targetType === 'personne') return 'connaît'
+  }
+  if (/\bexpert(?:e)?|sp[ée]cialiste|comp[ée]tence|expertise|sp[ée]cialis[ée]/.test(text)) {
+    if (targetType === 'domaine') return 'expert_en'
+  }
+  if (/\bop[èe]re\s+dans|secteur|actif\s+dans|march[ée]\s+de|industrie/.test(text)) {
+    if (sourceType === 'entreprise' && targetType === 'domaine') return 'opère_dans'
+  }
+  if (/\bparticipe|contribue\s+[àa]|membre\s+de/.test(text)) {
+    if (targetType === 'projet') return 'participe_à'
+  }
+  if (/\bsous[- ]domaine|sous[- ]cat[eé]gorie|branche\s+de|fait\s+partie\s+de/.test(text)) {
+    if (sourceType === 'domaine' && targetType === 'domaine') return 'sous_domaine_de'
+  }
+  if (/\btravaille|employ[ée]|directeur|directrice|ing[eé]nieur|responsable|manager|ceo|cto|cfo|coo|fondateur|fondatrice|stagiaire|consultant|chez\s+\[?\[?/.test(text)) {
+    if (targetType === 'entreprise') return 'employé_chez'
+  }
+
+  // --- Structural defaults (no keyword hit) ---
+  const pair = `${sourceType}->${targetType}`
+  const defaults: Record<string, string> = {
+    'personne->entreprise': 'employé_chez',
+    'personne->personne': 'connaît',
+    'personne->domaine': 'expert_en',
+    'personne->projet': 'travaille_sur',
+    'personne->note': 'évoqué_dans',
+    'personne->journal': 'évoqué_dans',
+
+    'entreprise->entreprise': 'liée_à',
+    'entreprise->domaine': 'opère_dans',
+    'entreprise->projet': 'participe_à',
+    'entreprise->personne': 'emploie',
+    'entreprise->note': 'évoquée_dans',
+    'entreprise->journal': 'évoquée_dans',
+
+    'domaine->domaine': 'liée_à',
+    'domaine->entreprise': 'inclut',
+    'domaine->personne': 'inclut',
+    'domaine->projet': 'inclut',
+    'domaine->note': 'évoqué_dans',
+    'domaine->journal': 'évoqué_dans',
+
+    'projet->personne': 'implique',
+    'projet->entreprise': 'implique',
+    'projet->domaine': 'concerne',
+    'projet->projet': 'liée_à',
+    'projet->note': 'évoqué_dans',
+    'projet->journal': 'évoqué_dans',
+
+    'journal->personne': 'évoque',
+    'journal->entreprise': 'évoque',
+    'journal->domaine': 'évoque',
+    'journal->projet': 'évoque',
+    'journal->note': 'évoque',
+    'journal->journal': 'liée_à',
+
+    'note->personne': 'référence',
+    'note->entreprise': 'référence',
+    'note->domaine': 'référence',
+    'note->projet': 'référence',
+    'note->note': 'liée_à',
+    'note->journal': 'référence'
+  }
+  return defaults[pair] || 'liée_à'
+}
+
 export class DatabaseService {
   private db!: Database.Database
 
@@ -78,12 +202,12 @@ export class DatabaseService {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       fileContent.path,
-      (fm.type as string) || 'note',
+      (fm.type as string) || inferTypeFromPath(fileContent.path),
       title,
       tags,
       contentHash,
-      (fm.created as string) || new Date().toISOString().split('T')[0],
-      (fm.modified as string) || new Date().toISOString().split('T')[0],
+      fm.created instanceof Date ? fm.created.toISOString().split('T')[0] : (fm.created as string) || new Date().toISOString().split('T')[0],
+      fm.modified instanceof Date ? fm.modified.toISOString().split('T')[0] : (fm.modified as string) || new Date().toISOString().split('T')[0],
       (fm.status as string) || 'actif'
     )
 
@@ -101,7 +225,11 @@ export class DatabaseService {
 
   private indexEntitiesFromFile(fileContent: FileContent): void {
     const fm = fileContent.frontmatter
-    const type = (fm.type as string) || 'note'
+    // Type comes from frontmatter, but if missing we infer it from the
+    // directory the file lives in. Without this, every file with a missing
+    // `type:` ends up as a generic "note" and the relation classifier falls
+    // back to "mentionne" for everything.
+    const type = (fm.type as string) || inferTypeFromPath(fileContent.path)
     const title = (fm.title as string) || this.extractTitle(fileContent.body) || fileContent.path.split('/').pop()?.replace('.md', '') || ''
 
     // Index all known entity types as graph nodes
@@ -117,26 +245,48 @@ export class DatabaseService {
       }
     }
 
-    // Extract wikilinks and create relations
-    const wikilinks = fileContent.body.match(/\[\[([^\]]+)\]\]/g)
-    if (wikilinks) {
-      const sourceEntity = this.db.prepare('SELECT id FROM entities WHERE file_path = ?').get(fileContent.path) as { id: number } | undefined
-      if (sourceEntity) {
-        for (const link of wikilinks) {
-          const targetName = link.replace(/\[\[|\]\]/g, '').trim()
-          const targetEntity = this.db.prepare('SELECT id FROM entities WHERE LOWER(name) = LOWER(?)').get(targetName) as { id: number } | undefined
-          if (targetEntity && targetEntity.id !== sourceEntity.id) {
-            // Check if relation already exists
-            const existingRel = this.db.prepare(
-              'SELECT id FROM relations WHERE source_entity_id = ? AND target_entity_id = ?'
-            ).get(sourceEntity.id, targetEntity.id)
-            if (!existingRel) {
-              this.db.prepare(
-                'INSERT INTO relations (source_entity_id, target_entity_id, relation_type, source_file) VALUES (?, ?, ?, ?)'
-              ).run(sourceEntity.id, targetEntity.id, 'lien', fileContent.path)
-            }
-          }
-        }
+    // Clear previous relations coming from this file — they may be stale
+    // (a line was edited, a link removed, or the inferred type changed).
+    this.db.prepare('DELETE FROM relations WHERE source_file = ?').run(fileContent.path)
+
+    const sourceEntity = this.db.prepare('SELECT id, type FROM entities WHERE file_path = ?').get(fileContent.path) as { id: number; type: string } | undefined
+    if (!sourceEntity) return
+
+    // Walk the body line by line to keep the surrounding context for each link.
+    // This lets us infer the relation type from verbs like "travaille", "connait", etc.
+    const lines = fileContent.body.split('\n')
+    const seen = new Set<string>() // dedupe per (target, type) within this file
+
+    let currentHeading = ''
+    for (const rawLine of lines) {
+      const headingMatch = rawLine.match(/^(#{1,6})\s+(.+?)\s*$/)
+      if (headingMatch) {
+        currentHeading = headingMatch[2].trim()
+        continue
+      }
+
+      const linkMatches = [...rawLine.matchAll(/\[\[([^\]]+)\]\]/g)]
+      if (linkMatches.length === 0) continue
+
+      for (const m of linkMatches) {
+        const targetName = m[1].trim()
+        const targetEntity = this.db.prepare('SELECT id, type FROM entities WHERE LOWER(name) = LOWER(?)').get(targetName) as { id: number; type: string } | undefined
+        if (!targetEntity || targetEntity.id === sourceEntity.id) continue
+
+        const relType = inferRelationType(
+          sourceEntity.type,
+          targetEntity.type,
+          rawLine,
+          currentHeading
+        )
+
+        const key = `${targetEntity.id}:${relType}`
+        if (seen.has(key)) continue
+        seen.add(key)
+
+        this.db.prepare(
+          'INSERT INTO relations (source_entity_id, target_entity_id, relation_type, source_file) VALUES (?, ?, ?, ?)'
+        ).run(sourceEntity.id, targetEntity.id, relType, fileContent.path)
       }
     }
   }

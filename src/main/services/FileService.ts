@@ -9,6 +9,7 @@ const BASE_DIRS = [
   'Domaines',
   'Projets',
   'Journal',
+  'Fiches',
   '_Templates',
   '_System'
 ]
@@ -54,6 +55,13 @@ export class FileService {
 
   async fileExists(filePath: string): Promise<boolean> {
     return fs.existsSync(this.resolvePath(filePath))
+  }
+
+  async deleteFile(filePath: string): Promise<void> {
+    const fullPath = this.resolvePath(filePath)
+    if (fs.existsSync(fullPath)) {
+      fs.unlinkSync(fullPath)
+    }
   }
 
   async listMarkdownFiles(dir?: string): Promise<string[]> {
