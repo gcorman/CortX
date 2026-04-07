@@ -20,7 +20,8 @@
       "Bash(grep '\"\"tailwindcss\"\"' package.json)",
       "mcp__Claude_Preview__preview_start",
       "Bash(npx tsc:*)",
-      "Bash(curl -s http://localhost:5173/)"
+      "Bash(curl -s http://localhost:5173/)",
+      "Bash(npm list:*)"
     ]
   }
 }

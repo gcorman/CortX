@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
-import { X, Server, Cloud, Cpu, Check, AlertCircle, FolderOpen, Sun, Moon } from 'lucide-react'
+import { X, Server, Cloud, Cpu, Check, AlertCircle, FolderOpen, Sun, Moon, Trash2 } from 'lucide-react'
 import { useUIStore } from '../../stores/uiStore'
+import { useGraphStore } from '../../stores/graphStore'
+import { useFileStore } from '../../stores/fileStore'
+import { useAgentStore } from '../../stores/agentStore'
 import type { LLMConfig } from '../../../shared/types'
 
 type Provider = 'anthropic' | 'openai-compatible'
@@ -43,6 +46,9 @@ const LOCAL_MODEL_EXAMPLES = [
 
 export function SettingsDialog(): React.JSX.Element {
   const { settingsOpen, toggleSettings, addToast, theme, setTheme } = useUIStore()
+  const { loadGraph, clearGraph } = useGraphStore()
+  const loadFiles = useFileStore((s) => s.loadFiles)
+  const clearActions = useAgentStore((s) => s.clearActions)
   const [provider, setProvider] = useState<Provider>('anthropic')
   const [apiKey, setApiKey] = useState('')
   const [model, setModel] = useState('')
@@ -51,11 +57,14 @@ export function SettingsDialog(): React.JSX.Element {
   const [isSaving, setIsSaving] = useState(false)
   const [isTestingConnection, setIsTestingConnection] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [resetConfirm, setResetConfirm] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
 
   // Load current config on open
   useEffect(() => {
     if (settingsOpen) {
       loadConfig()
+      setResetConfirm(false)
     }
   }, [settingsOpen])
 
@@ -156,6 +165,27 @@ export function SettingsDialog(): React.JSX.Element {
     setBaseUrl(example.url)
     setModel(example.model)
     setConnectionStatus('idle')
+  }
+
+  async function handleReset(): Promise<void> {
+    if (!resetConfirm) {
+      setResetConfirm(true)
+      return
+    }
+    setIsResetting(true)
+    try {
+      await window.cortx.app.resetBase()
+      // Immediately clear in-memory state, then reload from the now-empty DB
+      clearActions()
+      clearGraph()
+      await Promise.all([loadFiles(), loadGraph()])
+      addToast('Base de connaissances reinitialise', 'success')
+      setResetConfirm(false)
+      toggleSettings()
+    } catch (err) {
+      addToast(`Erreur lors de la reinitialisation: ${err instanceof Error ? err.message : 'Erreur inconnue'}`, 'error')
+    }
+    setIsResetting(false)
   }
 
   if (!settingsOpen) return <></>
@@ -360,6 +390,58 @@ export function SettingsDialog(): React.JSX.Element {
                 Nom du modele charge sur le serveur (ex: mistral, llama3, gemma3, qwen3)
               </p>
             )}
+          </div>
+
+          {/* Danger zone */}
+          <div className="space-y-3 pt-1">
+            <div className="border-t border-cortx-border" />
+            <label className="text-xs font-medium text-cortx-error uppercase tracking-wider">
+              Zone dangereuse
+            </label>
+            <div className="rounded-card border border-cortx-error/30 bg-cortx-error/5 p-4 space-y-3">
+              <div>
+                <p className="text-sm font-medium text-cortx-text-primary">Reinitialiser la base de connaissances</p>
+                <p className="text-xs text-cortx-text-secondary mt-0.5">
+                  Supprime tous les fichiers Markdown, l'index SQLite et l'historique Git. Cette action est irreversible.
+                </p>
+              </div>
+              {resetConfirm ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-cortx-error">
+                    Etes-vous certain ? Toutes les donnees seront perdues.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleReset}
+                      disabled={isResetting}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-card text-xs font-medium bg-cortx-error text-white hover:bg-cortx-error/80 disabled:opacity-50 transition-colors cursor-pointer"
+                    >
+                      {isResetting ? (
+                        <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <Trash2 size={12} />
+                      )}
+                      {isResetting ? 'Reinitialisation...' : 'Confirmer la suppression'}
+                    </button>
+                    <button
+                      onClick={() => setResetConfirm(false)}
+                      disabled={isResetting}
+                      className="px-3 py-1.5 rounded-card text-xs text-cortx-text-secondary hover:text-cortx-text-primary hover:bg-cortx-elevated transition-colors cursor-pointer"
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={handleReset}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-card text-xs font-medium border border-cortx-error/50 text-cortx-error hover:bg-cortx-error/10 transition-colors cursor-pointer"
+                >
+                  <Trash2 size={12} />
+                  Reinitialiser
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Connection test */}

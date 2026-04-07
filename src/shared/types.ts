@@ -180,6 +180,7 @@ export interface CortxAPI {
     openDirectoryDialog(): Promise<string | null>
     getConfig(): Promise<AppConfig>
     setConfig(config: Partial<AppConfig>): Promise<void>
+    resetBase(): Promise<void>
   }
   on(channel: string, callback: (...args: unknown[]) => void): void
   off(channel: string, callback: (...args: unknown[]) => void): void

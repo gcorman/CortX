@@ -44,7 +44,8 @@ const api: CortxAPI = {
     setBasePath: (path: string) => ipcRenderer.invoke('app:setBasePath', path),
     openDirectoryDialog: () => ipcRenderer.invoke('app:openDirectoryDialog'),
     getConfig: () => ipcRenderer.invoke('app:getConfig'),
-    setConfig: (config) => ipcRenderer.invoke('app:setConfig', config)
+    setConfig: (config) => ipcRenderer.invoke('app:setConfig', config),
+    resetBase: () => ipcRenderer.invoke('app:resetBase')
   },
   on: (channel: string, callback: (...args: unknown[]) => void) => {
     ipcRenderer.on(channel, (_event, ...args) => callback(...args))

@@ -166,6 +166,43 @@ function registerAppHandlers(): void {
     llm: { ...config.llm, apiKey: config.llm.apiKey ? '***' : '' }
   }))
 
+  ipcMain.handle('app:resetBase', async () => {
+    const basePath = config.basePath
+    const dbPath = join(basePath, '_System', 'cortx.db')
+
+    // Close DB before wiping it
+    try { dbService.close() } catch { /* ignore */ }
+
+    // Delete everything inside basePath except _System (we'll clear the DB files separately)
+    if (fs.existsSync(basePath)) {
+      for (const entry of fs.readdirSync(basePath)) {
+        if (entry === '_System') continue
+        const fullPath = join(basePath, entry)
+        try {
+          fs.rmSync(fullPath, { recursive: true, force: true })
+        } catch (err) {
+          console.error('[Reset] Failed to remove', fullPath, err)
+        }
+      }
+    }
+
+    // Remove the SQLite DB files inside _System
+    for (const p of [dbPath, dbPath + '-wal', dbPath + '-shm']) {
+      try { if (fs.existsSync(p)) fs.unlinkSync(p) } catch { /* ignore */ }
+    }
+
+    // Reinitialise all services (IPC handlers use getters so they pick up new instances)
+    fileService = new FileService(basePath)
+    await fileService.ensureBaseStructure()
+    dbService = new DatabaseService(dbPath)
+    dbService.initialize()
+    gitService = new GitService(basePath)
+    await gitService.initialize()
+    agentPipeline = new AgentPipeline(fileService, dbService, gitService, llmService, basePath)
+
+    console.log('[Reset] Base de connaissances réinitialisée')
+  })
+
   ipcMain.handle('app:setConfig', (_event, partial: Partial<AppConfig>) => {
     if (partial.llm) {
       // If apiKey is '***' (masked), keep the existing one
@@ -186,11 +223,11 @@ app.whenReady().then(async () => {
   await initializeServices()
 
   registerAppHandlers()
-  registerDatabaseHandlers(dbService)
-  registerFileHandlers(fileService)
+  registerDatabaseHandlers(() => dbService)
+  registerFileHandlers(() => fileService)
   registerLLMHandlers(llmService)
-  registerGitHandlers(gitService)
-  registerAgentHandlers(agentPipeline)
+  registerGitHandlers(() => gitService)
+  registerAgentHandlers(() => agentPipeline)
 
   createWindow()
 

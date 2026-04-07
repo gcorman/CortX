@@ -11,6 +11,7 @@ interface GraphState {
   loadGraph: () => Promise<void>
   setSelectedNode: (id: string | null) => void
   toggleFilterType: (type: string) => void
+  clearGraph: () => void
 }
 
 export const useGraphStore = create<GraphState>((set, get) => ({
@@ -40,6 +41,8 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   },
 
   setSelectedNode: (id) => set({ selectedNodeId: id }),
+
+  clearGraph: () => set({ nodes: [], edges: [], selectedNodeId: null }),
 
   toggleFilterType: (type) =>
     set((s) => {

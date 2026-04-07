@@ -65,9 +65,11 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
+    "@types/cytoscape": "^3.21.9",
     "better-sqlite3": "^12.8.0",
     "cytoscape": "^3.33.1",
     "cytoscape-cose-bilkent": "^4.1.0",
+    "cytoscape-fcose": "^2.2.0",
     "gray-matter": "^4.0.3",
     "isomorphic-git": "^1.37.4",
     "lucide-react": "^1.7.0",

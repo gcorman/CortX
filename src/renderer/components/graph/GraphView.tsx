@@ -1,17 +1,26 @@
 import { useEffect, useRef } from 'react'
 import cytoscape from 'cytoscape'
 import coseBilkent from 'cytoscape-cose-bilkent'
+import fcose from 'cytoscape-fcose'
 import { useGraphStore } from '../../stores/graphStore'
 import { useUIStore } from '../../stores/uiStore'
 import { Network, LayoutGrid } from 'lucide-react'
 
+// Register extensions — fcose takes priority over cose-bilkent for all layouts
+try { cytoscape.use(fcose as unknown as cytoscape.Ext) } catch { /* already registered */ }
 try { cytoscape.use(coseBilkent) } catch { /* already registered */ }
 
-// Resolved from CSS variables at runtime so they follow the active theme
+// CSS variables store "R G B" (space-separated) for Tailwind opacity support.
+// Cytoscape expects "rgb(R, G, B)" — convert accordingly.
 function getCssColor(varName: string): string {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(varName).trim()
-  // raw is "R G B" → convert to rgb()
-  return raw ? `rgb(${raw})` : '#94A3B8'
+  if (!raw) return '#94A3B8'
+  // Already a hex or full rgb() value — return as-is
+  if (raw.startsWith('#') || raw.startsWith('rgb')) return raw
+  // Space-separated "R G B" → "rgb(R, G, B)"
+  const parts = raw.split(/\s+/)
+  if (parts.length === 3) return `rgb(${parts.join(', ')})`
+  return raw
 }
 
 const NODE_COLORS: Record<string, string> = {
@@ -25,111 +34,176 @@ const NODE_COLORS: Record<string, string> = {
 }
 
 function buildCyStyle(): cytoscape.StylesheetStyle[] {
+  const bg = getCssColor('--cortx-bg')
+  const border = getCssColor('--cortx-border')
+  const textSec = getCssColor('--cortx-text-secondary')
+
   return [
     {
       selector: 'node',
       style: {
-        label: 'data(label)',
+        // Shape: crisp circle with colored fill + subtle border
+        shape: 'ellipse',
+        width: 20,
+        height: 20,
         'background-color': (ele: cytoscape.NodeSingular) =>
           NODE_COLORS[ele.data('type') as string] || '#94A3B8',
-        color: '#F8FAFC',
-        'font-size': '11px',
-        'font-family': 'Inter, sans-serif',
-        'font-weight': 500,
+        'background-opacity': 0.9,
+        'border-width': 1.5,
+        'border-color': 'white',
+        'border-opacity': 0.18,
+
+        // Label below the node
+        label: 'data(label)',
         'text-valign': 'bottom',
-        'text-margin-y': 6,
-        'text-background-color': getCssColor('--cortx-bg'),
-        'text-background-opacity': 0.7,
-        'text-background-padding': 2,
-        'text-background-shape': 'round-rectangle',
-        width: 28,
-        height: 28,
-        'border-width': 1,
-        'border-color': getCssColor('--cortx-border'),
+        'text-halign': 'center',
+        'text-margin-y': 4,
+        'font-size': '9px',
+        'font-family': 'Inter, system-ui, sans-serif',
+        'font-weight': '500',
+        color: '#F8FAFC',
         'text-outline-width': 0,
-        'shadow-blur': 6,
-        'shadow-opacity': 0.2,
-        'shadow-color': getCssColor('--cortx-border'),
-        'transition-property': 'opacity, border-width, border-color, width, height',
-        'transition-duration': 200
+        'text-background-color': bg,
+        'text-background-opacity': 0.72,
+        'text-background-padding': '2px',
+        'text-background-shape': 'round-rectangle',
+        'text-max-width': '90px',
+        'text-overflow-wrap': 'ellipsis',
+
+        // Smooth transitions for highlight states
+        'transition-property': 'opacity, width, height, border-width, border-color, border-opacity, background-opacity',
+        'transition-duration': 180
       } as unknown as cytoscape.Css.Node
     },
     {
       selector: 'edge',
       style: {
-        width: 1.2,
-        'line-color': getCssColor('--cortx-border'),
-        'target-arrow-color': getCssColor('--cortx-border'),
+        width: 1,
+        'line-color': border,
+        'target-arrow-color': border,
         'target-arrow-shape': 'triangle',
+        'arrow-scale': 0.7,
         'curve-style': 'bezier',
-        'line-cap': 'round',
-        'line-join': 'round',
         label: 'data(label)',
-        'font-size': '8px',
-        'font-weight': 500,
-        color: getCssColor('--cortx-text-primary'),
+        'font-size': '7.5px',
+        'font-family': 'Inter, system-ui, sans-serif',
+        color: textSec,
         'text-rotation': 'autorotate',
-        'text-outline-width': 0,
-        'text-background-opacity': 0,
-        'text-background-padding': 0,
-        'text-border-width': 0,
-        'text-border-opacity': 0,
-        'transition-property': 'opacity, line-color',
-        'transition-duration': 200
+        'text-background-color': bg,
+        'text-background-opacity': 0.65,
+        'text-background-padding': '1px',
+        'text-background-shape': 'round-rectangle',
+        opacity: 0.7,
+        'transition-property': 'opacity, line-color, width',
+        'transition-duration': 180
       } as unknown as cytoscape.Css.Edge
     },
-    // --- Selection highlight states ---
+
+    // --- Dimmed (non-selected neighborhood) ---
     {
       selector: 'node.dimmed',
-      style: { opacity: 0.1 } as cytoscape.Css.Node
+      style: { opacity: 0.08 } as cytoscape.Css.Node
     },
     {
       selector: 'edge.dimmed',
-      style: { opacity: 0.04 } as cytoscape.Css.Edge
+      style: { opacity: 0.03 } as cytoscape.Css.Edge
     },
+
+    // --- Neighbor highlight ---
     {
       selector: 'node.highlighted',
       style: {
         opacity: 1,
+        width: 22,
+        height: 22,
         'border-color': '#14B8A6',
-        'border-width': 3,
-        width: 32,
-        height: 32
+        'border-opacity': 0.9,
+        'border-width': 2,
+        'background-opacity': 1
       } as unknown as cytoscape.Css.Node
     },
+
+    // --- Selected node (origin of highlight) ---
     {
       selector: 'node.selected-node',
       style: {
         opacity: 1,
+        width: 26,
+        height: 26,
         'border-color': '#F97316',
-        'border-width': 4,
-        width: 36,
-        height: 36
+        'border-opacity': 1,
+        'border-width': 2.5,
+        'background-opacity': 1
       } as unknown as cytoscape.Css.Node
     },
+
+    // --- Highlighted edge ---
     {
       selector: 'edge.highlighted',
       style: {
         opacity: 1,
         'line-color': '#0D9488',
         'target-arrow-color': '#0D9488',
-        width: 2.5
+        width: 2
       } as unknown as cytoscape.Css.Edge
     }
   ]
 }
 
-function createLayoutOptions(overrides: Record<string, unknown>): cytoscape.LayoutOptions {
+// Initial layout: fcose with high quality — better than cose-bilkent for first render
+function makeInitialLayout(): cytoscape.LayoutOptions {
   return {
-    name: 'cose-bilkent',
+    name: 'fcose',
+    animate: false,
+    randomize: true,
+    quality: 'proof',
+    fit: true,
+    padding: 48,
     nodeDimensionsIncludeLabels: true,
-    idealEdgeLength: 130,
+    idealEdgeLength: 120,
     nodeRepulsion: 8000,
     edgeElasticity: 0.45,
-    gravity: 0.4,
+    gravity: 0.25,
     numIter: 2500,
-    tile: true,
-    ...overrides
+    tilingPaddingVertical: 10,
+    tilingPaddingHorizontal: 10
+  } as unknown as cytoscape.LayoutOptions
+}
+
+// Live physics during drag: fcose supports fixedNodeConstraint
+function makeLiveLayout(fixedId: string, fixedPos: { x: number; y: number }): cytoscape.LayoutOptions {
+  return {
+    name: 'fcose',
+    animate: 'during',
+    animationDuration: 80,
+    animationEasing: 'linear',
+    randomize: false,
+    fit: false,
+    quality: 'draft',
+    numIter: 60,
+    idealEdgeLength: 110,
+    nodeRepulsion: 4500,
+    edgeElasticity: 0.4,
+    gravity: 0.2,
+    fixedNodeConstraint: [{ nodeId: fixedId, position: fixedPos }]
+  } as unknown as cytoscape.LayoutOptions
+}
+
+// Settle after drag release
+function makeSettleLayout(): cytoscape.LayoutOptions {
+  return {
+    name: 'fcose',
+    animate: true,
+    animationDuration: 350,
+    animationEasing: 'ease-out',
+    randomize: false,
+    fit: false,
+    quality: 'proof',
+    numIter: 800,
+    idealEdgeLength: 110,
+    nodeRepulsion: 6000,
+    edgeElasticity: 0.4,
+    gravity: 0.3
   } as unknown as cytoscape.LayoutOptions
 }
 
@@ -137,26 +211,34 @@ export function GraphView(): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const cyRef = useRef<cytoscape.Core | null>(null)
   const layoutRanOnce = useRef(false)
+  const containerReadyRef = useRef(false)  // true once the container has real dimensions
   const selectedNodeRef = useRef<string | null>(null)
-  const dragLayoutRef = useRef<cytoscape.Layouts | null>(null)
-  const dragRafRef = useRef<number | null>(null)
-  const isDraggingRef = useRef(false)
+  const liveLayoutRef = useRef<cytoscape.Layouts | null>(null)
+  const rafRef = useRef<number | null>(null)
   const draggedNodeRef = useRef<cytoscape.NodeSingular | null>(null)
+  // Snapshot of last data so we can replay it once the container is ready
+  const pendingDataRef = useRef<{ nodes: typeof nodes; edges: typeof edges; filterTypes: Set<string> } | null>(null)
 
   const { nodes, edges, isLoading, loadGraph, filterTypes, toggleFilterType } = useGraphStore()
   const openFilePreview = useUIStore((s) => s.openFilePreview)
-  // Keep openFilePreview in a ref so the cy event handler is never stale
+  const theme = useUIStore((s) => s.theme)
   const openFilePreviewRef = useRef(openFilePreview)
   useEffect(() => { openFilePreviewRef.current = openFilePreview }, [openFilePreview])
 
-  // Poll
+  // Rebuild Cytoscape style when theme changes (colors come from CSS variables)
+  useEffect(() => {
+    const cy = cyRef.current
+    if (!cy) return
+    cy.style(buildCyStyle())
+  }, [theme])
+
   useEffect(() => {
     loadGraph()
     const id = setInterval(loadGraph, 5000)
     return () => clearInterval(id)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Create cy instance once — event handlers live here
+  // Create cy instance once — event handlers wired here
   useEffect(() => {
     if (!containerRef.current) return
 
@@ -164,183 +246,167 @@ export function GraphView(): React.JSX.Element {
       container: containerRef.current,
       elements: [],
       style: buildCyStyle(),
-      pixelRatio: Math.max(1, window.devicePixelRatio || 1),
-      minZoom: 0.2,
-      maxZoom: 4,
-      wheelSensitivity: 0.3
+      pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+      minZoom: 0.15,
+      maxZoom: 5,
+      wheelSensitivity: 0.25
     })
+
+    function stopLive(): void {
+      if (liveLayoutRef.current) {
+        liveLayoutRef.current.stop()
+        liveLayoutRef.current = null
+      }
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
+      }
+    }
 
     function clearSelection(): void {
       cy.elements().removeClass('dimmed highlighted selected-node')
       selectedNodeRef.current = null
     }
 
-    // Tap background → clear selection
     cy.on('tap', (e) => {
-      if ((e.target as cytoscape.Core) === cy) clearSelection()
+      if ((e.target as unknown) === cy) clearSelection()
     })
 
-    // Single tap on node → highlight neighbors, dim rest
     cy.on('tap', 'node', (evt) => {
       const node = evt.target as cytoscape.NodeSingular
-      const nodeId = node.id() as string
-
-      if (selectedNodeRef.current === nodeId) {
-        // Second tap on same node → clear
-        clearSelection()
-        return
-      }
-
-      selectedNodeRef.current = nodeId
-
-      // Dim everything first
+      const id = node.id() as string
+      if (selectedNodeRef.current === id) { clearSelection(); return }
+      selectedNodeRef.current = id
       cy.elements().addClass('dimmed').removeClass('highlighted selected-node')
-
-      // Highlight selected node
       node.removeClass('dimmed').addClass('selected-node')
-
-      // Highlight direct neighbors + connecting edges
-      const neighbors = node.neighborhood()
-      neighbors.nodes().removeClass('dimmed').addClass('highlighted')
-      neighbors.edges().removeClass('dimmed').addClass('highlighted')
+      const nb = node.neighborhood()
+      nb.nodes().removeClass('dimmed').addClass('highlighted')
+      nb.edges().removeClass('dimmed').addClass('highlighted')
       node.connectedEdges().removeClass('dimmed').addClass('highlighted')
     })
 
-    // Double tap → open file preview
     cy.on('dbltap', 'node', (evt) => {
-      const filePath = (evt.target as cytoscape.NodeSingular).data('filePath') as string
-      if (filePath) openFilePreviewRef.current(filePath)
+      const fp = (evt.target as cytoscape.NodeSingular).data('filePath') as string
+      if (fp) openFilePreviewRef.current(fp)
     })
 
-    function runLiveLayout(draggedNode: cytoscape.NodeSingular): void {
-      if (dragLayoutRef.current) dragLayoutRef.current.stop()
-      dragLayoutRef.current = cy.layout(createLayoutOptions({
-        animate: 'during',
-        animationDuration: 250,
-        animationEasing: 'ease-out' as cytoscape.Css.TransitionTimingFunction,
-        randomize: false,
-        fit: false,
-        quality: 'draft',
-        refresh: 30,
-        numIter: 1200,
-        initialEnergyOnIncremental: 0.8,
-        fixedNodeConstraint: [
-          { nodeId: draggedNode.id(), position: draggedNode.position() }
-        ]
-      }))
-      dragLayoutRef.current.run()
-    }
+    // ── Live physics drag ──────────────────────────────────────────────────
 
-    function stopLiveLayout(): void {
-      if (dragLayoutRef.current) {
-        dragLayoutRef.current.stop()
-        dragLayoutRef.current = null
-      }
-    }
-
-    // Live reflow while dragging nodes
     cy.on('grab', 'node', (evt) => {
-      isDraggingRef.current = true
-      const node = evt.target as cytoscape.NodeSingular
-      draggedNodeRef.current = node
-      runLiveLayout(node)
+      stopLive()
+      draggedNodeRef.current = evt.target as cytoscape.NodeSingular
     })
 
     cy.on('drag', 'node', () => {
-      if (!isDraggingRef.current) return
       const node = draggedNodeRef.current
       if (!node) return
-      if (dragRafRef.current !== null) return
-      dragRafRef.current = requestAnimationFrame(() => {
-        dragRafRef.current = null
-        runLiveLayout(node)
+      if (rafRef.current !== null) return // already scheduled
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null
+        if (!draggedNodeRef.current) return
+        stopLive()
+        const pos = draggedNodeRef.current.position()
+        liveLayoutRef.current = cy.layout(
+          makeLiveLayout(draggedNodeRef.current.id() as string, { x: pos.x, y: pos.y })
+        )
+        liveLayoutRef.current.run()
       })
     })
 
-    cy.on('dragfree', 'node', (evt) => {
-      isDraggingRef.current = false
+    cy.on('dragfree', 'node', () => {
+      stopLive()
       draggedNodeRef.current = null
-      stopLiveLayout()
-      const settleLayout = cy.layout(createLayoutOptions({
-        animate: 'end',
-        animationDuration: 300,
-        animationEasing: 'ease-out' as cytoscape.Css.TransitionTimingFunction,
-        randomize: false,
-        fit: false
-      }))
-      settleLayout.run()
+      // Let physics settle smoothly after release
+      const settle = cy.layout(makeSettleLayout())
+      settle.run()
     })
 
-    cyRef.current = cy
+    // ResizeObserver: detect when the container gets real dimensions and
+    // replay any data that arrived before the container was visible.
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (!entry) return
+      const { width, height } = entry.contentRect
+      if (width > 10 && height > 10) {
+        cy.resize() // tell Cytoscape the container changed size
+        if (!containerReadyRef.current) {
+          containerReadyRef.current = true
+          // If data arrived before the container was ready, apply it now
+          const pending = pendingDataRef.current
+          if (pending) {
+            pendingDataRef.current = null
+            applyData(cy, pending.nodes, pending.edges, pending.filterTypes)
+          }
+        }
+      }
+    })
+    if (containerRef.current) ro.observe(containerRef.current)
 
+    cyRef.current = cy
     return () => {
-      if (dragRafRef.current !== null) cancelAnimationFrame(dragRafRef.current)
-      stopLiveLayout()
+      ro.disconnect()
+      stopLive()
       cy.destroy()
       cyRef.current = null
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Update elements + re-run animated layout when data or filters change
+  // Extracted so it can be called both from the data effect and from the ResizeObserver
+  function applyData(
+    cy: cytoscape.Core,
+    dataNodes: typeof nodes,
+    dataEdges: typeof edges,
+    dataFilterTypes: Set<string>
+  ): void {
+    const filteredNodes = dataFilterTypes.size > 0
+      ? dataNodes.filter((n) => dataFilterTypes.has(n.type))
+      : dataNodes
+    const filteredNodeIds = new Set(filteredNodes.map((n) => n.id))
+    const filteredEdges = dataEdges.filter(
+      (e) => filteredNodeIds.has(e.source) && filteredNodeIds.has(e.target)
+    )
+
+    selectedNodeRef.current = null
+    cy.elements().remove()
+    if (filteredNodes.length === 0) return
+
+    cy.add([
+      ...filteredNodes.map((n) => ({
+        data: { id: n.id, label: n.label, type: n.type, filePath: n.filePath }
+      })),
+      ...filteredEdges.map((e, i) => ({
+        data: {
+          id: `e${i}`,
+          source: e.source,
+          target: e.target,
+          label: (e.label || 'lien').replace(/_/g, ' ')
+        }
+      }))
+    ])
+
+    const isFirst = !layoutRanOnce.current
+    const layout = cy.layout(
+      isFirst
+        ? makeInitialLayout()
+        : ({ ...makeSettleLayout(), animationDuration: 500 } as unknown as cytoscape.LayoutOptions)
+    )
+    layout.run()
+    layoutRanOnce.current = true
+  }
+
+  // Sync elements + relayout when data / filters change
   useEffect(() => {
     const cy = cyRef.current
     if (!cy) return
 
-    const filteredNodes = filterTypes.size > 0
-      ? nodes.filter((n) => filterTypes.has(n.type))
-      : nodes
-    const filteredNodeIds = new Set(filteredNodes.map((n) => n.id))
-    const filteredEdges = edges.filter(
-      (e) => filteredNodeIds.has(e.source) && filteredNodeIds.has(e.target)
-    )
-
-    // Clear selection state on data change
-    selectedNodeRef.current = null
-
-    // Replace elements
-    cy.elements().remove()
-
-    if (filteredNodes.length === 0) return
-
-    const elements: cytoscape.ElementDefinition[] = [
-      ...filteredNodes.map((node) => ({
-        data: {
-          id: node.id,
-          label: node.label,
-          type: node.type,
-          filePath: node.filePath
-        }
-      })),
-      ...filteredEdges.map((edge, i) => ({
-        data: {
-          id: `e${i}`,
-          source: edge.source,
-          target: edge.target,
-          label: (edge.label || 'lien').replace(/_/g, ' ')
-        }
-      }))
-    ]
-
-    cy.add(elements)
-
-    // First run: randomize positions, no animation (elements have no coords yet)
-    // Subsequent runs: keep current positions as start, animate the relayout
-    const isFirst = !layoutRanOnce.current
-    const layout = cy.layout(createLayoutOptions({
-      animate: isFirst ? false : 'end',
-      animationDuration: 500,
-      animationEasing: 'ease-out' as cytoscape.Css.TransitionTimingFunction,
-      randomize: isFirst
-    }))
-
-    layout.run()
-    layoutRanOnce.current = true
-
-    // Fit to view after first layout (give layout time to finish)
-    if (isFirst) {
-      setTimeout(() => cy.fit(undefined, 40), 50)
+    if (!containerReadyRef.current) {
+      // Container has no size yet — store data and wait for ResizeObserver
+      pendingDataRef.current = { nodes, edges, filterTypes }
+      return
     }
-  }, [nodes, edges, filterTypes])
+
+    applyData(cy, nodes, edges, filterTypes)
+  }, [nodes, edges, filterTypes]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (isLoading && nodes.length === 0) {
     return (
@@ -358,7 +424,7 @@ export function GraphView(): React.JSX.Element {
         </div>
         <h3 className="text-sm font-medium text-cortx-text-secondary mb-1">Graphe vide</h3>
         <p className="text-xs text-cortx-text-secondary/60 max-w-[280px]">
-          Commence par capturer des informations via la conversation. Les entités et leurs connexions apparaîtront ici.
+          Commence par capturer des informations via la conversation.
         </p>
       </div>
     )
@@ -367,30 +433,26 @@ export function GraphView(): React.JSX.Element {
   return (
     <div className="flex-1 relative w-full h-full">
       <div ref={containerRef} className="absolute inset-0 w-full h-full" />
-
-      {/* Filter + legend bar */}
       <GraphFilterBar filterTypes={filterTypes} toggleFilterType={toggleFilterType} cyRef={cyRef} />
-
-      {/* Hint when a node is selected */}
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none">
-        <p className="text-2xs text-cortx-text-secondary/50 bg-cortx-surface/80 backdrop-blur-sm px-2 py-1 rounded-full border border-cortx-border/40">
-          Clic = sélectionner · Double-clic = ouvrir
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none select-none">
+        <p className="text-2xs text-cortx-text-secondary/40 bg-cortx-surface/70 backdrop-blur-sm px-2.5 py-1 rounded-full border border-cortx-border/30">
+          Clic = sélectionner · Double-clic = ouvrir · Glisser = déplacer
         </p>
       </div>
     </div>
   )
 }
 
-// --- Filter + legend bar ---
+// ── Filter bar ──────────────────────────────────────────────────────────────
 
 const LEGEND_ITEMS = [
-  { type: 'personne',   label: 'Personne',    color: NODE_COLORS.personne },
-  { type: 'entreprise', label: 'Entreprise',  color: NODE_COLORS.entreprise },
-  { type: 'domaine',    label: 'Domaine',     color: NODE_COLORS.domaine },
-  { type: 'projet',     label: 'Projet',      color: NODE_COLORS.projet },
-  { type: 'note',       label: 'Note',        color: NODE_COLORS.note },
-  { type: 'journal',    label: 'Journal',     color: NODE_COLORS.journal },
-  { type: 'fiche',      label: 'Fiche',       color: NODE_COLORS.fiche }
+  { type: 'personne',   label: 'Personne',   color: NODE_COLORS.personne },
+  { type: 'entreprise', label: 'Entreprise', color: NODE_COLORS.entreprise },
+  { type: 'domaine',    label: 'Domaine',    color: NODE_COLORS.domaine },
+  { type: 'projet',     label: 'Projet',     color: NODE_COLORS.projet },
+  { type: 'note',       label: 'Note',       color: NODE_COLORS.note },
+  { type: 'journal',    label: 'Journal',    color: NODE_COLORS.journal },
+  { type: 'fiche',      label: 'Fiche',      color: NODE_COLORS.fiche }
 ]
 
 function GraphFilterBar({
@@ -404,60 +466,43 @@ function GraphFilterBar({
 }): React.JSX.Element {
   const allVisible = filterTypes.size === 0
 
-  function resetFilters(): void {
-    // Clear all active filters (show everything)
-    filterTypes.forEach((t) => toggleFilterType(t))
-  }
-
-  function fitGraph(): void {
-    cyRef.current?.fit(undefined, 40)
-  }
-
   return (
     <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2 bg-cortx-surface/95 backdrop-blur-sm rounded-card px-3 py-2 border border-cortx-border shadow-lg flex-wrap">
-      {/* Filter label */}
-      <span className="text-2xs text-cortx-text-secondary/50 uppercase tracking-wider mr-1">
+      <span className="text-2xs text-cortx-text-secondary/50 uppercase tracking-wider mr-1 flex-shrink-0">
         Filtrer
       </span>
-
       {LEGEND_ITEMS.map((item) => {
-        const isActive = allVisible || filterTypes.has(item.type)
+        const active = allVisible || filterTypes.has(item.type)
         return (
           <button
             key={item.type}
             onClick={() => toggleFilterType(item.type)}
-            title={isActive ? `Masquer ${item.label}` : `Afficher ${item.label}`}
-            className={`flex items-center gap-1.5 text-2xs px-2 py-0.5 rounded-full border cursor-pointer transition-all ${
-              isActive
-                ? 'border-transparent text-cortx-text-primary opacity-100'
-                : 'border-cortx-border text-cortx-text-secondary/40 opacity-40'
+            className={`flex items-center gap-1.5 text-2xs px-2 py-0.5 rounded-full border cursor-pointer transition-all duration-150 ${
+              active
+                ? 'border-transparent text-cortx-text-primary'
+                : 'border-cortx-border text-cortx-text-secondary/40 opacity-35'
             }`}
-            style={{ backgroundColor: isActive ? item.color + '22' : undefined }}
+            style={{ backgroundColor: active ? item.color + '20' : undefined }}
           >
-            <span
-              className="w-2 h-2 rounded-full flex-shrink-0"
-              style={{ backgroundColor: isActive ? item.color : undefined, opacity: isActive ? 1 : 0.3 }}
-            />
+            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+              style={{ backgroundColor: active ? item.color : '#64748B' }} />
             {item.label}
           </button>
         )
       })}
-
-      <div className="ml-auto flex items-center gap-1">
-        {/* Reset filters button — only shown when filters are active */}
+      <div className="ml-auto flex items-center gap-1 flex-shrink-0">
         {filterTypes.size > 0 && (
           <button
-            onClick={resetFilters}
+            onClick={() => filterTypes.forEach((t) => toggleFilterType(t))}
             className="text-2xs px-2 py-0.5 rounded border border-cortx-accent/40 text-cortx-accent hover:bg-cortx-accent/10 cursor-pointer transition-colors"
           >
             Tout afficher
           </button>
         )}
-        {/* Fit graph */}
         <button
-          onClick={fitGraph}
-          title="Recentrer le graphe"
-          className="p-1 rounded hover:bg-cortx-elevated text-cortx-text-secondary/60 hover:text-cortx-text-primary cursor-pointer transition-colors"
+          onClick={() => cyRef.current?.fit(undefined, 40)}
+          title="Recentrer"
+          className="p-1 rounded hover:bg-cortx-elevated text-cortx-text-secondary/50 hover:text-cortx-text-primary cursor-pointer transition-colors"
         >
           <LayoutGrid size={12} />
         </button>
