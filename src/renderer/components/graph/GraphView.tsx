@@ -33,16 +33,23 @@ function buildCyStyle(): cytoscape.StylesheetStyle[] {
         'background-color': (ele: cytoscape.NodeSingular) =>
           NODE_COLORS[ele.data('type') as string] || '#94A3B8',
         color: '#F8FAFC',
-        'font-size': '10px',
+        'font-size': '11px',
         'font-family': 'Inter, sans-serif',
+        'font-weight': 500,
         'text-valign': 'bottom',
         'text-margin-y': 6,
+        'text-background-color': getCssColor('--cortx-bg'),
+        'text-background-opacity': 0.7,
+        'text-background-padding': 2,
+        'text-background-shape': 'round-rectangle',
         width: 28,
         height: 28,
-        'border-width': 2,
-        'border-color': getCssColor('--cortx-surface'),
-        'text-outline-width': 2,
-        'text-outline-color': getCssColor('--cortx-bg'),
+        'border-width': 1,
+        'border-color': getCssColor('--cortx-border'),
+        'text-outline-width': 0,
+        'shadow-blur': 6,
+        'shadow-opacity': 0.2,
+        'shadow-color': getCssColor('--cortx-border'),
         'transition-property': 'opacity, border-width, border-color, width, height',
         'transition-duration': 200
       } as unknown as cytoscape.Css.Node
@@ -50,17 +57,23 @@ function buildCyStyle(): cytoscape.StylesheetStyle[] {
     {
       selector: 'edge',
       style: {
-        width: 1.5,
+        width: 1.2,
         'line-color': getCssColor('--cortx-border'),
         'target-arrow-color': getCssColor('--cortx-border'),
         'target-arrow-shape': 'triangle',
         'curve-style': 'bezier',
+        'line-cap': 'round',
+        'line-join': 'round',
         label: 'data(label)',
         'font-size': '8px',
-        color: getCssColor('--cortx-text-secondary'),
+        'font-weight': 500,
+        color: getCssColor('--cortx-text-primary'),
         'text-rotation': 'autorotate',
-        'text-outline-width': 1,
-        'text-outline-color': getCssColor('--cortx-bg'),
+        'text-outline-width': 0,
+        'text-background-opacity': 0,
+        'text-background-padding': 0,
+        'text-border-width': 0,
+        'text-border-opacity': 0,
         'transition-property': 'opacity, line-color',
         'transition-duration': 200
       } as unknown as cytoscape.Css.Edge
@@ -106,11 +119,29 @@ function buildCyStyle(): cytoscape.StylesheetStyle[] {
   ]
 }
 
+function createLayoutOptions(overrides: Record<string, unknown>): cytoscape.LayoutOptions {
+  return {
+    name: 'cose-bilkent',
+    nodeDimensionsIncludeLabels: true,
+    idealEdgeLength: 130,
+    nodeRepulsion: 8000,
+    edgeElasticity: 0.45,
+    gravity: 0.4,
+    numIter: 2500,
+    tile: true,
+    ...overrides
+  } as unknown as cytoscape.LayoutOptions
+}
+
 export function GraphView(): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const cyRef = useRef<cytoscape.Core | null>(null)
   const layoutRanOnce = useRef(false)
   const selectedNodeRef = useRef<string | null>(null)
+  const dragLayoutRef = useRef<cytoscape.Layouts | null>(null)
+  const dragRafRef = useRef<number | null>(null)
+  const isDraggingRef = useRef(false)
+  const draggedNodeRef = useRef<cytoscape.NodeSingular | null>(null)
 
   const { nodes, edges, isLoading, loadGraph, filterTypes, toggleFilterType } = useGraphStore()
   const openFilePreview = useUIStore((s) => s.openFilePreview)
@@ -133,6 +164,7 @@ export function GraphView(): React.JSX.Element {
       container: containerRef.current,
       elements: [],
       style: buildCyStyle(),
+      pixelRatio: Math.max(1, window.devicePixelRatio || 1),
       minZoom: 0.2,
       maxZoom: 4,
       wheelSensitivity: 0.3
@@ -180,9 +212,70 @@ export function GraphView(): React.JSX.Element {
       if (filePath) openFilePreviewRef.current(filePath)
     })
 
+    function runLiveLayout(draggedNode: cytoscape.NodeSingular): void {
+      if (dragLayoutRef.current) dragLayoutRef.current.stop()
+      dragLayoutRef.current = cy.layout(createLayoutOptions({
+        animate: 'during',
+        animationDuration: 250,
+        animationEasing: 'ease-out' as cytoscape.Css.TransitionTimingFunction,
+        randomize: false,
+        fit: false,
+        quality: 'draft',
+        refresh: 30,
+        numIter: 1200,
+        initialEnergyOnIncremental: 0.8,
+        fixedNodeConstraint: [
+          { nodeId: draggedNode.id(), position: draggedNode.position() }
+        ]
+      }))
+      dragLayoutRef.current.run()
+    }
+
+    function stopLiveLayout(): void {
+      if (dragLayoutRef.current) {
+        dragLayoutRef.current.stop()
+        dragLayoutRef.current = null
+      }
+    }
+
+    // Live reflow while dragging nodes
+    cy.on('grab', 'node', (evt) => {
+      isDraggingRef.current = true
+      const node = evt.target as cytoscape.NodeSingular
+      draggedNodeRef.current = node
+      runLiveLayout(node)
+    })
+
+    cy.on('drag', 'node', () => {
+      if (!isDraggingRef.current) return
+      const node = draggedNodeRef.current
+      if (!node) return
+      if (dragRafRef.current !== null) return
+      dragRafRef.current = requestAnimationFrame(() => {
+        dragRafRef.current = null
+        runLiveLayout(node)
+      })
+    })
+
+    cy.on('dragfree', 'node', (evt) => {
+      isDraggingRef.current = false
+      draggedNodeRef.current = null
+      stopLiveLayout()
+      const settleLayout = cy.layout(createLayoutOptions({
+        animate: 'end',
+        animationDuration: 300,
+        animationEasing: 'ease-out' as cytoscape.Css.TransitionTimingFunction,
+        randomize: false,
+        fit: false
+      }))
+      settleLayout.run()
+    })
+
     cyRef.current = cy
 
     return () => {
+      if (dragRafRef.current !== null) cancelAnimationFrame(dragRafRef.current)
+      stopLiveLayout()
       cy.destroy()
       cyRef.current = null
     }
@@ -233,20 +326,12 @@ export function GraphView(): React.JSX.Element {
     // First run: randomize positions, no animation (elements have no coords yet)
     // Subsequent runs: keep current positions as start, animate the relayout
     const isFirst = !layoutRanOnce.current
-    const layout = cy.layout({
-      name: 'cose-bilkent',
-      animate: !isFirst,
+    const layout = cy.layout(createLayoutOptions({
+      animate: isFirst ? false : 'end',
       animationDuration: 500,
       animationEasing: 'ease-out' as cytoscape.Css.TransitionTimingFunction,
-      randomize: isFirst,
-      nodeDimensionsIncludeLabels: true,
-      idealEdgeLength: 130,
-      nodeRepulsion: 8000,
-      edgeElasticity: 0.45,
-      gravity: 0.4,
-      numIter: 2500,
-      tile: true
-    } as unknown as cytoscape.LayoutOptions)
+      randomize: isFirst
+    }))
 
     layout.run()
     layoutRanOnce.current = true
