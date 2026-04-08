@@ -21,6 +21,13 @@
       "out/**/*",
       "node_modules/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "resources/python-sidecar",
+        "to": "python-sidecar",
+        "filter": ["**/*"]
+      }
+    ],
     "win": {
       "target": "nsis",
       "icon": "resources/icon.ico"

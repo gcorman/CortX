@@ -21,7 +21,8 @@
       "mcp__Claude_Preview__preview_start",
       "Bash(npx tsc:*)",
       "Bash(curl -s http://localhost:5173/)",
-      "Bash(npm list:*)"
+      "Bash(npm list:*)",
+      "Bash(echo \"EXIT: $?\")"
     ]
   }
 }

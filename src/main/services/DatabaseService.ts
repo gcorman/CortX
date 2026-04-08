@@ -186,6 +186,61 @@ export class DatabaseService {
         content,
         content_rowid='rowid'
       );
+
+      -- ── Library tables ────────────────────────────────────────────────
+      -- One row per imported document (PDF, DOCX, XLSX, …)
+      CREATE TABLE IF NOT EXISTS library_documents (
+        id TEXT PRIMARY KEY,
+        path TEXT NOT NULL UNIQUE,
+        filename TEXT NOT NULL,
+        mime_type TEXT,
+        size INTEGER,
+        hash_sha256 TEXT,
+        title TEXT,
+        author TEXT,
+        page_count INTEGER,
+        summary TEXT,
+        tags TEXT NOT NULL DEFAULT '[]',
+        added_at TEXT NOT NULL,
+        indexed_at TEXT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        error_message TEXT
+      );
+
+      -- One row per text chunk extracted from a document
+      CREATE TABLE IF NOT EXISTS library_chunks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        document_id TEXT NOT NULL REFERENCES library_documents(id) ON DELETE CASCADE,
+        chunk_index INTEGER NOT NULL,
+        page_from INTEGER,
+        page_to INTEGER,
+        heading TEXT,
+        text TEXT NOT NULL
+      );
+
+      -- FTS5 index over chunks
+      CREATE VIRTUAL TABLE IF NOT EXISTS library_chunks_fts USING fts5(
+        text,
+        heading,
+        document_id UNINDEXED,
+        content='library_chunks',
+        content_rowid='id'
+      );
+
+      -- Embeddings stored as BLOB (float32 array serialised as JSON for now;
+      -- can be migrated to sqlite-vec when packaging is validated)
+      CREATE TABLE IF NOT EXISTS library_embeddings (
+        chunk_id INTEGER PRIMARY KEY REFERENCES library_chunks(id) ON DELETE CASCADE,
+        vector BLOB NOT NULL
+      );
+
+      -- Detected links between library documents and knowledge-base entities
+      CREATE TABLE IF NOT EXISTS library_links (
+        document_id TEXT NOT NULL REFERENCES library_documents(id) ON DELETE CASCADE,
+        entity_id INTEGER NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+        link_type TEXT NOT NULL DEFAULT 'mention_auto',
+        PRIMARY KEY (document_id, entity_id, link_type)
+      );
     `)
   }
 
@@ -552,6 +607,11 @@ export class DatabaseService {
       hash |= 0
     }
     return hash.toString(36)
+  }
+
+  /** Expose the raw better-sqlite3 instance for services that need direct access (e.g. LibraryService). */
+  getDb(): Database.Database {
+    return this.db
   }
 
   close(): void {

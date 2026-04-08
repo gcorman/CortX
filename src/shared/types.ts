@@ -145,6 +145,53 @@ export interface AppConfig {
   validationMode: 'always' | 'creations-only' | 'automatic'
 }
 
+// --- Library ---
+
+export type LibraryDocumentStatus = 'pending' | 'extracting' | 'indexed' | 'error'
+
+export interface LibraryDocument {
+  id: string
+  /** Path relative to Bibliotheque/ */
+  path: string
+  filename: string
+  mimeType: string | null
+  size: number | null
+  title: string | null
+  author: string | null
+  pageCount: number | null
+  summary: string | null
+  tags: string[]
+  addedAt: string
+  indexedAt: string | null
+  status: LibraryDocumentStatus
+  errorMessage?: string
+}
+
+export interface LibraryChunkResult {
+  chunkId: number
+  documentId: string
+  documentTitle: string | null
+  documentPath: string
+  heading: string | null
+  text: string
+  pageFrom: number | null
+  pageTo: number | null
+  /** FTS rank or cosine similarity score */
+  score: number
+}
+
+export interface LibrarySearchResult {
+  document: LibraryDocument
+  chunks: LibraryChunkResult[]
+}
+
+export interface LibraryIngestProgress {
+  documentId: string
+  filename: string
+  stage: 'copying' | 'extracting' | 'chunking' | 'embedding' | 'linking' | 'done' | 'error'
+  message?: string
+}
+
 // --- IPC API surface ---
 
 export interface CortxAPI {
@@ -193,6 +240,20 @@ export interface CortxAPI {
     getConfig(): Promise<AppConfig>
     setConfig(config: Partial<AppConfig>): Promise<void>
     resetBase(): Promise<void>
+  }
+  library: {
+    ingest(absolutePath: string): Promise<LibraryDocument>
+    ingestMany(absolutePaths: string[]): Promise<LibraryDocument[]>
+    list(folder?: string): Promise<LibraryDocument[]>
+    get(id: string): Promise<LibraryDocument | null>
+    delete(id: string): Promise<void>
+    rename(id: string, newFilename: string): Promise<void>
+    getPreview(id: string): Promise<{ markdown: string; pageCount: number | null }>
+    openOriginal(id: string): Promise<void>
+    search(query: string, mode?: 'lexical' | 'semantic' | 'hybrid', limit?: number): Promise<LibraryChunkResult[]>
+    reindexAll(): Promise<{ added: number; updated: number; removed: number }>
+    getStatus(): Promise<{ sidecarReady: boolean; queueLength: number }>
+    openImportDialog(): Promise<string[]>
   }
   on(channel: string, callback: (...args: unknown[]) => void): void
   off(channel: string, callback: (...args: unknown[]) => void): void

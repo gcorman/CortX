@@ -15,7 +15,17 @@ export class GitService {
       // Create .gitignore
       const gitignore = path.join(this.basePath, '.gitignore')
       if (!fs.existsSync(gitignore)) {
-        fs.writeFileSync(gitignore, '_System/cortx.db\n_System/cortx.db-wal\n_System/cortx.db-shm\n', 'utf-8')
+        fs.writeFileSync(
+          gitignore,
+          [
+            '_System/cortx.db',
+            '_System/cortx.db-wal',
+            '_System/cortx.db-shm',
+            '_System/library-cache/',
+            'Bibliotheque/',
+          ].join('\n') + '\n',
+          'utf-8'
+        )
       }
       // Initial commit
       await this.exec('add', '-A')

@@ -6,11 +6,14 @@ import { registerFileHandlers } from './ipc/files'
 import { registerLLMHandlers } from './ipc/llm'
 import { registerGitHandlers } from './ipc/git'
 import { registerAgentHandlers } from './ipc/agent'
+import { registerLibraryHandlers } from './ipc/library'
 import { DatabaseService } from './services/DatabaseService'
 import { FileService } from './services/FileService'
 import { GitService } from './services/GitService'
 import { LLMService } from './services/LLMService'
 import { AgentPipeline } from './services/AgentPipeline'
+import { libraryService } from './services/LibraryService'
+import { pythonSidecar } from './services/PythonSidecar'
 import type { AppConfig } from '../shared/types'
 
 let mainWindow: BrowserWindow | null = null
@@ -118,6 +121,9 @@ async function initializeServices(): Promise<void> {
     llmService,
     config.basePath
   )
+
+  // Initialise library service (creates Bibliotheque/ if needed)
+  libraryService.initialize(dbService.getDb(), config.basePath)
 
   // Index existing files
   await indexAllFiles()
@@ -228,6 +234,7 @@ app.whenReady().then(async () => {
   registerLLMHandlers(llmService)
   registerGitHandlers(() => gitService)
   registerAgentHandlers(() => agentPipeline)
+  registerLibraryHandlers(() => libraryService, () => mainWindow)
 
   createWindow()
 
@@ -236,6 +243,10 @@ app.whenReady().then(async () => {
       createWindow()
     }
   })
+})
+
+app.on('before-quit', async () => {
+  await pythonSidecar.shutdown()
 })
 
 app.on('window-all-closed', () => {

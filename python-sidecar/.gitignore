@@ -1,0 +1,13 @@
+# Python environments
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# PyInstaller artifacts
+build/
+dist/
+*.spec
+
+# Sentence-transformers model cache (downloaded at build time)
+sentence_transformers_cache/

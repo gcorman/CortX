@@ -2,7 +2,8 @@ import { useUIStore } from '../../stores/uiStore'
 import { GraphView } from '../graph/GraphView'
 import { TagBrowser } from '../tags/TagBrowser'
 import { FilePreview } from '../files/FilePreview'
-import { Network, Hash, Search } from 'lucide-react'
+import { LibraryPanel } from '../library/LibraryPanel'
+import { Network, Hash, Search, Library } from 'lucide-react'
 import { useState } from 'react'
 
 export function CenterPanel(): React.JSX.Element {
@@ -11,7 +12,8 @@ export function CenterPanel(): React.JSX.Element {
 
   const tabs = [
     { id: 'graph' as const, label: 'Graphe', icon: Network },
-    { id: 'tags' as const, label: 'Tags', icon: Hash }
+    { id: 'tags' as const, label: 'Tags', icon: Hash },
+    { id: 'library' as const, label: 'Bibliothèque', icon: Library }
   ]
 
   return (
@@ -40,23 +42,26 @@ export function CenterPanel(): React.JSX.Element {
           })}
         </div>
 
-        {/* Search */}
-        <div className="flex-1 relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-cortx-text-secondary" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher dans la base..."
-            className="w-full bg-cortx-surface border border-cortx-border rounded-input pl-9 pr-3 py-1.5 text-xs text-cortx-text-primary placeholder:text-cortx-text-secondary/50 focus:outline-none focus:border-cortx-accent transition-colors"
-          />
-        </div>
+        {/* Search — hidden in library view (library has its own search bar) */}
+        {activeCenterView !== 'library' && (
+          <div className="flex-1 relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-cortx-text-secondary" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Rechercher dans la base..."
+              className="w-full bg-cortx-surface border border-cortx-border rounded-input pl-9 pr-3 py-1.5 text-xs text-cortx-text-primary placeholder:text-cortx-text-secondary/50 focus:outline-none focus:border-cortx-accent transition-colors"
+            />
+          </div>
+        )}
       </div>
 
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         {activeCenterView === 'graph' && <GraphView />}
         {activeCenterView === 'tags' && <TagBrowser />}
+        {activeCenterView === 'library' && <LibraryPanel />}
       </div>
 
       {/* File Preview Overlay */}

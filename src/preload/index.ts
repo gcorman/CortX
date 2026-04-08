@@ -51,6 +51,21 @@ const api: CortxAPI = {
     setConfig: (config) => ipcRenderer.invoke('app:setConfig', config),
     resetBase: () => ipcRenderer.invoke('app:resetBase')
   },
+  library: {
+    ingest: (absolutePath: string) => ipcRenderer.invoke('library:ingest', absolutePath),
+    ingestMany: (absolutePaths: string[]) => ipcRenderer.invoke('library:ingestMany', absolutePaths),
+    list: (folder?: string) => ipcRenderer.invoke('library:list', folder),
+    get: (id: string) => ipcRenderer.invoke('library:get', id),
+    delete: (id: string) => ipcRenderer.invoke('library:delete', id),
+    rename: (id: string, newFilename: string) => ipcRenderer.invoke('library:rename', id, newFilename),
+    getPreview: (id: string) => ipcRenderer.invoke('library:getPreview', id),
+    openOriginal: (id: string) => ipcRenderer.invoke('library:openOriginal', id),
+    search: (query: string, mode?: 'lexical' | 'semantic' | 'hybrid', limit?: number) =>
+      ipcRenderer.invoke('library:search', query, mode, limit),
+    reindexAll: () => ipcRenderer.invoke('library:reindexAll'),
+    getStatus: () => ipcRenderer.invoke('library:getStatus'),
+    openImportDialog: () => ipcRenderer.invoke('library:openImportDialog')
+  },
   on: (channel: string, callback: (...args: unknown[]) => void) => {
     ipcRenderer.on(channel, (_event, ...args) => callback(...args))
   },

@@ -2,6 +2,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { DatabaseService } from '../services/DatabaseService'
 import { FileService } from '../services/FileService'
+import type { LibraryChunkResult } from '../../shared/types'
 
 // Extract the raw prompt template from the CortX_Agent_Prompt_V1.md file
 // The prompt is between the first ``` and the last ``` in the "Prompt complet" section
@@ -99,11 +100,30 @@ La date du jour est : {{today}}
 L'heure actuelle est : {{now}}`
 }
 
+/** Format library chunks for prompt injection. */
+function formatLibraryContext(chunks: LibraryChunkResult[]): string {
+  if (chunks.length === 0) return ''
+  const lines: string[] = ['', '## Documents de référence (bibliothèque)']
+  lines.push('Ces extraits proviennent de documents importés en lecture seule. Cite-les avec [doc:<id>] si tu t\'en sers.')
+  for (const chunk of chunks) {
+    const title = chunk.documentTitle || chunk.documentPath
+    const loc = chunk.heading ? ` — § ${chunk.heading}` : ''
+    const page = chunk.pageFrom ? ` — p.${chunk.pageFrom}${chunk.pageTo && chunk.pageTo !== chunk.pageFrom ? `-${chunk.pageTo}` : ''}` : ''
+    lines.push(`\n[doc:${chunk.documentId}] "${title}"${loc}${page}`)
+    // Truncate chunk to 400 words
+    const words = chunk.text.split(/\s+/)
+    const excerpt = words.slice(0, 400).join(' ') + (words.length > 400 ? '…' : '')
+    lines.push(`> ${excerpt}`)
+  }
+  return lines.join('\n')
+}
+
 export function buildSystemPrompt(
   dbService: DatabaseService,
   fileService: FileService,
   contextFiles: string,
-  basePath: string
+  basePath: string,
+  libraryChunks: LibraryChunkResult[] = []
 ): string {
   const template = loadPromptTemplate(basePath)
 
@@ -125,6 +145,12 @@ export function buildSystemPrompt(
   let prompt = template
   for (const [key, value] of Object.entries(variables)) {
     prompt = prompt.replaceAll(key, value)
+  }
+
+  // Inject library context if any documents matched
+  const libSection = formatLibraryContext(libraryChunks)
+  if (libSection) {
+    prompt += libSection
   }
 
   // Append a final critical reminder. Repeated instructions at the end of the

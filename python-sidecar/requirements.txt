@@ -1,0 +1,15 @@
+# CortX sidecar dependencies
+# Install in a dedicated venv:
+#   python -m venv .venv
+#   .venv\Scripts\activate
+#   pip install -r requirements.txt
+
+# Document extraction (PDF, DOCX, XLSX, PPTX, HTML...)
+docling>=2.0.0
+
+# Semantic embeddings — multilingual FR/EN
+# Model used: intfloat/multilingual-e5-small (~120 MB, auto-downloaded on first run)
+sentence-transformers>=3.0.0
+
+# Packaging (dev only — not needed at runtime)
+pyinstaller>=6.0.0

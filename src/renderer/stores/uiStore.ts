@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type CenterView = 'graph' | 'tags' | 'files'
+export type CenterView = 'graph' | 'tags' | 'files' | 'library'
 export type Theme = 'dark' | 'light'
 
 interface UIState {

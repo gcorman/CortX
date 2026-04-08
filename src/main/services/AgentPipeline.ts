@@ -3,8 +3,9 @@ import { FileService } from './FileService'
 import { DatabaseService } from './DatabaseService'
 import { GitService } from './GitService'
 import { LLMService } from './LLMService'
+import { libraryService } from './LibraryService'
 import { buildSystemPrompt } from '../utils/promptBuilder'
-import type { AgentResponse, AgentAction } from '../../shared/types'
+import type { AgentResponse, AgentAction, LibraryChunkResult } from '../../shared/types'
 
 interface RawAction {
   action?: string
@@ -53,13 +54,17 @@ export class AgentPipeline {
    * Actions are NOT executed — they are proposals for the user to review.
    */
   async process(input: string, onStreamDelta?: (delta: string) => void): Promise<AgentResponse> {
-    const contextFiles = await this.retrieveContext(input)
+    const [contextFiles, libraryChunks] = await Promise.all([
+      this.retrieveContext(input),
+      this.retrieveLibraryContext(input),
+    ])
 
     const systemPrompt = buildSystemPrompt(
       this.dbService,
       this.fileService,
       contextFiles,
-      this.basePath
+      this.basePath,
+      libraryChunks
     )
 
     const rawResponse = await this.llmService.sendMessage(
@@ -702,6 +707,14 @@ export class AgentPipeline {
     if (['create', 'créer', 'creer', 'new', 'add', 'create_file'].includes(lower)) return 'create'
     if (['modify', 'modifier', 'update', 'edit', 'append', 'modify_file', 'change'].includes(lower)) return 'modify'
     return lower
+  }
+
+  private async retrieveLibraryContext(input: string): Promise<LibraryChunkResult[]> {
+    try {
+      return await libraryService.getContextChunks(input, 6)
+    } catch {
+      return []
+    }
   }
 
   private async retrieveContext(input: string): Promise<string> {
