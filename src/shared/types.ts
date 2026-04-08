@@ -175,6 +175,7 @@ export interface CortxAPI {
   }
   agent: {
     process(input: string): Promise<AgentResponse>
+    processStream(input: string, requestId: string): Promise<AgentResponse>
     execute(actions: AgentAction[], summary: string): Promise<string>
     preview(action: AgentAction): Promise<{ before: string; after: string }>
     undo(commitHash: string): Promise<void>

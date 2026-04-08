@@ -29,6 +29,8 @@ const api: CortxAPI = {
   },
   agent: {
     process: (input: string) => ipcRenderer.invoke('agent:process', input),
+    processStream: (input: string, requestId: string) =>
+      ipcRenderer.invoke('agent:processStream', input, requestId),
     execute: (actions: unknown[], summary: string) => ipcRenderer.invoke('agent:execute', actions, summary),
     preview: (action: unknown) => ipcRenderer.invoke('agent:preview', action),
     undo: (commitHash: string) => ipcRenderer.invoke('agent:undo', commitHash),

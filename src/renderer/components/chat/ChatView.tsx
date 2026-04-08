@@ -5,7 +5,7 @@ import { useChatStore } from '../../stores/chatStore'
 import { Brain, Sparkles } from 'lucide-react'
 
 export function ChatView(): React.JSX.Element {
-  const { messages, isProcessing, sendMessage } = useChatStore()
+  const { messages, isProcessing, sendMessage, streamProgress } = useChatStore()
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -25,19 +25,67 @@ export function ChatView(): React.JSX.Element {
         )}
 
         {isProcessing && (
-          <div className="flex items-center gap-2 px-3 py-2">
-            <div className="flex gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-cortx-accent animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-cortx-accent animate-bounce" style={{ animationDelay: '150ms' }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-cortx-accent animate-bounce" style={{ animationDelay: '300ms' }} />
+          streamProgress > 0 ? (
+            <div className="flex items-center gap-2 px-3 py-2">
+              <span className="text-xs text-cortx-text-secondary">Rédaction de la réponse</span>
+              <ProgressRing progress={streamProgress} />
             </div>
-            <span className="text-xs text-cortx-text-secondary">L'agent analyse...</span>
-          </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-2">
+              <div className="flex gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-cortx-accent animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-cortx-accent animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-cortx-accent animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+              <span className="text-xs text-cortx-text-secondary">L'agent analyse...</span>
+            </div>
+          )
         )}
       </div>
 
       {/* Input */}
       <ChatInput onSend={sendMessage} disabled={isProcessing} />
+    </div>
+  )
+}
+
+function ProgressRing({ progress }: { progress: number }): React.JSX.Element {
+  const size = 22
+  const stroke = 3
+  const radius = (size - stroke) / 2
+  const circumference = 2 * Math.PI * radius
+  const clamped = Math.max(0, Math.min(1, progress))
+  const offset = circumference * (1 - clamped)
+  const percent = Math.round(clamped * 100)
+
+  return (
+    <div className="relative w-[22px] h-[22px] flex items-center justify-center">
+      <svg width={size} height={size} className="block">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="currentColor"
+          strokeWidth={stroke}
+          fill="transparent"
+          className="text-cortx-border/70"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="currentColor"
+          strokeWidth={stroke}
+          fill="transparent"
+          strokeLinecap="round"
+          strokeDasharray={`${circumference} ${circumference}`}
+          strokeDashoffset={offset}
+          className="text-cortx-accent transition-[stroke-dashoffset] duration-200 ease-out"
+        />
+      </svg>
+      <span className="absolute text-[9px] leading-none text-cortx-text-secondary font-mono">
+        {percent}%
+      </span>
     </div>
   )
 }

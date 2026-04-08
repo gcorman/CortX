@@ -9,6 +9,8 @@ import { useFicheStore } from './ficheStore'
 interface ChatState {
   messages: ChatMessage[]
   isProcessing: boolean
+  streamProgress: number
+  streamActive: boolean
   /** Set of suggestion texts the user has dismissed — hides them from chat AND right panel */
   dismissedSuggestions: Set<string>
   sendMessage: (content: string) => Promise<void>
@@ -24,6 +26,97 @@ interface SlashRewrite {
   prompt: string
   ficheKind?: string // if set, the response is auto-archived as a fiche of this kind
   ficheSubject?: string
+}
+
+type StreamMode = 'default' | 'brief' | 'synthese' | 'digest'
+
+let streamBuffer = ''
+let streamResetTimer: ReturnType<typeof setTimeout> | undefined
+
+function computeStreamProgress(buffer: string, mode: StreamMode): number {
+  const len = buffer.length
+  const lengthScore = len / (len + 500)
+
+  if (mode !== 'brief') {
+    return Math.min(0.95, lengthScore)
+  }
+
+  const sections: Array<string[]> = [
+    ['identite', 'identité'],
+    ['historique'],
+    ['contexte'],
+    ['points a creuser', 'points à creuser', 'points a explorer', 'points à explorer'],
+    ['sources']
+  ]
+
+  const found = sections.reduce((count, variants) => {
+    return count + (hasHeading(buffer, variants) ? 1 : 0)
+  }, 0)
+
+  const sectionScore = found / sections.length
+  const progress = 0.1 + 0.7 * sectionScore + 0.2 * lengthScore
+  return Math.min(0.95, progress)
+}
+
+function hasHeading(buffer: string, variants: string[]): boolean {
+  return variants.some((variant) => {
+    const escaped = variant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const re = new RegExp(`(?:^|\\n|\\\\n|\\r\\n|\\\\r\\\\n)\\s*##\\s*${escaped}\\b`, 'i')
+    return re.test(buffer)
+  })
+}
+
+function startStreamSession(
+  requestId: string,
+  streamMode: StreamMode,
+  set: (partial: Partial<ChatState> | ((state: ChatState) => Partial<ChatState>)) => void,
+  get: () => ChatState
+): () => void {
+  streamBuffer = ''
+  if (streamResetTimer) {
+    clearTimeout(streamResetTimer)
+    streamResetTimer = undefined
+  }
+  set({ streamProgress: 0, streamActive: true })
+
+  const handleStream = (payload: unknown) => {
+    const data = payload as { requestId?: string; delta?: string; done?: boolean; error?: string }
+    if (!data || data.requestId !== requestId) return
+    if (data.delta) {
+      streamBuffer += data.delta
+      const progress = computeStreamProgress(streamBuffer, streamMode)
+      set((s) => ({
+        streamProgress: Math.max(s.streamProgress, progress),
+        streamActive: true
+      }))
+    }
+    if (data.done) {
+      set({ streamProgress: 1, streamActive: false })
+      streamResetTimer = setTimeout(() => {
+        set({ streamProgress: 0 })
+      }, 450)
+    }
+    if (data.error) {
+      set({ streamActive: false })
+    }
+  }
+
+  window.cortx.on('agent:stream', handleStream)
+
+  return () => {
+    window.cortx.off('agent:stream', handleStream)
+    const hadProgress = get().streamProgress > 0
+    if (hadProgress) {
+      set({ streamActive: false, streamProgress: 1 })
+      if (!streamResetTimer) {
+        streamResetTimer = setTimeout(() => {
+          set({ streamProgress: 0 })
+        }, 450)
+      }
+    } else {
+      set({ streamActive: false })
+    }
+  }
 }
 
 function rewriteSlashCommand(input: string): SlashRewrite {
@@ -71,6 +164,8 @@ function rewriteSlashCommand(input: string): SlashRewrite {
 export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   isProcessing: false,
+  streamProgress: 0,
+  streamActive: false,
   dismissedSuggestions: new Set<string>(),
 
   sendMessage: async (content: string) => {
@@ -119,8 +214,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
       ? `[FICHIERS CITES PAR L'UTILISATEUR — traite-les comme contexte prioritaire]\n${mentionContext}\n${rewrite.prompt}`
       : rewrite.prompt
 
+    const requestId = Date.now().toString(36) + 'r'
+    const streamMode: StreamMode =
+      rewrite.ficheKind === 'brief'
+        ? 'brief'
+        : rewrite.ficheKind === 'synthese'
+          ? 'synthese'
+          : rewrite.ficheKind === 'digest'
+            ? 'digest'
+            : 'default'
+
+    const stopStream = startStreamSession(requestId, streamMode, set, get)
+
     try {
-      const response: AgentResponse = await window.cortx.agent.process(finalPrompt)
+      const response: AgentResponse = await window.cortx.agent.processStream(finalPrompt, requestId)
 
       // For long-form commands (brief, synthese, digest), the full response is
       // archived as a fiche — show only a short confirmation in the chat to
@@ -167,6 +274,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
       set((s) => ({ messages: [...s.messages, errorMessage], isProcessing: false }))
       useUIStore.getState().addToast('Erreur lors du traitement', 'error')
+    } finally {
+      stopStream()
     }
   },
 
@@ -293,8 +402,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     const followup = `[REPONSE A TA QUESTION « ${clar.question} »] ${choice}\n\n[Demande initiale: ${originalInput}]`
 
+    const requestId = Date.now().toString(36) + 'r'
+    const stopStream = startStreamSession(requestId, 'default', set, get)
+
     try {
-      const response: AgentResponse = await window.cortx.agent.process(followup)
+      const response: AgentResponse = await window.cortx.agent.processStream(followup, requestId)
       const agentMessage: ChatMessage = {
         id: Date.now().toString(36) + 'a',
         role: 'agent',
@@ -315,6 +427,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
       set((s) => ({ messages: [...s.messages, errorMessage], isProcessing: false }))
       useUIStore.getState().addToast('Erreur lors du traitement', 'error')
+    } finally {
+      stopStream()
     }
   },
 
@@ -352,8 +466,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
       `Suggestion a appliquer : ${text}`
     ].join('\n')
 
+    const requestId = Date.now().toString(36) + 'r'
+    const stopStream = startStreamSession(requestId, 'default', set, get)
+
     try {
-      const response: AgentResponse = await window.cortx.agent.process(order)
+      const response: AgentResponse = await window.cortx.agent.processStream(order, requestId)
       const agentMessage: ChatMessage = {
         id: Date.now().toString(36) + 'a',
         role: 'agent',
@@ -374,6 +491,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
       set((s) => ({ messages: [...s.messages, errorMessage], isProcessing: false }))
       useUIStore.getState().addToast('Erreur lors du traitement', 'error')
+    } finally {
+      stopStream()
     }
   },
 

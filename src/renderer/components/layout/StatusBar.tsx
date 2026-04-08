@@ -5,12 +5,11 @@ import { useChatStore } from '../../stores/chatStore'
 
 export function StatusBar(): React.JSX.Element {
   const toggleSettings = useUIStore((s) => s.toggleSettings)
-  const isProcessing = useChatStore((s) => s.isProcessing)
+  const streamProgress = useChatStore((s) => s.streamProgress)
+  const streamActive = useChatStore((s) => s.streamActive)
   const [fileCount, setFileCount] = useState(0)
   const [lastCommit, setLastCommit] = useState('Aucun commit')
   const [llmStatus, setLlmStatus] = useState<'configured' | 'unconfigured'>('unconfigured')
-  const [progress, setProgress] = useState(0)
-  const [showProgress, setShowProgress] = useState(false)
 
   const refresh = useCallback(async () => {
     try {
@@ -62,28 +61,9 @@ export function StatusBar(): React.JSX.Element {
     }
   }, [settingsOpen, refresh])
 
-  useEffect(() => {
-    if (isProcessing) {
-      setShowProgress(true)
-      setProgress((p) => (p > 0 ? p : 0.05))
-      const interval = setInterval(() => {
-        setProgress((p) => {
-          if (p >= 0.92) return p
-          const delta = p < 0.6 ? 0.03 : p < 0.8 ? 0.015 : 0.007
-          return Math.min(0.92, p + delta)
-        })
-      }, 120)
-      return () => clearInterval(interval)
-    }
-
-    if (!showProgress) return
-    setProgress(1)
-    const timeout = setTimeout(() => {
-      setShowProgress(false)
-      setProgress(0)
-    }, 450)
-    return () => clearTimeout(timeout)
-  }, [isProcessing, showProgress])
+  const showProgress = streamActive || streamProgress > 0
+  const clamped = Math.max(0, Math.min(1, streamProgress))
+  const progress = showProgress ? clamped : 0
 
   return (
     <div className="relative flex-shrink-0 h-7 bg-cortx-surface border-t border-cortx-border px-4 flex items-center justify-between text-2xs text-cortx-text-secondary font-mono">

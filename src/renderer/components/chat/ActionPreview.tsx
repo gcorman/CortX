@@ -32,7 +32,7 @@ export function ActionPreview({ action, onClose }: ActionPreviewProps): React.JS
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-cortx-surface border border-cortx-border rounded-panel w-full max-w-4xl mx-4 shadow-2xl max-h-[85vh] flex flex-col">
+      <div className="relative bg-cortx-surface border border-cortx-border rounded-panel w-full max-w-4xl mx-4 shadow-2xl h-[85vh] max-h-[85vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-cortx-border flex-shrink-0">
           <div className="flex items-center gap-2">
@@ -64,25 +64,29 @@ export function ActionPreview({ action, onClose }: ActionPreviewProps): React.JS
             </div>
           ) : action.action === 'create' ? (
             /* Create: show new content only */
-            <div className="h-full overflow-y-auto p-4">
-              <div className="text-2xs uppercase text-cortx-success font-medium mb-2 tracking-wider">
+            <div className="h-full p-4 flex flex-col min-h-0">
+              <div className="text-2xs uppercase text-cortx-success font-medium mb-2 tracking-wider flex-shrink-0">
                 Nouveau contenu
               </div>
-              <pre className="text-xs text-cortx-text-primary font-mono whitespace-pre-wrap bg-cortx-bg rounded-card p-4 border border-cortx-success/20">
-                {after}
-              </pre>
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                <pre className="text-xs text-cortx-text-primary font-mono whitespace-pre-wrap bg-cortx-bg rounded-card p-4 border border-cortx-success/20">
+                  {after}
+                </pre>
+              </div>
             </div>
           ) : (
             /* Modify: show before/after side by side */
             <div className="flex h-full min-h-0">
               {/* Before */}
-              <div className="flex-1 overflow-y-auto p-4 border-r border-cortx-border">
-                <div className="text-2xs uppercase text-cortx-text-secondary font-medium mb-2 tracking-wider">
+              <div className="flex-1 p-4 border-r border-cortx-border flex flex-col min-h-0">
+                <div className="text-2xs uppercase text-cortx-text-secondary font-medium mb-2 tracking-wider flex-shrink-0">
                   Contenu actuel
                 </div>
-                <pre className="text-xs text-cortx-text-secondary font-mono whitespace-pre-wrap bg-cortx-bg rounded-card p-4 border border-cortx-border">
-                  {before || '(fichier vide)'}
-                </pre>
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  <pre className="text-xs text-cortx-text-secondary font-mono whitespace-pre-wrap bg-cortx-bg rounded-card p-4 border border-cortx-border">
+                    {before || '(fichier vide)'}
+                  </pre>
+                </div>
               </div>
 
               {/* Arrow */}
@@ -91,13 +95,15 @@ export function ActionPreview({ action, onClose }: ActionPreviewProps): React.JS
               </div>
 
               {/* After */}
-              <div className="flex-1 overflow-y-auto p-4">
-                <div className="text-2xs uppercase text-cortx-success font-medium mb-2 tracking-wider">
+              <div className="flex-1 p-4 flex flex-col min-h-0">
+                <div className="text-2xs uppercase text-cortx-success font-medium mb-2 tracking-wider flex-shrink-0">
                   Apres modification
                 </div>
-                <pre className="text-xs text-cortx-text-primary font-mono whitespace-pre-wrap bg-cortx-bg rounded-card p-4 border border-cortx-success/20">
-                  {after}
-                </pre>
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  <pre className="text-xs text-cortx-text-primary font-mono whitespace-pre-wrap bg-cortx-bg rounded-card p-4 border border-cortx-success/20">
+                    {after}
+                  </pre>
+                </div>
               </div>
             </div>
           )}

@@ -52,7 +52,7 @@ export class AgentPipeline {
    * Process user input: call LLM, parse response, return proposed actions.
    * Actions are NOT executed — they are proposals for the user to review.
    */
-  async process(input: string): Promise<AgentResponse> {
+  async process(input: string, onStreamDelta?: (delta: string) => void): Promise<AgentResponse> {
     const contextFiles = await this.retrieveContext(input)
 
     const systemPrompt = buildSystemPrompt(
@@ -64,7 +64,8 @@ export class AgentPipeline {
 
     const rawResponse = await this.llmService.sendMessage(
       [{ role: 'user', content: input }],
-      systemPrompt
+      systemPrompt,
+      onStreamDelta
     )
 
     console.log('[AgentPipeline] Raw LLM response length:', rawResponse.length)

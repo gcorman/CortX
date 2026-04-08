@@ -5,6 +5,24 @@ import type { AgentAction } from '../../shared/types'
 export function registerAgentHandlers(getAgent: () => AgentPipeline): void {
   ipcMain.handle('agent:process', (_event, input: string) => getAgent().process(input))
 
+  ipcMain.handle('agent:processStream', async (event, input: string, requestId: string) => {
+    const onDelta = (delta: string) => {
+      if (!delta) return
+      event.sender.send('agent:stream', { requestId, delta })
+    }
+    try {
+      const response = await getAgent().process(input, onDelta)
+      event.sender.send('agent:stream', { requestId, done: true })
+      return response
+    } catch (err) {
+      event.sender.send('agent:stream', {
+        requestId,
+        error: err instanceof Error ? err.message : String(err)
+      })
+      throw err
+    }
+  })
+
   ipcMain.handle('agent:execute', (_event, actions: AgentAction[], summary: string) =>
     getAgent().execute(actions, summary)
   )
