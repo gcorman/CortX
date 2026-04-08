@@ -86,22 +86,26 @@ def cmd_extract(req: dict) -> dict:
 
     # --- Metadata ---
     metadata = {}
-    if hasattr(doc, "metadata") and doc.metadata:
-        m = doc.metadata
-        metadata["title"] = getattr(m, "title", None) or os.path.splitext(os.path.basename(path))[0]
-        metadata["author"] = getattr(m, "authors", None)
-        metadata["page_count"] = getattr(m, "page_count", None)
+    # Try doc.origin for document-level metadata
+    origin = getattr(doc, "origin", None)
+    if origin:
+        metadata["title"] = getattr(origin, "filename", None) or os.path.splitext(os.path.basename(path))[0]
     else:
         metadata["title"] = os.path.splitext(os.path.basename(path))[0]
-        metadata["author"] = None
-        metadata["page_count"] = None
+    metadata["author"] = None
+    metadata["page_count"] = None
 
-    # Try to infer page count from pages if not in metadata
-    if metadata["page_count"] is None and hasattr(doc, "pages"):
-        metadata["page_count"] = len(doc.pages) if doc.pages else None
+    # Page count: num_pages() method or length of pages dict
+    try:
+        pc = doc.num_pages()
+        metadata["page_count"] = pc if pc else None
+    except Exception:
+        pass
+    if metadata["page_count"] is None and hasattr(doc, "pages") and doc.pages:
+        metadata["page_count"] = len(doc.pages)
 
     # --- Structured sections (headings + text blocks) ---
-    # Docling's document model exposes items with types and provenance (page refs)
+    # Iterate directly on doc (not doc.body) — correct API in current Docling versions
     structure = []
     current_heading = None
     current_text_parts = []
@@ -117,31 +121,30 @@ def cmd_extract(req: dict) -> dict:
                 "page_to": current_page_to,
             })
 
-    if hasattr(doc, "body") and doc.body:
-        for item, _ in doc.body.iterate_items():
-            item_type = type(item).__name__
+    for item, _ in doc.iterate_items():
+        item_type = type(item).__name__
 
-            # Extract page numbers from provenance
-            page_from = None
-            page_to = None
-            if hasattr(item, "prov") and item.prov:
-                pages = [p.page_no for p in item.prov if hasattr(p, "page_no")]
-                if pages:
-                    page_from = min(pages)
-                    page_to = max(pages)
+        # Extract page numbers from provenance
+        page_from = None
+        page_to = None
+        if hasattr(item, "prov") and item.prov:
+            pages = [p.page_no for p in item.prov if hasattr(p, "page_no")]
+            if pages:
+                page_from = min(pages)
+                page_to = max(pages)
 
-            if item_type in ("SectionHeaderItem", "TitleItem"):
-                flush_section()
-                current_heading = item.text if hasattr(item, "text") else str(item)
-                current_text_parts = []
+        if item_type in ("SectionHeaderItem", "TitleItem"):
+            flush_section()
+            current_heading = item.text if hasattr(item, "text") else str(item)
+            current_text_parts = []
+            current_page_from = page_from
+            current_page_to = page_to
+        elif hasattr(item, "text") and item.text:
+            if current_page_from is None:
                 current_page_from = page_from
+            if page_to is not None:
                 current_page_to = page_to
-            elif hasattr(item, "text") and item.text:
-                if current_page_from is None:
-                    current_page_from = page_from
-                if page_to is not None:
-                    current_page_to = page_to
-                current_text_parts.append(item.text)
+            current_text_parts.append(item.text)
 
     flush_section()
 
@@ -218,8 +221,9 @@ COMMANDS = {
 
 
 def main():
-    # Flush stdout immediately so Node.js readline gets each response
-    sys.stdout.reconfigure(line_buffering=True)  # type: ignore[attr-defined]
+    # Force UTF-8 on stdout/stdin — critical on Windows where the default is cp1252
+    sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)  # type: ignore[attr-defined]
+    sys.stdin.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
     # Stderr can be read by the parent for debug logging
     sys.stderr.write("[cortx-extractor] started\n")
     sys.stderr.flush()

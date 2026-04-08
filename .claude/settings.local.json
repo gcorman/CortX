@@ -22,7 +22,15 @@
       "Bash(npx tsc:*)",
       "Bash(curl -s http://localhost:5173/)",
       "Bash(npm list:*)",
-      "Bash(echo \"EXIT: $?\")"
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(python python-sidecar/cortx_extractor.py)",
+      "Bash(printf '{\"id\":\"t1\",\"cmd\":\"extract\",\"path\":\"C:/Users/gauti/Documents/GitHub/CortX/README.md\"}\\\\n{\"id\":\"t2\",\"cmd\":\"shutdown\"}')",
+      "Bash(python -c \"import sys,json; [print\\(json.dumps\\({k:v for k,v in json.loads\\(l\\).items\\(\\) if k!='markdown'}, indent=2\\)\\) for l in sys.stdin]\")",
+      "Bash(python -c ':*)",
+      "Bash(printf '{\"id\":\"e1\",\"cmd\":\"embed\",\"texts\":[\"Bonjour le monde\",\"Hello world\",\"CortX knowledge base\"]}\\\\n{\"id\":\"e2\",\"cmd\":\"embed_query\",\"text\":\"intelligence artificielle\"}\\\\n{\"id\":\"z\",\"cmd\":\"shutdown\"}')",
+      "Bash(pip install:*)",
+      "Bash(python -m PyInstaller --version)",
+      "Bash(python -m PyInstaller --onedir --name cortx-extractor --distpath dist --workpath build --noconfirm --clean cortx_extractor.py)"
     ]
   }
 }
