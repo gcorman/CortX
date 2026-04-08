@@ -26,4 +26,8 @@ export function registerAgentHandlers(getAgent: () => AgentPipeline): void {
   ipcMain.handle('agent:listFiches', () => getAgent().listFiches())
 
   ipcMain.handle('agent:deleteFiche', (_event, filePath: string) => getAgent().deleteFiche(filePath))
+
+  ipcMain.handle('agent:rewriteFile', (_event, filePath: string) => getAgent().rewriteFile(filePath))
+
+  ipcMain.handle('agent:deleteFile', (_event, filePath: string) => getAgent().deleteFile(filePath))
 }

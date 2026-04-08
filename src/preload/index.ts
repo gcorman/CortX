@@ -37,7 +37,9 @@ const api: CortxAPI = {
     saveBrief: (subject: string, body: string, kind?: string) =>
       ipcRenderer.invoke('agent:saveBrief', subject, body, kind),
     listFiches: () => ipcRenderer.invoke('agent:listFiches'),
-    deleteFiche: (filePath: string) => ipcRenderer.invoke('agent:deleteFiche', filePath)
+    deleteFiche: (filePath: string) => ipcRenderer.invoke('agent:deleteFiche', filePath),
+    rewriteFile: (filePath: string) => ipcRenderer.invoke('agent:rewriteFile', filePath),
+    deleteFile: (filePath: string) => ipcRenderer.invoke('agent:deleteFile', filePath)
   },
   app: {
     getBasePath: () => ipcRenderer.invoke('app:getBasePath'),

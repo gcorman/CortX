@@ -1,4 +1,5 @@
 import { useAgentStore } from '../../stores/agentStore'
+import { useChatStore } from '../../stores/chatStore'
 import { ActionCard } from './ActionCard'
 import { SuggestionCard } from './SuggestionCard'
 import { ConflictAlert } from './ConflictAlert'
@@ -6,8 +7,10 @@ import { Activity } from 'lucide-react'
 
 export function ActivityFeed(): React.JSX.Element {
   const { actions, suggestions, conflicts } = useAgentStore()
+  const dismissedSuggestions = useChatStore((s) => s.dismissedSuggestions)
 
-  const hasContent = actions.length > 0 || suggestions.length > 0 || conflicts.length > 0
+  const visibleSuggestions = suggestions.filter((s) => !dismissedSuggestions.has(s))
+  const hasContent = actions.length > 0 || visibleSuggestions.length > 0 || conflicts.length > 0
 
   if (!hasContent) {
     return (
@@ -37,12 +40,12 @@ export function ActivityFeed(): React.JSX.Element {
       )}
 
       {/* Suggestions */}
-      {suggestions.length > 0 && (
+      {visibleSuggestions.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-2xs font-semibold text-cortx-accent uppercase tracking-wider px-1">
             Suggestions
           </h3>
-          {suggestions.map((suggestion, i) => (
+          {visibleSuggestions.map((suggestion, i) => (
             <SuggestionCard key={i} suggestion={suggestion} />
           ))}
         </div>

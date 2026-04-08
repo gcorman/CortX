@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { X, Pencil, Save, RotateCcw } from 'lucide-react'
+import { X, Pencil, Save, RotateCcw, Trash2, RefreshCw } from 'lucide-react'
 import { MarkdownRenderer } from './MarkdownRenderer'
 import { useUIStore } from '../../stores/uiStore'
 import { useGraphStore } from '../../stores/graphStore'
@@ -17,6 +17,9 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [isRewriting, setIsRewriting] = useState(false)
+  const [rewriteUndo, setRewriteUndo] = useState<{ commitHash: string } | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const addToast = useUIStore((s) => s.addToast)
   const reloadGraph = useGraphStore((s) => s.loadGraph)
   const reloadFiles = useFileStore((s) => s.loadFiles)
@@ -82,6 +85,36 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
     setIsEditing(true)
   }
 
+  async function handleRewrite(): Promise<void> {
+    if (isRewriting) return
+    setIsRewriting(true)
+    try {
+      const commitHash = await window.cortx.agent.rewriteFile(path)
+      setRewriteUndo({ commitHash })
+      await loadFile()
+      reloadGraph()
+      setTimeout(() => setRewriteUndo(null), 8000)
+    } catch (err) {
+      console.error('[FilePreview] rewrite failed', err)
+      addToast('Erreur lors de la réorganisation', 'error')
+    } finally {
+      setIsRewriting(false)
+    }
+  }
+
+  async function handleDelete(): Promise<void> {
+    try {
+      await window.cortx.agent.deleteFile(path)
+      addToast('Fichier supprimé', 'info')
+      await Promise.all([reloadGraph(), reloadFiles()])
+      onClose()
+    } catch (err) {
+      console.error('[FilePreview] delete failed', err)
+      addToast('Erreur lors de la suppression', 'error')
+      setConfirmDelete(false)
+    }
+  }
+
   const fileName = path.split('/').pop() || path
 
   return (
@@ -104,13 +137,48 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
             {!isEditing && content && (
-              <button
-                onClick={handleEnterEdit}
-                className="p-1.5 rounded hover:bg-cortx-elevated text-cortx-text-secondary hover:text-cortx-accent transition-colors cursor-pointer"
-                title="Modifier ce fichier"
-              >
-                <Pencil size={14} />
-              </button>
+              <>
+                <button
+                  onClick={handleRewrite}
+                  disabled={isRewriting}
+                  className="p-1.5 rounded hover:bg-cortx-elevated text-cortx-text-secondary hover:text-cortx-accent transition-colors cursor-pointer disabled:opacity-40"
+                  title="Reprendre la rédaction (réorganise sans perdre d'information)"
+                >
+                  <RefreshCw size={14} className={isRewriting ? 'animate-spin' : ''} />
+                </button>
+                {!confirmDelete ? (
+                  <button
+                    onClick={() => setConfirmDelete(true)}
+                    className="p-1.5 rounded hover:bg-red-500/10 text-cortx-text-secondary hover:text-red-400 transition-colors cursor-pointer"
+                    title="Supprimer ce fichier"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1 bg-red-500/10 border border-red-500/30 rounded px-2 py-0.5">
+                    <span className="text-2xs text-red-400">Supprimer ?</span>
+                    <button
+                      onClick={() => void handleDelete()}
+                      className="text-2xs text-red-400 hover:text-red-300 font-medium cursor-pointer transition-colors"
+                    >
+                      Oui
+                    </button>
+                    <button
+                      onClick={() => setConfirmDelete(false)}
+                      className="text-2xs text-cortx-text-secondary hover:text-cortx-text-primary cursor-pointer transition-colors"
+                    >
+                      Non
+                    </button>
+                  </div>
+                )}
+                <button
+                  onClick={handleEnterEdit}
+                  className="p-1.5 rounded hover:bg-cortx-elevated text-cortx-text-secondary hover:text-cortx-accent transition-colors cursor-pointer"
+                  title="Modifier ce fichier"
+                >
+                  <Pencil size={14} />
+                </button>
+              </>
             )}
             {isEditing && (
               <>
@@ -144,6 +212,37 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
             </button>
           </div>
         </div>
+
+        {/* Rewrite undo bar */}
+        {rewriteUndo && (
+          <div className="flex items-center justify-between px-4 py-2 bg-cortx-accent/10 border-b border-cortx-accent/20 flex-shrink-0">
+            <span className="text-xs text-cortx-text-primary">Rédaction réorganisée</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  try {
+                    await window.cortx.agent.undo(rewriteUndo.commitHash)
+                    setRewriteUndo(null)
+                    await loadFile()
+                    reloadGraph()
+                    addToast('Annulé', 'info')
+                  } catch {
+                    addToast("Erreur lors de l'annulation", 'error')
+                  }
+                }}
+                className="text-xs text-cortx-accent hover:text-cortx-accent-light cursor-pointer transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => setRewriteUndo(null)}
+                className="text-xs text-cortx-text-secondary/50 hover:text-cortx-text-primary cursor-pointer"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">

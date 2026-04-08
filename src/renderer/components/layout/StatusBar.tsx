@@ -1,12 +1,16 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Wifi, WifiOff, FileText, GitCommit, Settings } from 'lucide-react'
 import { useUIStore } from '../../stores/uiStore'
+import { useChatStore } from '../../stores/chatStore'
 
 export function StatusBar(): React.JSX.Element {
   const toggleSettings = useUIStore((s) => s.toggleSettings)
+  const isProcessing = useChatStore((s) => s.isProcessing)
   const [fileCount, setFileCount] = useState(0)
   const [lastCommit, setLastCommit] = useState('Aucun commit')
   const [llmStatus, setLlmStatus] = useState<'configured' | 'unconfigured'>('unconfigured')
+  const [progress, setProgress] = useState(0)
+  const [showProgress, setShowProgress] = useState(false)
 
   const refresh = useCallback(async () => {
     try {
@@ -58,8 +62,31 @@ export function StatusBar(): React.JSX.Element {
     }
   }, [settingsOpen, refresh])
 
+  useEffect(() => {
+    if (isProcessing) {
+      setShowProgress(true)
+      setProgress((p) => (p > 0 ? p : 0.05))
+      const interval = setInterval(() => {
+        setProgress((p) => {
+          if (p >= 0.92) return p
+          const delta = p < 0.6 ? 0.03 : p < 0.8 ? 0.015 : 0.007
+          return Math.min(0.92, p + delta)
+        })
+      }, 120)
+      return () => clearInterval(interval)
+    }
+
+    if (!showProgress) return
+    setProgress(1)
+    const timeout = setTimeout(() => {
+      setShowProgress(false)
+      setProgress(0)
+    }, 450)
+    return () => clearTimeout(timeout)
+  }, [isProcessing, showProgress])
+
   return (
-    <div className="flex-shrink-0 h-7 bg-cortx-surface border-t border-cortx-border px-4 flex items-center justify-between text-2xs text-cortx-text-secondary font-mono">
+    <div className="relative flex-shrink-0 h-7 bg-cortx-surface border-t border-cortx-border px-4 flex items-center justify-between text-2xs text-cortx-text-secondary font-mono">
       {/* Left section */}
       <div className="flex items-center gap-4">
         {/* LLM Status */}
@@ -105,6 +132,21 @@ export function StatusBar(): React.JSX.Element {
           <Settings size={11} />
           <span>Settings</span>
         </button>
+      </div>
+
+      {/* Progress bar */}
+      <div className="pointer-events-none absolute left-0 right-0 bottom-0 h-0.5 bg-cortx-border/60 overflow-hidden">
+        <div
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(progress * 100)}
+          className="h-full bg-gradient-to-r from-cortx-cta/40 via-cortx-cta to-cortx-accent transition-[width,opacity] duration-200 ease-out motion-reduce:transition-none"
+          style={{
+            width: `${Math.round(progress * 100)}%`,
+            opacity: showProgress ? 1 : 0
+          }}
+        />
       </div>
     </div>
   )

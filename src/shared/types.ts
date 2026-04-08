@@ -182,6 +182,8 @@ export interface CortxAPI {
     saveBrief(subject: string, body: string, kind?: string): Promise<string>
     listFiches(): Promise<Fiche[]>
     deleteFiche(filePath: string): Promise<void>
+    rewriteFile(filePath: string): Promise<string>
+    deleteFile(filePath: string): Promise<void>
   }
   app: {
     getBasePath(): Promise<string>

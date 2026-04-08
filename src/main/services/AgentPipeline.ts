@@ -303,6 +303,78 @@ export class AgentPipeline {
   }
 
   /**
+   * Rewrite a file: ask the LLM to reorganize its content while preserving
+   * every piece of information and all [[wikilinks]]. Commits the result so
+   * the user can undo it via agent:undo. Returns the commit hash.
+   */
+  async rewriteFile(filePath: string): Promise<string> {
+    const content = await this.fileService.readFile(filePath)
+    if (!content) throw new Error(`Fichier introuvable : ${filePath}`)
+
+    const systemPrompt = [
+      'Tu es un expert en organisation de notes Markdown.',
+      'Reorganise proprement ce fichier Markdown SANS perdre la moindre information et SANS modifier les wikilinks [[...]].',
+      '',
+      'REGLES ABSOLUES :',
+      '1. Conserve TOUTES les informations existantes — rien ne doit disparaitre.',
+      '2. Ne modifie pas les wikilinks [[Nom]] — laisse-les exactement tels quels.',
+      '3. Conserve le frontmatter YAML tel quel (entre les --- markers), sauf mettre a jour le champ "modified" avec la date du jour.',
+      '4. Restructure le corps en sections logiques avec des titres ## clairs.',
+      '5. Elimine les doublons evidents, regroupe les informations liees, utilise des bullet points si pertinent.',
+      '6. Retourne UNIQUEMENT le contenu Markdown final, sans commentaire, sans explication, sans bloc de code.'
+    ].join('\n')
+
+    const raw = await this.llmService.sendMessage(
+      [{ role: 'user', content: `Voici le fichier a reorganiser :\n\n${content.raw}` }],
+      systemPrompt
+    )
+
+    // Strip potential code fence wrapping the whole response
+    let clean = raw.trim()
+    const fenceMatch = clean.match(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```\s*$/i)
+    if (fenceMatch) clean = fenceMatch[1].trim()
+
+    await this.fileService.writeFile(filePath, clean + '\n')
+
+    let commitHash = ''
+    try {
+      commitHash = await this.gitService.commitAll(`Rewrite: ${filePath}`)
+    } catch (err) {
+      console.error('[AgentPipeline] Git commit failed on rewriteFile:', err)
+    }
+
+    await this.reindexAll()
+
+    this.dbService.logAgentAction(
+      `Reecriture de ${filePath}`,
+      'rewrite',
+      JSON.stringify([{ action: 'modify', file: filePath }]),
+      commitHash
+    )
+
+    return commitHash
+  }
+
+  /**
+   * Delete any Markdown file in the knowledge base (excluding _System/).
+   * Commits the deletion and reindexes.
+   */
+  async deleteFile(filePath: string): Promise<void> {
+    if (filePath.startsWith('_System/') || filePath.startsWith('_System\\')) {
+      throw new Error('deleteFile refuses to delete system files')
+    }
+    // Remove from DB immediately so the graph/FTS are clean before commit
+    this.dbService.removeFile(filePath)
+    await this.fileService.deleteFile(filePath)
+    try {
+      await this.gitService.commitAll(`Delete: ${filePath}`)
+    } catch (err) {
+      console.error('[AgentPipeline] Git commit failed on deleteFile:', err)
+    }
+    await this.reindexAll()
+  }
+
+  /**
    * Delete a fiche file, commit and reindex.
    */
   async deleteFiche(filePath: string): Promise<void> {
@@ -526,6 +598,9 @@ export class AgentPipeline {
     }
     for (const content of contents) this.dbService.indexFile(content)
     for (const content of contents) this.dbService.indexFile(content)
+
+    // Remove DB entries for files that no longer exist on disk (e.g. after deletion).
+    this.dbService.purgeStaleFiles(new Set(files))
   }
 
   private normalizeActions(rawActions: RawAction[]): Array<{
@@ -642,12 +717,123 @@ export class AgentPipeline {
   }
 
   private parseResponse(raw: string): RawAgentResponse {
-    try { return JSON.parse(raw) } catch { /* continue */ }
-    const codeBlockMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)```/)
-    if (codeBlockMatch) { try { return JSON.parse(codeBlockMatch[1]) } catch { /* continue */ } }
-    const jsonMatch = raw.match(/\{[\s\S]*\}/)
-    if (jsonMatch) { try { return JSON.parse(jsonMatch[0]) } catch { /* continue */ } }
+    const candidates: string[] = []
+    const trimmed = raw.trim()
+    candidates.push(trimmed)
+
+    const codeBlockMatch = trimmed.match(/```(?:json)?\s*\n?([\s\S]*?)```/i)
+    if (codeBlockMatch) candidates.push(codeBlockMatch[1].trim())
+
+    const jsonMatch = trimmed.match(/\{[\s\S]*\}/)
+    if (jsonMatch) candidates.push(jsonMatch[0].trim())
+
+    for (const c of candidates) {
+      const direct = this.tryParseJson(c)
+      if (direct) return direct
+      const repaired = this.tryParseJson(this.repairJson(c))
+      if (repaired) return repaired
+    }
+
     return { input_type: 'question', actions: [], response: raw, conflicts: [], ambiguities: [], suggestions: [] }
+  }
+
+  private tryParseJson(input: string): RawAgentResponse | null {
+    if (!input) return null
+    try {
+      return JSON.parse(input) as RawAgentResponse
+    } catch {
+      return null
+    }
+  }
+
+  private repairJson(input: string): string {
+    let out = input.trim()
+    // Remove BOM if present
+    if (out.charCodeAt(0) === 0xfeff) out = out.slice(1)
+    // Escape raw control chars inside JSON strings (common LLM failure with multiline content).
+    out = this.escapeControlCharsInStrings(out)
+    // Remove trailing commas outside strings.
+    out = this.removeTrailingCommas(out)
+    return out
+  }
+
+  private escapeControlCharsInStrings(input: string): string {
+    let out = ''
+    let inString = false
+    let escaped = false
+
+    for (let i = 0; i < input.length; i++) {
+      const ch = input[i]
+      if (inString) {
+        if (escaped) {
+          out += ch
+          escaped = false
+          continue
+        }
+        if (ch === '\\') {
+          out += ch
+          escaped = true
+          continue
+        }
+        if (ch === '"') {
+          inString = false
+          out += ch
+          continue
+        }
+        if (ch === '\n') { out += '\\n'; continue }
+        if (ch === '\r') { out += '\\r'; continue }
+        if (ch === '\t') { out += '\\t'; continue }
+        out += ch
+        continue
+      }
+
+      if (ch === '"') inString = true
+      out += ch
+    }
+
+    return out
+  }
+
+  private removeTrailingCommas(input: string): string {
+    let out = ''
+    let inString = false
+    let escaped = false
+
+    for (let i = 0; i < input.length; i++) {
+      const ch = input[i]
+
+      if (inString) {
+        out += ch
+        if (escaped) {
+          escaped = false
+        } else if (ch === '\\') {
+          escaped = true
+        } else if (ch === '"') {
+          inString = false
+        }
+        continue
+      }
+
+      if (ch === '"') {
+        inString = true
+        out += ch
+        continue
+      }
+
+      if (ch === ',') {
+        let j = i + 1
+        while (j < input.length && /\s/.test(input[j])) j++
+        const next = input[j]
+        if (next === '}' || next === ']') {
+          // Skip this trailing comma
+          continue
+        }
+      }
+
+      out += ch
+    }
+
+    return out
   }
 
   private async executeActions(actions: Array<{

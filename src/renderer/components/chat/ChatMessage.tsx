@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { User, Brain, FilePlus, FileEdit, Copy, Check, Eye, HelpCircle } from 'lucide-react'
+import { User, Brain, FilePlus, FileEdit, Copy, Check, Eye, HelpCircle, Lightbulb, X } from 'lucide-react'
 import { ActionButtons } from './ActionButtons'
 import { ActionPreview } from './ActionPreview'
 import { WikiText } from '../../utils/wikilink'
@@ -23,6 +23,9 @@ export function ChatMessage({ message }: ChatMessageProps): React.JSX.Element {
   const [copied, setCopied] = useState(false)
   const [previewAction, setPreviewAction] = useState<AgentAction | null>(null)
   const answerClarification = useChatStore((s) => s.answerClarification)
+  const dismissSuggestion = useChatStore((s) => s.dismissSuggestion)
+  const acceptSuggestion = useChatStore((s) => s.acceptSuggestion)
+  const dismissedSuggestions = useChatStore((s) => s.dismissedSuggestions)
 
   function handleCopy(): void {
     const text = isUser
@@ -146,14 +149,35 @@ export function ChatMessage({ message }: ChatMessageProps): React.JSX.Element {
         {/* Suggestions */}
         {response?.suggestions && response.suggestions.length > 0 && (
           <div className="space-y-1">
-            {response.suggestions.map((suggestion, i) => (
-              <div
-                key={i}
-                className="text-xs text-cortx-accent-light bg-cortx-accent/5 border border-cortx-accent/20 rounded px-2.5 py-1.5"
-              >
-                <WikiText text={suggestion} />
-              </div>
-            ))}
+            {response.suggestions
+              .filter((s) => !dismissedSuggestions.has(s))
+              .map((suggestion, i) => (
+                <div
+                  key={i}
+                  className="group/sugg flex items-start gap-2 text-xs text-cortx-accent-light bg-cortx-accent/5 border border-cortx-accent/20 rounded px-2.5 py-1.5"
+                >
+                  <Lightbulb size={12} className="text-cortx-accent flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <WikiText text={suggestion} />
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                      onClick={() => void acceptSuggestion(suggestion)}
+                      className="px-1.5 py-0.5 rounded text-2xs bg-cortx-accent/15 hover:bg-cortx-accent/25 text-cortx-accent transition-colors cursor-pointer"
+                      title="Demander à l'agent d'appliquer cette suggestion"
+                    >
+                      Accepter
+                    </button>
+                    <button
+                      onClick={() => dismissSuggestion(suggestion)}
+                      className="p-0.5 rounded hover:bg-cortx-elevated text-cortx-text-secondary/60 hover:text-cortx-text-primary transition-colors cursor-pointer"
+                      title="Ignorer cette suggestion"
+                    >
+                      <X size={11} />
+                    </button>
+                  </div>
+                </div>
+              ))}
           </div>
         )}
 

@@ -22,6 +22,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   isLoading: false,
 
   loadGraph: async () => {
+    if (get().nodes.length === 0) set({ isLoading: true })
     try {
       const data: GraphData = await window.cortx.db.getGraphData()
       console.log('[GraphStore] Loaded graph data:', data.nodes.length, 'nodes,', data.edges.length, 'edges')

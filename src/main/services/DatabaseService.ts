@@ -485,6 +485,45 @@ export class DatabaseService {
     ).run(inputText, inputType, actionsJson, commitHash, status)
   }
 
+  /**
+   * Fully remove a file and all its DB traces: files table, FTS index,
+   * entity row, and all relations where this entity is source OR target.
+   */
+  removeFile(filePath: string): void {
+    // Find the entity for this file before removing it
+    const entity = this.db.prepare(
+      'SELECT id FROM entities WHERE file_path = ?'
+    ).get(filePath) as { id: number } | undefined
+
+    if (entity) {
+      // Remove all relations involving this entity (as source or target)
+      this.db.prepare(
+        'DELETE FROM relations WHERE source_entity_id = ? OR target_entity_id = ?'
+      ).run(entity.id, entity.id)
+      // Also remove relations from other files that pointed to this entity
+      // (handled above via target_entity_id = entity.id)
+      this.db.prepare('DELETE FROM entities WHERE id = ?').run(entity.id)
+    }
+
+    // Clean FTS and files table
+    this.db.prepare('DELETE FROM files_fts WHERE path = ?').run(filePath)
+    this.db.prepare('DELETE FROM files WHERE path = ?').run(filePath)
+  }
+
+  /**
+   * Remove DB entries for any file paths that no longer exist on disk.
+   * Called at the end of reindexAll to keep the DB in sync after deletions.
+   */
+  purgeStaleFiles(existingPaths: Set<string>): void {
+    const dbPaths = (this.db.prepare('SELECT path FROM files').all() as Array<{ path: string }>)
+      .map((r) => r.path)
+    for (const p of dbPaths) {
+      if (!existingPaths.has(p)) {
+        this.removeFile(p)
+      }
+    }
+  }
+
   addRelation(sourceId: number, targetId: number, relationType: string, sourceFile: string): void {
     // Check for existing relation
     const existing = this.db.prepare(

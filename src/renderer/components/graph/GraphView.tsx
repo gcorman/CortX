@@ -1,10 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import cytoscape from 'cytoscape'
 import coseBilkent from 'cytoscape-cose-bilkent'
 import fcose from 'cytoscape-fcose'
 import { useGraphStore } from '../../stores/graphStore'
 import { useUIStore } from '../../stores/uiStore'
-import { Network, LayoutGrid } from 'lucide-react'
+import { useFileStore } from '../../stores/fileStore'
+import { Network, LayoutGrid, Trash2, RefreshCw } from 'lucide-react'
 
 // Register extensions — fcose takes priority over cose-bilkent for all layouts
 try { cytoscape.use(fcose as unknown as cytoscape.Ext) } catch { /* already registered */ }
@@ -219,11 +220,61 @@ export function GraphView(): React.JSX.Element {
   // Snapshot of last data so we can replay it once the container is ready
   const pendingDataRef = useRef<{ nodes: typeof nodes; edges: typeof edges; filterTypes: Set<string> } | null>(null)
 
+  const [contextMenu, setContextMenu] = useState<{
+    x: number; y: number; filePath: string; label: string
+  } | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [isRewriting, setIsRewriting] = useState(false)
+  const [rewriteUndo, setRewriteUndo] = useState<{ commitHash: string } | null>(null)
+
   const { nodes, edges, isLoading, loadGraph, filterTypes, toggleFilterType } = useGraphStore()
   const openFilePreview = useUIStore((s) => s.openFilePreview)
+  const addToast = useUIStore((s) => s.addToast)
   const theme = useUIStore((s) => s.theme)
+  const loadFiles = useFileStore((s) => s.loadFiles)
   const openFilePreviewRef = useRef(openFilePreview)
   useEffect(() => { openFilePreviewRef.current = openFilePreview }, [openFilePreview])
+
+  // Close context menu on Escape
+  useEffect(() => {
+    if (!contextMenu) return
+    const handler = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') { setContextMenu(null); setConfirmDelete(false) }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [contextMenu])
+
+  async function handleRewrite(): Promise<void> {
+    if (!contextMenu) return
+    setIsRewriting(true)
+    try {
+      const commitHash = await window.cortx.agent.rewriteFile(contextMenu.filePath)
+      setContextMenu(null)
+      setRewriteUndo({ commitHash })
+      await loadGraph()
+      setTimeout(() => setRewriteUndo(null), 8000)
+    } catch (err) {
+      console.error(err)
+      addToast('Erreur lors de la rédaction', 'error')
+    } finally {
+      setIsRewriting(false)
+    }
+  }
+
+  async function handleDelete(): Promise<void> {
+    if (!contextMenu) return
+    try {
+      await window.cortx.agent.deleteFile(contextMenu.filePath)
+      setContextMenu(null)
+      setConfirmDelete(false)
+      await Promise.all([loadGraph(), loadFiles()])
+      addToast('Fichier supprimé', 'info')
+    } catch (err) {
+      console.error(err)
+      addToast('Erreur lors de la suppression', 'error')
+    }
+  }
 
   // Rebuild Cytoscape style when theme changes (colors come from CSS variables)
   useEffect(() => {
@@ -288,6 +339,16 @@ export function GraphView(): React.JSX.Element {
     cy.on('dbltap', 'node', (evt) => {
       const fp = (evt.target as cytoscape.NodeSingular).data('filePath') as string
       if (fp) openFilePreviewRef.current(fp)
+    })
+
+    cy.on('cxttap', 'node', (evt) => {
+      const node = evt.target as cytoscape.NodeSingular
+      const fp = node.data('filePath') as string
+      const label = node.data('label') as string
+      if (!fp) return
+      const pos = evt.renderedPosition
+      setContextMenu({ x: pos.x, y: pos.y, filePath: fp, label })
+      setConfirmDelete(false)
     })
 
     // ── Live physics drag ──────────────────────────────────────────────────
@@ -366,6 +427,12 @@ export function GraphView(): React.JSX.Element {
       (e) => filteredNodeIds.has(e.source) && filteredNodeIds.has(e.target)
     )
 
+    // Save existing node positions so incremental updates don't reset them
+    const savedPositions = new Map<string, { x: number; y: number }>()
+    cy.nodes().forEach((node) => {
+      savedPositions.set(node.id() as string, { ...node.position() })
+    })
+
     selectedNodeRef.current = null
     cy.elements().remove()
     if (filteredNodes.length === 0) return
@@ -383,6 +450,26 @@ export function GraphView(): React.JSX.Element {
         }
       }))
     ])
+
+    // Restore saved positions; place brand-new nodes with random jitter near
+    // the origin so force-directed physics can spread them naturally.
+    const centerX = savedPositions.size > 0
+      ? Array.from(savedPositions.values()).reduce((s, p) => s + p.x, 0) / savedPositions.size
+      : 0
+    const centerY = savedPositions.size > 0
+      ? Array.from(savedPositions.values()).reduce((s, p) => s + p.y, 0) / savedPositions.size
+      : 0
+    cy.nodes().forEach((node) => {
+      const saved = savedPositions.get(node.id() as string)
+      if (saved) {
+        node.position(saved)
+      } else {
+        node.position({
+          x: centerX + (Math.random() - 0.5) * 120,
+          y: centerY + (Math.random() - 0.5) * 120
+        })
+      }
+    })
 
     const isFirst = !layoutRanOnce.current
     const layout = cy.layout(
@@ -408,37 +495,125 @@ export function GraphView(): React.JSX.Element {
     applyData(cy, nodes, edges, filterTypes)
   }, [nodes, edges, filterTypes]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (isLoading && nodes.length === 0) {
-    return (
-      <div className="flex-1 flex items-center justify-center text-cortx-text-secondary">
-        <span className="text-sm">Chargement du graphe...</span>
-      </div>
-    )
-  }
-
-  if (nodes.length === 0) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center px-8">
-        <div className="w-14 h-14 rounded-full bg-cortx-surface flex items-center justify-center mb-4">
-          <Network size={28} className="text-cortx-text-secondary/40" />
-        </div>
-        <h3 className="text-sm font-medium text-cortx-text-secondary mb-1">Graphe vide</h3>
-        <p className="text-xs text-cortx-text-secondary/60 max-w-[280px]">
-          Commence par capturer des informations via la conversation.
-        </p>
-      </div>
-    )
-  }
-
+  // Always render the container div so the Cytoscape setup effect can attach
+  // to it on the very first mount — even before data loads.
+  // Loading / empty states are overlaid on top rather than replacing the container.
   return (
     <div className="flex-1 relative w-full h-full">
+      {/* Cytoscape canvas — always present so the setup effect can attach */}
       <div ref={containerRef} className="absolute inset-0 w-full h-full" />
-      <GraphFilterBar filterTypes={filterTypes} toggleFilterType={toggleFilterType} cyRef={cyRef} />
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none select-none">
-        <p className="text-2xs text-cortx-text-secondary/40 bg-cortx-surface/70 backdrop-blur-sm px-2.5 py-1 rounded-full border border-cortx-border/30">
-          Clic = sélectionner · Double-clic = ouvrir · Glisser = déplacer
-        </p>
-      </div>
+
+      {/* Loading overlay */}
+      {isLoading && nodes.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <span className="text-sm text-cortx-text-secondary">Chargement du graphe...</span>
+        </div>
+      )}
+
+      {/* Empty state overlay */}
+      {!isLoading && nodes.length === 0 && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-8 pointer-events-none">
+          <div className="w-14 h-14 rounded-full bg-cortx-surface flex items-center justify-center mb-4">
+            <Network size={28} className="text-cortx-text-secondary/40" />
+          </div>
+          <h3 className="text-sm font-medium text-cortx-text-secondary mb-1">Graphe vide</h3>
+          <p className="text-xs text-cortx-text-secondary/60 max-w-[280px]">
+            Commence par capturer des informations via la conversation.
+          </p>
+        </div>
+      )}
+
+      {nodes.length > 0 && (
+        <GraphFilterBar filterTypes={filterTypes} toggleFilterType={toggleFilterType} cyRef={cyRef} />
+      )}
+      {nodes.length > 0 && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none select-none">
+          <p className="text-2xs text-cortx-text-secondary/40 bg-cortx-surface/70 backdrop-blur-sm px-2.5 py-1 rounded-full border border-cortx-border/30">
+            Clic = sélectionner · Double-clic = ouvrir · Clic droit = menu · Glisser = déplacer
+          </p>
+        </div>
+      )}
+
+      {/* Undo bar after rewrite */}
+      {rewriteUndo && (
+        <div className="absolute top-3 right-3 z-30 flex items-center gap-2 bg-cortx-surface border border-cortx-border rounded-card px-3 py-2 shadow-lg">
+          <span className="text-xs text-cortx-text-primary">Rédaction réorganisée</span>
+          <button
+            onClick={async () => {
+              try {
+                await window.cortx.agent.undo(rewriteUndo.commitHash)
+                setRewriteUndo(null)
+                await loadGraph()
+                addToast('Annulé', 'info')
+              } catch {
+                addToast("Erreur lors de l'annulation", 'error')
+              }
+            }}
+            className="text-xs text-cortx-accent hover:text-cortx-accent-light cursor-pointer transition-colors"
+          >
+            Annuler
+          </button>
+          <button
+            onClick={() => setRewriteUndo(null)}
+            className="text-xs text-cortx-text-secondary/50 hover:text-cortx-text-primary cursor-pointer"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* Context menu */}
+      {contextMenu && (
+        <>
+          <div
+            className="absolute inset-0 z-10"
+            onClick={() => { setContextMenu(null); setConfirmDelete(false) }}
+          />
+          <div
+            className="absolute z-20 bg-cortx-surface border border-cortx-border rounded-card shadow-xl py-1 min-w-[200px]"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+          >
+            <div className="px-3 py-1.5 text-2xs text-cortx-text-secondary/60 border-b border-cortx-border truncate">
+              {contextMenu.label}
+            </div>
+            <button
+              onClick={handleRewrite}
+              disabled={isRewriting}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-cortx-text-primary hover:bg-cortx-elevated transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw size={13} className={isRewriting ? 'animate-spin' : ''} />
+              {isRewriting ? 'Réorganisation...' : 'Reprendre la rédaction'}
+            </button>
+            {!confirmDelete ? (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+              >
+                <Trash2 size={13} />
+                Supprimer
+              </button>
+            ) : (
+              <div className="px-3 py-2 space-y-1.5">
+                <p className="text-xs text-red-400">Supprimer définitivement ?</p>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={handleDelete}
+                    className="flex-1 text-xs bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded px-2 py-1 transition-colors cursor-pointer"
+                  >
+                    Supprimer
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(false)}
+                    className="flex-1 text-xs bg-cortx-elevated hover:bg-cortx-border text-cortx-text-secondary rounded px-2 py-1 transition-colors cursor-pointer"
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }

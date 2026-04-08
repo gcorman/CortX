@@ -9,11 +9,15 @@ import { useFicheStore } from './ficheStore'
 interface ChatState {
   messages: ChatMessage[]
   isProcessing: boolean
+  /** Set of suggestion texts the user has dismissed — hides them from chat AND right panel */
+  dismissedSuggestions: Set<string>
   sendMessage: (content: string) => Promise<void>
   acceptActions: (messageId: string) => Promise<void>
   rejectActions: (messageId: string) => void
   undoActions: (commitHash: string, messageId: string) => Promise<void>
   answerClarification: (messageId: string, optionIndex: number) => Promise<void>
+  dismissSuggestion: (text: string) => void
+  acceptSuggestion: (text: string) => Promise<void>
 }
 
 interface SlashRewrite {
@@ -67,6 +71,7 @@ function rewriteSlashCommand(input: string): SlashRewrite {
 export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   isProcessing: false,
+  dismissedSuggestions: new Set<string>(),
 
   sendMessage: async (content: string) => {
     const userMessage: ChatMessage = {
@@ -106,14 +111,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
     // (they are already injected as explicit context above)
     const strippedContent = content.replace(/@\[([^\]]+)\]/g, '@$1')
 
-    // Intercept slash commands and rewrite them as explicit directives for the LLM
-    const baseContent = mentionContext
-      ? `[FICHIERS CITES PAR L'UTILISATEUR — traite-les comme contexte prioritaire]\n${mentionContext}\n${strippedContent}`
-      : strippedContent
-    const rewrite = rewriteSlashCommand(baseContent)
+    // Intercept slash commands BEFORE injecting mention context.
+    // Otherwise the prepended context hides the leading "/" and breaks /brief, /synthese, etc.
+    const rewrite = rewriteSlashCommand(strippedContent)
+
+    const finalPrompt = mentionContext
+      ? `[FICHIERS CITES PAR L'UTILISATEUR — traite-les comme contexte prioritaire]\n${mentionContext}\n${rewrite.prompt}`
+      : rewrite.prompt
 
     try {
-      const response: AgentResponse = await window.cortx.agent.process(rewrite.prompt)
+      const response: AgentResponse = await window.cortx.agent.process(finalPrompt)
 
       // For long-form commands (brief, synthese, digest), the full response is
       // archived as a fiche — show only a short confirmation in the chat to
@@ -288,6 +295,65 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     try {
       const response: AgentResponse = await window.cortx.agent.process(followup)
+      const agentMessage: ChatMessage = {
+        id: Date.now().toString(36) + 'a',
+        role: 'agent',
+        content: response.summary || response.response || '',
+        timestamp: new Date().toISOString(),
+        agentResponse: response
+      }
+      set((s) => ({ messages: [...s.messages, agentMessage], isProcessing: false }))
+      if (response.actions.length > 0) {
+        useAgentStore.getState().addActions(response)
+      }
+    } catch (error) {
+      const errorMessage: ChatMessage = {
+        id: Date.now().toString(36) + 'e',
+        role: 'agent',
+        content: `Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`,
+        timestamp: new Date().toISOString()
+      }
+      set((s) => ({ messages: [...s.messages, errorMessage], isProcessing: false }))
+      useUIStore.getState().addToast('Erreur lors du traitement', 'error')
+    }
+  },
+
+  dismissSuggestion: (text: string) => {
+    set((s) => {
+      const next = new Set(s.dismissedSuggestions)
+      next.add(text)
+      return { dismissedSuggestions: next }
+    })
+  },
+
+  acceptSuggestion: async (text: string) => {
+    // Mark dismissed everywhere immediately
+    set((s) => {
+      const next = new Set(s.dismissedSuggestions)
+      next.add(text)
+      return { dismissedSuggestions: next }
+    })
+
+    // Clean user-facing message; the actual order sent to the agent is more explicit
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(36) + 'u',
+      role: 'user',
+      content: `Applique cette suggestion : ${text}`,
+      timestamp: new Date().toISOString()
+    }
+    set((s) => ({ messages: [...s.messages, userMessage], isProcessing: true }))
+
+    const order = [
+      "[ORDRE EXPLICITE DE L'UTILISATEUR]",
+      'Execute IMMEDIATEMENT cette suggestion en creant ou modifiant les fichiers necessaires.',
+      'Tu DOIS retourner des actions concretes (create / modify), pas une nouvelle question, pas une nouvelle suggestion.',
+      'Si plusieurs interpretations sont possibles, choisis la plus pertinente et explique brievement ton choix dans "summary".',
+      '',
+      `Suggestion a appliquer : ${text}`
+    ].join('\n')
+
+    try {
+      const response: AgentResponse = await window.cortx.agent.process(order)
       const agentMessage: ChatMessage = {
         id: Date.now().toString(36) + 'a',
         role: 'agent',

@@ -21,7 +21,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps): React.JSX.
   )
 
   return (
-    <div className="prose prose-invert prose-sm max-w-none">
+    <div className="max-w-none text-sm text-cortx-text-primary/90">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -36,6 +36,12 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps): React.JSX.
           ),
           p: ({ children }) => (
             <p className="text-sm text-cortx-text-primary/90 leading-relaxed mb-3">{children}</p>
+          ),
+          ul: ({ children }) => (
+            <ul className="list-disc pl-5 mb-3 space-y-0.5">{children}</ul>
+          ),
+          ol: ({ children }) => (
+            <ol className="list-decimal pl-5 mb-3 space-y-0.5">{children}</ol>
           ),
           li: ({ children }) => (
             <li className="text-sm text-cortx-text-primary/90 leading-relaxed">{children}</li>
