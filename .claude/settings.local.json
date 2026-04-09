@@ -30,7 +30,17 @@
       "Bash(printf '{\"id\":\"e1\",\"cmd\":\"embed\",\"texts\":[\"Bonjour le monde\",\"Hello world\",\"CortX knowledge base\"]}\\\\n{\"id\":\"e2\",\"cmd\":\"embed_query\",\"text\":\"intelligence artificielle\"}\\\\n{\"id\":\"z\",\"cmd\":\"shutdown\"}')",
       "Bash(pip install:*)",
       "Bash(python -m PyInstaller --version)",
-      "Bash(python -m PyInstaller --onedir --name cortx-extractor --distpath dist --workpath build --noconfirm --clean cortx_extractor.py)"
+      "Bash(python -m PyInstaller --onedir --name cortx-extractor --distpath dist --workpath build --noconfirm --clean cortx_extractor.py)",
+      "Bash(python -m PyInstaller --onedir --name cortx-extractor --distpath dist --workpath build --noconfirm --collect-all docling --collect-all docling_core --collect-all docling_parse --collect-all docling_ibm_models --collect-all sentence_transformers --collect-all transformers --collect-all tokenizers --collect-all huggingface_hub --collect-all safetensors --collect-all torch --hidden-import docling.models.plugins --hidden-import docling.backend --hidden-import docling.pipeline --hidden-import PIL --hidden-import cv2 --hidden-import easyocr --hidden-import rtree cortx_extractor.py)",
+      "Bash(tasklist /FI \"IMAGENAME eq python.exe\")",
+      "Bash(tasklist)",
+      "Bash(dir \"C:\\\\Users\\\\gauti\\\\Documents\\\\GitHub\\\\CortX\\\\python-sidecar\\\\build\\\\cortx-extractor\")",
+      "Bash(cd /tmp)",
+      "Bash(printf '%s\\\\n%s\\\\n' '{\"id\":\"1\",\"cmd\":\"health\"}' '{\"id\":\"2\",\"cmd\":\"extract\",\"path\":\"C:\\\\\\\\Users\\\\\\\\gauti\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\test.md\"}')",
+      "Bash(\"C:/Users/gauti/Documents/GitHub/CortX/resources/python-sidecar/cortx-extractor.exe\")",
+      "Bash(pip show:*)",
+      "Bash(python -c \"import onnxruntime; print\\(onnxruntime.__file__\\)\")",
+      "Bash(python -c \"import omegaconf; print\\(omegaconf.__file__\\)\")"
     ]
   }
 }

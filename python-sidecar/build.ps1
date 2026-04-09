@@ -41,6 +41,26 @@ pyinstaller `
     --specpath "$ScriptDir" `
     --noconfirm `
     --clean `
+    --collect-all docling `
+    --collect-all docling_core `
+    --collect-all docling_parse `
+    --collect-all docling_ibm_models `
+    --collect-all sentence_transformers `
+    --collect-all transformers `
+    --collect-all tokenizers `
+    --collect-all huggingface_hub `
+    --collect-all safetensors `
+    --collect-all torch `
+    --collect-all rapidocr `
+    --collect-all onnxruntime `
+    --collect-all omegaconf `
+    --hidden-import docling.models.plugins `
+    --hidden-import docling.backend `
+    --hidden-import docling.pipeline `
+    --hidden-import PIL `
+    --hidden-import cv2 `
+    --hidden-import easyocr `
+    --hidden-import rtree `
     cortx_extractor.py
 
 if ($LASTEXITCODE -ne 0) {

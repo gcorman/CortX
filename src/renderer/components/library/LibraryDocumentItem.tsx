@@ -20,10 +20,17 @@ function MimeIcon({ mime }: { mime: string | null }) {
   return <File size={14} className="text-cortx-text-secondary flex-shrink-0" />
 }
 
-function StatusBadge({ status }: { status: LibraryDocument['status'] }) {
+function StatusBadge({ status, errorMessage }: { status: LibraryDocument['status']; errorMessage?: string }) {
   if (status === 'indexed') return null
   if (status === 'error')
-    return <span className="text-[10px] text-red-400 px-1.5 py-0.5 bg-red-400/10 rounded">erreur</span>
+    return (
+      <span
+        className="text-[10px] text-red-400 px-1.5 py-0.5 bg-red-400/10 rounded"
+        title={errorMessage ?? 'Erreur inconnue'}
+      >
+        erreur
+      </span>
+    )
   return (
     <span className="flex items-center gap-1 text-[10px] text-cortx-text-secondary">
       <Loader2 size={10} className="animate-spin" />
@@ -47,12 +54,17 @@ export function LibraryDocumentItem({ doc, isSelected, onSelect, onDelete, onOpe
           <span className="text-xs font-medium text-cortx-text-primary truncate">
             {doc.title || doc.filename}
           </span>
-          <StatusBadge status={doc.status} />
+          <StatusBadge status={doc.status} errorMessage={doc.errorMessage} />
         </div>
         {doc.author && (
           <p className="text-[10px] text-cortx-text-secondary truncate">{doc.author}</p>
         )}
         <p className="text-[10px] text-cortx-text-secondary/60 truncate">{doc.path}</p>
+        {doc.status === 'error' && doc.errorMessage && (
+          <p className="text-[10px] text-red-400/80 mt-0.5 break-words" title={doc.errorMessage}>
+            {doc.errorMessage.length > 140 ? doc.errorMessage.slice(0, 140) + '…' : doc.errorMessage}
+          </p>
+        )}
       </div>
 
       {/* Actions — visible on hover */}

@@ -28,16 +28,54 @@ import os
 # Lazy-loaded heavy imports — only imported on first use so the health check
 # responds fast even before models are fully loaded.
 # ---------------------------------------------------------------------------
-_docling_converter = None
+_docling_converter = None  # Tuple of (key, converter) or None
 _embed_model = None
 
 
-def _get_converter():
+def _get_converter(force_ocr: bool = False):
+    """
+    Returns a DocumentConverter configured for low memory usage.
+
+    Default mode ("fast"):
+      - OCR off
+      - Table structure off
+      - Layout batch size 1 (one page at a time)
+      - force_backend_text on (use PDF's embedded text layer directly)
+    This handles 95% of business PDFs (they have a text layer).
+
+    force_ocr mode:
+      - OCR on, but batch size 1 to limit memory
+    """
     global _docling_converter
-    if _docling_converter is None:
-        from docling.document_converter import DocumentConverter
-        _docling_converter = DocumentConverter()
-    return _docling_converter
+    key = "ocr" if force_ocr else "fast"
+    if _docling_converter is not None and _docling_converter[0] == key:
+        return _docling_converter[1]
+
+    from docling.document_converter import DocumentConverter, PdfFormatOption
+    from docling.datamodel.base_models import InputFormat
+    from docling.datamodel.pipeline_options import PdfPipelineOptions
+
+    pipeline_options = PdfPipelineOptions()
+    pipeline_options.do_ocr = force_ocr
+    pipeline_options.do_table_structure = False
+    pipeline_options.layout_batch_size = 1
+    pipeline_options.ocr_batch_size = 1
+    pipeline_options.generate_page_images = False
+    pipeline_options.generate_picture_images = False
+
+    if not force_ocr:
+        # Skip the heavy layout model — extract text directly from PDF backend.
+        # This avoids the preprocess stage that renders pages to images
+        # and causes std::bad_alloc on large documents.
+        pipeline_options.force_backend_text = True
+
+    converter = DocumentConverter(
+        format_options={
+            InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options),
+        }
+    )
+    _docling_converter = (key, converter)
+    return converter
 
 
 def _get_embed_model():
@@ -77,7 +115,8 @@ def cmd_extract(req: dict) -> dict:
     if not path or not os.path.isfile(path):
         return {"ok": False, "error": f"File not found: {path}"}
 
-    converter = _get_converter()
+    force_ocr = bool(req.get("ocr", False))
+    converter = _get_converter(force_ocr=force_ocr)
     result = converter.convert(path)
     doc = result.document
 

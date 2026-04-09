@@ -197,8 +197,10 @@ export class LibraryService {
       INSERT INTO library_chunks (document_id, chunk_index, page_from, page_to, heading, text)
       VALUES (?, ?, ?, ?, ?, ?)
     `)
-    // Delete stale chunks first (re-ingest case)
-    this.db.prepare('DELETE FROM library_chunks WHERE document_id = ?').run(id)
+    // Delete stale chunks first (re-ingest case).
+    // For external-content FTS5, we must use the special 'delete' command
+    // before removing the source rows — otherwise the FTS index corrupts.
+    this._deleteChunksAndFts(id)
 
     const insertMany = this.db.transaction((chks: typeof chunks) => {
       for (const c of chks) {
@@ -208,7 +210,6 @@ export class LibraryService {
     insertMany(chunks)
 
     // Rebuild FTS for this document
-    this.db.prepare('DELETE FROM library_chunks_fts WHERE document_id = ?').run(id)
     const rows = this.db.prepare('SELECT id, text, heading, document_id FROM library_chunks WHERE document_id = ?')
       .all(id) as Array<{ id: number; text: string; heading: string | null; document_id: string }>
     const insertFts = this.db.prepare(
@@ -394,7 +395,9 @@ export class LibraryService {
       if (fs.existsSync(cf)) fs.rmSync(cf)
     }
 
-    // DB cascades handle chunks / embeddings / links
+    // Clean up FTS5 external-content index *before* cascading delete
+    this._deleteChunksAndFts(id)
+    // Now cascade handles embeddings + links
     this.db.prepare('DELETE FROM library_documents WHERE id = ?').run(id)
   }
 
@@ -676,6 +679,35 @@ export class LibraryService {
       status: row.status as LibraryDocument['status'],
       errorMessage: row.error_message ?? undefined,
     }
+  }
+
+  /**
+   * Safely removes all chunks + their FTS5 entries for a document.
+   *
+   * External-content FTS5 tables cannot be updated with normal DELETE.
+   * We must issue the special `INSERT INTO fts(fts, rowid, ...) VALUES('delete', ...)`
+   * command *before* deleting the source rows, otherwise the FTS index corrupts
+   * and subsequent reads throw "database disk image is malformed".
+   */
+  private _deleteChunksAndFts(documentId: string): void {
+    const existing = this.db.prepare(
+      'SELECT id, text, heading, document_id FROM library_chunks WHERE document_id = ?'
+    ).all(documentId) as Array<{ id: number; text: string; heading: string | null; document_id: string }>
+
+    if (existing.length > 0) {
+      const deleteFts = this.db.prepare(
+        "INSERT INTO library_chunks_fts(library_chunks_fts, rowid, text, heading, document_id) VALUES('delete', ?, ?, ?, ?)"
+      )
+      const txn = this.db.transaction(() => {
+        for (const row of existing) {
+          deleteFts.run(row.id, row.text, row.heading ?? '', row.document_id)
+        }
+      })
+      txn()
+    }
+
+    // Now safe to delete the source rows
+    this.db.prepare('DELETE FROM library_chunks WHERE document_id = ?').run(documentId)
   }
 
   private _sha256(filePath: string): string {

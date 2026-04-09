@@ -7,6 +7,9 @@
 # Document extraction (PDF, DOCX, XLSX, PPTX, HTML...)
 docling>=2.0.0
 
+# OCR engine required by rapidocr (transitive docling dep)
+onnxruntime>=1.18.0
+
 # Semantic embeddings — multilingual FR/EN
 # Model used: intfloat/multilingual-e5-small (~120 MB, auto-downloaded on first run)
 sentence-transformers>=3.0.0

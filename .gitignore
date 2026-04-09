@@ -6,3 +6,6 @@ dist/
 *.db-shm
 .env
 AGENTS.md
+/python-sidecar/build/
+/python-sidecar/dist/
+resources/python-sidecar/

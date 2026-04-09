@@ -44,7 +44,7 @@ interface PendingRequest {
 // -------------------------------------------------------------------------
 
 /** Maximum time (ms) to wait for any single sidecar response. */
-const DEFAULT_TIMEOUT_MS = 120_000 // 2 min — large PDFs can take a while
+const DEFAULT_TIMEOUT_MS = 600_000 // 10 min — first PDF triggers docling model load (can be slow)
 
 /** Timeout for the health check only. */
 const HEALTH_TIMEOUT_MS = 10_000
@@ -208,6 +208,12 @@ export class PythonSidecar extends EventEmitter {
           if (resp.ok) {
             pending.resolve(resp)
           } else {
+            // Log the full error + traceback on the main process console so
+            // failures are visible even if the renderer only shows a short message.
+            console.error(`[PythonSidecar] Error response:`, resp.error)
+            if (resp.traceback) {
+              console.error(`[PythonSidecar] Traceback:\n${resp.traceback}`)
+            }
             pending.reject(new Error(resp.error ?? 'Sidecar returned ok=false'))
           }
         } else {
