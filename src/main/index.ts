@@ -281,7 +281,7 @@ app.whenReady().then(async () => {
   registerGitHandlers(() => gitService)
   registerAgentHandlers(() => agentPipeline)
   registerLibraryHandlers(() => libraryService, () => mainWindow)
-  registerIdleHandlers(() => idleService)
+  registerIdleHandlers(() => idleService, () => agentPipeline)
   setIdleServiceForAgent(idleService)
 
   createWindow()

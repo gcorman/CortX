@@ -1,10 +1,12 @@
-import { X, Archive, MessageSquare, Zap, GitBranch, AlertTriangle, Minus, Layers } from 'lucide-react'
+import { X, Archive, MessageSquare, Zap, GitBranch, AlertTriangle, Minus, Layers, Lightbulb, TrendingUp } from 'lucide-react'
 import type { IdleInsight } from '../../../shared/types'
 import { useIdleStore } from '../../stores/idleStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useChatStore } from '../../stores/chatStore'
 
 const CATEGORY_LABELS: Record<IdleInsight['category'], string> = {
+  opportunity: 'Opportunité',
+  development: 'À développer',
   hidden_connection: 'Connexion cachée',
   pattern: 'Pattern',
   contradiction: 'Contradiction',
@@ -13,6 +15,8 @@ const CATEGORY_LABELS: Record<IdleInsight['category'], string> = {
 }
 
 const CATEGORY_ICONS: Record<IdleInsight['category'], React.ComponentType<{ size: number; className?: string }>> = {
+  opportunity: Lightbulb,
+  development: TrendingUp,
   hidden_connection: GitBranch,
   pattern: Layers,
   contradiction: AlertTriangle,
@@ -21,6 +25,8 @@ const CATEGORY_ICONS: Record<IdleInsight['category'], React.ComponentType<{ size
 }
 
 const CATEGORY_COLORS: Record<IdleInsight['category'], string> = {
+  opportunity: 'text-yellow-300 bg-yellow-300/12',
+  development: 'text-emerald-400 bg-emerald-400/10',
   hidden_connection: 'text-teal-400 bg-teal-400/10',
   pattern: 'text-purple-400 bg-purple-400/10',
   contradiction: 'text-red-400 bg-red-400/10',

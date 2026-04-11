@@ -1,7 +1,11 @@
 import { ipcMain } from 'electron'
 import type { IdleService } from '../services/IdleService'
+import type { AgentPipeline } from '../services/AgentPipeline'
 
-export function registerIdleHandlers(getIdleService: () => IdleService): void {
+export function registerIdleHandlers(
+  getIdleService: () => IdleService,
+  getAgentPipeline: () => AgentPipeline
+): void {
   ipcMain.handle('idle:start', async () => {
     await getIdleService().start()
   })
@@ -19,7 +23,17 @@ export function registerIdleHandlers(getIdleService: () => IdleService): void {
   })
 
   ipcMain.handle('idle:saveInsightAsFiche', async (_event, id: string) => {
-    return getIdleService().saveInsightAsFiche(id)
+    // Build fiche content in IdleService (wikilinks, formatting)
+    const { subject, body } = getIdleService().buildInsightFicheContent(id)
+
+    // Delegate actual write + git commit + reindex to AgentPipeline.saveBrief
+    // so the fiche lands in Fiches/ with the right format and appears in FichePanel
+    const filePath = await getAgentPipeline().saveBrief(subject, body, 'idle-insight')
+
+    // Mark insight as saved in IdleService (persists to disk)
+    getIdleService().markInsightSaved(id)
+
+    return filePath
   })
 
   ipcMain.handle('idle:getConfig', () => {

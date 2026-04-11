@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import type { IdleInsight, IdleExplorationEvent } from '../../shared/types'
+import { useFicheStore } from './ficheStore'
+import { useGraphStore } from './graphStore'
 
 interface IdleState {
   isActive: boolean
@@ -64,11 +66,15 @@ export const useIdleStore = create<IdleState>((set, get) => ({
 
   saveInsightAsFiche: async (id: string) => {
     const path = await window.cortx.idle.saveInsightAsFiche(id)
+    // Mark saved in local store
     set((state) => ({
       insights: state.insights.map((i) =>
         i.id === id ? { ...i, status: 'saved' as const } : i
       )
     }))
+    // Immediately refresh FichePanel and graph so the new fiche appears without waiting for polls
+    void useFicheStore.getState().loadFiches()
+    void useGraphStore.getState().loadGraph()
     return path
   },
 

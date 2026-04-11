@@ -202,7 +202,7 @@ export interface IdleInsight {
   edgeKeys: string[]
   content: string
   confidence: number
-  category: 'hidden_connection' | 'pattern' | 'contradiction' | 'gap' | 'cluster'
+  category: 'hidden_connection' | 'pattern' | 'contradiction' | 'gap' | 'cluster' | 'opportunity' | 'development'
   status: 'new' | 'dismissed' | 'saved'
 }
 

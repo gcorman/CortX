@@ -78,37 +78,56 @@ export class IdleService {
     if (insight) { insight.status = 'dismissed'; this.persistInsights() }
   }
 
-  async saveInsightAsFiche(id: string): Promise<string> {
+  /**
+   * Build the subject + body for an insight fiche.
+   * The actual write, git commit and reindex are delegated to AgentPipeline.saveBrief
+   * via the IPC handler so the fiche lands in Fiches/ and appears in FichePanel.
+   */
+  buildInsightFicheContent(id: string): { subject: string; body: string } {
     const insight = this.insights.find((i) => i.id === id)
     if (!insight) throw new Error('Insight non trouvé')
 
-    const slug = insight.entityNames.join('_').replace(/\s+/g, '_').slice(0, 40)
-    const filename = `_insight_${slug}_${Date.now()}.md`
-    const absPath = join(this.basePath, 'Journal', filename)
+    const subject = `Insight : ${insight.entityNames.join(' × ')}`
+    const today = new Date().toLocaleDateString('fr-FR')
+    const confPct = Math.round(insight.confidence * 100)
 
-    const body = `---
-type: note
-status: brouillon
-tags: [idle-insight, ${insight.category}]
-created: ${new Date().toISOString().split('T')[0]}
----
+    const CATEGORY_LABELS: Record<string, string> = {
+      opportunity: 'Opportunité',
+      development: 'À développer',
+      hidden_connection: 'Connexion cachée',
+      pattern: 'Pattern',
+      contradiction: 'Contradiction',
+      gap: 'Lacune',
+      cluster: 'Cluster'
+    }
+    const catLabel = CATEGORY_LABELS[insight.category] ?? insight.category
 
-# Insight : ${insight.entityNames.join(' × ')}
+    // Build wikilinks for all entity names (they exist in the KB)
+    const wikilinkLines = insight.entityNames
+      .map((name) => `- [[${name}]]`)
+      .join('\n')
 
-**Catégorie** : ${insight.category}
-**Confiance** : ${Math.round(insight.confidence * 100)}%
+    const body = `**Catégorie** : ${catLabel} — **Confiance** : ${confPct}%
 
 ${insight.content}
 
----
-*Généré par l'agent en mode Idle le ${new Date().toLocaleDateString('fr-FR')}*
-`
+## Entités concernées
 
-    fs.mkdirSync(join(this.basePath, 'Journal'), { recursive: true })
-    fs.writeFileSync(absPath, body, 'utf-8')
-    insight.status = 'saved'
-    this.persistInsights()
-    return join('Journal', filename)
+${wikilinkLines}
+
+---
+*Généré par l'agent en mode Idle le ${today}*`
+
+    return { subject, body }
+  }
+
+  /** Mark an insight as saved without touching the file system. */
+  markInsightSaved(id: string): void {
+    const insight = this.insights.find((i) => i.id === id)
+    if (insight) {
+      insight.status = 'saved'
+      this.persistInsights()
+    }
   }
 
   getConfig(): IdleConfig { return { ...this.config } }
@@ -258,16 +277,23 @@ Sois EXTRÊMEMENT sélectif. Réponds en JSON strict, rien d'autre.`
       .map((d, i) => `${i + 1}. [${d.category}] "${d.content}" — entités: ${d.entityNames.join(', ')} (confiance brute: ${Math.round(d.confidence * 100)}%)`)
       .join('\n')
 
-    const userMsg = `Voici ${this.draftInsights.length} intuitions provisoires collectées au fil de l'exploration :
+    const userMsg = `Voici ${this.draftInsights.length} intuitions provisoires collectées en explorant la base de connaissances :
 
 ${draftList}
 
-Parmi celles-ci, sélectionne 0, 1 ou 2 insights qui méritent vraiment d'être mis en avant.
-Critères de sélection : connexion non-évidente, actionnable, vraiment surprenante.
-Réécris-les en les approfondissant si nécessaire (sois précis, concis, 1-3 phrases).
+## MISSION DE SYNTHÈSE
+Sélectionne 0, 1 ou 2 insights qui méritent vraiment d'être mis en avant.
 
-Si aucun ne mérite d'être mis en avant : {"promoted": []}
-Sinon : {"promoted": [{"category": "hidden_connection|pattern|contradiction|gap|cluster", "content": "...", "confidence": 0.0, "entityNames": ["..."], "entityIds": ["..."]}]}`
+Priorité absolue aux insights qui :
+1. Révèlent une **opportunité concrète** non encore exploitée
+2. Pointent vers quelque chose d'**actionnable** (approfondissement, connexion à créer, risque à surveiller)
+3. Sont **surprenants** — que l'utilisateur ne saurait pas sans cette analyse
+
+Écarte systématiquement les insights purement structurels ("il manque un lien") au profit des insights de fond.
+Réécris et affine les insights sélectionnés pour les rendre plus précis et percutants.
+
+Si aucun ne mérite vraiment : {"promoted": []}
+Sinon : {"promoted": [{"category": "opportunity|development|pattern|contradiction|hidden_connection|gap|cluster", "content": "...", "confidence": 0.0, "entityNames": ["..."], "entityIds": ["..."]}]}`
 
     try {
       const raw = await this.llmService.sendMessage(
@@ -292,10 +318,10 @@ Sinon : {"promoted": [{"category": "hidden_connection|pattern|contradiction|gap|
       for (const p of promoted) {
         if (!p.content || !p.confidence || p.confidence < 0.6) continue
 
-        const validCats = ['hidden_connection', 'pattern', 'contradiction', 'gap', 'cluster']
-        const category = validCats.includes(p.category ?? '')
+        const validCats: IdleInsight['category'][] = ['hidden_connection', 'pattern', 'contradiction', 'gap', 'cluster', 'opportunity', 'development']
+        const category = validCats.includes(p.category as IdleInsight['category'])
           ? (p.category as IdleInsight['category'])
-          : 'hidden_connection'
+          : 'opportunity'
 
         const entityNames = p.entityNames ?? []
         const entityIds = p.entityIds ?? lastNodeIds
@@ -343,10 +369,11 @@ Sinon : {"promoted": [{"category": "hidden_connection|pattern|contradiction|gap|
   }
 
   private makeThinkingThought(target: ExplorationTarget): string {
-    if (target.strategy === 'bridge') return `Y a-t-il un lien indirect entre ${target.entityNames.slice(0, 2).join(' et ')} ?`
-    if (target.strategy === 'cluster') return `Analyse du cluster : ${target.entityNames.slice(0, 3).join(', ')}`
-    if (target.strategy === 'peripheral') return `Connexion manquante autour de "${target.entityNames[0]}" ?`
-    return `Analyse croisée en cours…`
+    const names = target.entityNames.slice(0, 2).join(' et ')
+    if (target.strategy === 'bridge') return `Opportunité entre ${names} ?`
+    if (target.strategy === 'cluster') return `Que révèle le contenu de ${names} ?`
+    if (target.strategy === 'peripheral') return `Aspect sous-développé autour de "${target.entityNames[0]}" ?`
+    return `Analyse de fond en cours…`
   }
 
   // ── Target picking ─────────────────────────────────────────────────────────
@@ -448,7 +475,10 @@ Sinon : {"promoted": [{"category": "hidden_connection|pattern|contradiction|gap|
   // ── Context gathering ──────────────────────────────────────────────────────
 
   private async gatherContext(target: ExplorationTarget, entities: Entity[], relations: Relation[]): Promise<string> {
-    const lines: string[] = ['## ENTITÉS EXAMINÉES']
+    const lines: string[] = ['## ENTITÉS EXAMINÉES (contenu intégral)']
+
+    // Read examined entities — up to 500 words each for richer content analysis
+    const examIds = new Set(target.entityIds)
     for (let i = 0; i < target.entityIds.length; i++) {
       const entity = entities.find((e) => e.id === target.entityIds[i])
       lines.push(`\n### ${target.entityNames[i]} (type: ${entity?.type ?? 'inconnu'})`)
@@ -456,31 +486,60 @@ Sinon : {"promoted": [{"category": "hidden_connection|pattern|contradiction|gap|
         try {
           const content = await this.fileService.readFile(entity.filePath)
           if (content) {
-            const words = content.body.split(/\s+/).slice(0, 350)
-            lines.push(words.join(' ') + (content.body.split(/\s+/).length > 350 ? '…' : ''))
+            const words = content.body.split(/\s+/)
+            lines.push(words.slice(0, 500).join(' ') + (words.length > 500 ? '…' : ''))
           }
         } catch { lines.push('(Fichier non lisible)') }
+      } else {
+        lines.push('(Pas de fichier associé)')
       }
     }
 
-    const ids = new Set(target.entityIds)
-    const relevant = relations.filter((r) => ids.has(r.sourceEntityId) && ids.has(r.targetEntityId))
+    // Add brief excerpts of direct neighbors for extra context
+    const neighborIds = new Set<number>()
+    for (const r of relations) {
+      if (examIds.has(r.sourceEntityId) && !examIds.has(r.targetEntityId)) neighborIds.add(r.targetEntityId)
+      if (examIds.has(r.targetEntityId) && !examIds.has(r.sourceEntityId)) neighborIds.add(r.sourceEntityId)
+    }
+    if (neighborIds.size > 0) {
+      lines.push('\n## ENTITÉS VOISINES (contexte élargi)')
+      let neighborCount = 0
+      for (const nid of neighborIds) {
+        if (neighborCount >= 3) break
+        const ne = entities.find((e) => e.id === nid)
+        if (!ne) continue
+        lines.push(`- **${ne.name}** (${ne.type})`)
+        if (ne.filePath) {
+          try {
+            const content = await this.fileService.readFile(ne.filePath)
+            if (content) {
+              const excerpt = content.body.split(/\s+/).slice(0, 80).join(' ')
+              lines.push(`  ${excerpt}…`)
+            }
+          } catch { /* skip */ }
+        }
+        neighborCount++
+      }
+    }
+
+    // Relations between examined entities
+    const relevant = relations.filter((r) => examIds.has(r.sourceEntityId) && examIds.has(r.targetEntityId))
     if (relevant.length > 0) {
-      lines.push('\n## RELATIONS CONNUES')
+      lines.push('\n## RELATIONS DOCUMENTÉES')
       for (const r of relevant) {
         const src = entities.find((e) => e.id === r.sourceEntityId)
         const tgt = entities.find((e) => e.id === r.targetEntityId)
         lines.push(`- ${src?.name} → [${r.relationType}] → ${tgt?.name}`)
       }
     } else {
-      lines.push('\n## RELATIONS CONNUES\n(Aucune relation directe — potentiel pont !)')
+      lines.push('\n## RELATIONS DOCUMENTÉES\n(Aucune relation directe entre ces entités)')
     }
 
+    // Global KB summary
     const typeCount = new Map<string, number>()
     for (const e of entities) typeCount.set(e.type, (typeCount.get(e.type) ?? 0) + 1)
-    lines.push(`\n## CONTEXTE GLOBAL\n${entities.length} entités (${[...typeCount.entries()].map(([t, c]) => `${c} ${t}`).join(', ')}), ${relations.length} relations.`)
-    lines.push(`Stratégie : ${target.strategy}`)
-    lines.push(`Brouillons en attente de synthèse : ${this.draftInsights.length}`)
+    lines.push(`\n## BASE DE CONNAISSANCES\n${entities.length} entités (${[...typeCount.entries()].map(([t, c]) => `${c} ${t}`).join(', ')}), ${relations.length} relations.`)
+    lines.push(`Stratégie d'exploration : ${target.strategy} | Brouillons accumulés : ${this.draftInsights.length}`)
 
     return lines.join('\n')
   }
@@ -490,29 +549,54 @@ Sinon : {"promoted": [{"category": "hidden_connection|pattern|contradiction|gap|
   private async evaluateInsight(
     context: string
   ): Promise<{ content: string; confidence: number; category: IdleInsight['category'] } | null> {
-    const systemPrompt = `Tu es un analyste perspicace d'une base de connaissances personnelle.
-Tu cherches des connexions non-évidentes, patterns ou lacunes. Réponds UNIQUEMENT en JSON valide.`
+    const systemPrompt = `Tu es un analyste stratégique et intellectuel qui explore une base de connaissances personnelle.
+Tu analyses à la fois la STRUCTURE du graphe ET le CONTENU des notes pour dégager des insights à valeur ajoutée.
+Réponds UNIQUEMENT en JSON valide, rien d'autre.`
 
     const userMessage = `${context}
 
-## TÂCHE
-Examine ces entités. Cherche UNE chose remarquable parmi :
-1. Lien non-évident ou indirect non documenté
-2. Pattern récurrent dans leurs relations
-3. Contradiction ou tension entre informations
-4. Lacune notable (relation attendue mais absente)
-5. Cluster thématique surprenant
+## MISSION
+Analyse ces entités sous deux angles complémentaires et cherche UNE observation remarquable :
 
-## RÈGLES CRITIQUES
-- Ne signale JAMAIS l'évident ou le déjà documenté.
-- Si rien d'intéressant : {"found": false}
-- Sois bref et précis (1-3 phrases max).
-- Confiance : 0.9+ = preuves solides · 0.7-0.9 = inférence plausible · 0.4-0.7 = spéculatif mais potentiellement utile
+**A) ANALYSE DE FOND — priorité haute**
+Lis le contenu des notes et demande-toi :
+- Y a-t-il une opportunité business, stratégique ou intellectuelle que l'utilisateur n'a pas encore explorée ?
+- Un sujet ou domaine sous-représenté qui mériterait d'être approfondi ?
+- Une convergence entre des sujets qui semblent pointer vers la même direction ?
+- Un risque, une tension ou une contradiction dans les idées ou plans documentés ?
+- Un angle d'action concret que le contenu suggère implicitement ?
 
-## FORMAT JSON (strict, rien d'autre)
+**B) ANALYSE STRUCTURELLE — priorité secondaire**
+- Un lien indirect non documenté entre ces entités ?
+- Une connexion attendue qui manque ?
+- Un pattern dans la façon dont ces entités sont reliées ?
+
+## RÈGLES ABSOLUES
+- Prioritise toujours l'analyse de fond sur l'analyse structurelle
+- Ne signale JAMAIS l'évident, le déjà documenté, ou le trivial
+- Si rien de vraiment intéressant : {"found": false} — c'est la réponse normale la plupart du temps
+- Sois concret, précis, actionnable (1-3 phrases max)
+- Ne génère PAS de conseils génériques ("il faudrait mieux documenter…")
+
+## GUIDE DE CONFIANCE
+- 0.85-1.0 : insight solide, supporté par le contenu, directement actionnable
+- 0.65-0.85 : inférence plausible, bien fondée
+- 0.45-0.65 : piste intéressante mais spéculative
+- < 0.45 : trop incertain, ne pas signaler
+
+## CATÉGORIES
+- opportunity : opportunité business, stratégique ou intellectuelle détectée dans le contenu
+- development : aspect sous-développé qui mériterait d'être approfondi
+- pattern : convergence ou tendance répétée dans les contenus
+- contradiction : tension ou incohérence dans les idées documentées
+- hidden_connection : lien indirect non documenté entre deux entités
+- gap : connexion structurelle attendue mais absente
+- cluster : regroupement thématique révélateur
+
+## FORMAT JSON STRICT (rien d'autre)
 {"found": false}
 OU
-{"found": true, "category": "hidden_connection|pattern|contradiction|gap|cluster", "content": "...", "confidence": 0.0}`
+{"found": true, "category": "opportunity|development|pattern|contradiction|hidden_connection|gap|cluster", "content": "...", "confidence": 0.0}`
 
     const raw = await this.llmService.sendMessage(
       [{ role: 'user', content: userMessage }],
@@ -524,8 +608,8 @@ OU
     try {
       const parsed = JSON.parse(jsonMatch[0]) as { found: boolean; category?: string; content?: string; confidence?: number }
       if (!parsed.found || !parsed.content || parsed.confidence === undefined) return null
-      const validCats = ['hidden_connection', 'pattern', 'contradiction', 'gap', 'cluster']
-      const category = validCats.includes(parsed.category ?? '')
+      const validCats: IdleInsight['category'][] = ['hidden_connection', 'pattern', 'contradiction', 'gap', 'cluster', 'opportunity', 'development']
+      const category = validCats.includes(parsed.category as IdleInsight['category'])
         ? (parsed.category as IdleInsight['category'])
         : 'hidden_connection'
       return { content: parsed.content, confidence: Math.min(1, Math.max(0, parsed.confidence)), category }
