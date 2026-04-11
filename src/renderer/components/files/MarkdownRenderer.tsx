@@ -1,3 +1,4 @@
+import React from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useUIStore } from '../../stores/uiStore'
@@ -34,9 +35,25 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps): React.JSX.
           h3: ({ children }) => (
             <h3 className="text-sm font-semibold text-cortx-text-primary mb-1.5 mt-4">{children}</h3>
           ),
-          p: ({ children }) => (
-            <p className="text-sm text-cortx-text-primary/90 leading-relaxed mb-3">{children}</p>
-          ),
+          p: ({ children }) => {
+            // A paragraph whose only child is a <strong> element (e.g. **Titre de section**)
+            // is rendered with heading-like styling so it stands out visually.
+            const arr = React.Children.toArray(children).filter(
+              (c) => !(typeof c === 'string' && c.trim() === '')
+            )
+            const isBoldTitle =
+              arr.length === 1 &&
+              React.isValidElement(arr[0]) &&
+              (arr[0] as React.ReactElement).type === 'strong'
+            if (isBoldTitle) {
+              return (
+                <p className="text-sm font-semibold text-cortx-text-primary mt-4 mb-1.5 pb-1 border-b border-cortx-border/40">
+                  {(arr[0] as React.ReactElement).props.children as React.ReactNode}
+                </p>
+              )
+            }
+            return <p className="text-sm text-cortx-text-primary/90 leading-relaxed mb-3">{children}</p>
+          },
           ul: ({ children }) => (
             <ul className="list-disc pl-5 mb-3 space-y-0.5">{children}</ul>
           ),

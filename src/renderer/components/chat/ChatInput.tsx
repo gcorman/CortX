@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { SendHorizontal, Slash, AtSign, Plus, FileText } from 'lucide-react'
+import { SendHorizontal, Slash, AtSign, Plus, FileText, BookOpen } from 'lucide-react'
 import { useFileStore } from '../../stores/fileStore'
+import { useLibraryStore } from '../../stores/libraryStore'
 
 interface ChatInputProps {
   onSend: (message: string) => void
@@ -19,6 +20,7 @@ export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps
   const [mentionStart, setMentionStart] = useState(-1)
   const [mentionIndex, setMentionIndex] = useState(0)
   const dropdownRef = useRef<HTMLUListElement>(null)
+  const libraryDocs = useLibraryStore((s) => s.documents)
 
   // Auto-resize textarea
   useEffect(() => {
@@ -29,17 +31,39 @@ export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps
     }
   }, [value])
 
-  // Filter files matching the current @query
-  const mentionResults = mentionQuery !== null
-    ? files
-        .filter((f) => {
-          const q = mentionQuery.toLowerCase()
-          return (
-            f.title.toLowerCase().includes(q) ||
-            f.path.split('/').pop()?.replace('.md', '').toLowerCase().includes(q)
-          )
-        })
-        .slice(0, 8)
+  // Unified mention targets: KB files + indexed library documents
+  type MentionTarget =
+    | { kind: 'file'; path: string; title: string }
+    | { kind: 'library'; id: string; title: string; filename: string }
+
+  const mentionResults: MentionTarget[] = mentionQuery !== null
+    ? [
+        ...files
+          .filter((f) => {
+            const q = mentionQuery.toLowerCase()
+            return (
+              f.title.toLowerCase().includes(q) ||
+              f.path.split('/').pop()?.replace('.md', '').toLowerCase().includes(q)
+            )
+          })
+          .slice(0, 5)
+          .map((f): MentionTarget => ({ kind: 'file', path: f.path, title: f.title })),
+        ...libraryDocs
+          .filter((d) => d.status === 'indexed' && (() => {
+            const q = mentionQuery.toLowerCase()
+            return (
+              (d.title ?? '').toLowerCase().includes(q) ||
+              d.filename.toLowerCase().includes(q)
+            )
+          })())
+          .slice(0, 4)
+          .map((d): MentionTarget => ({
+            kind: 'library',
+            id: d.id,
+            title: d.title ?? d.filename,
+            filename: d.filename
+          }))
+      ]
     : []
 
   // Parse text to detect an active @query at current cursor position
@@ -68,11 +92,14 @@ export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps
     }
   }
 
-  function handleSelect(file: { path: string; title: string }): void {
+  function handleSelect(target: MentionTarget): void {
     if (mentionStart === -1) return
     const before = value.slice(0, mentionStart)
     const after = value.slice(mentionStart + 1 + (mentionQuery?.length ?? 0))
-    const inserted = `@[${file.title}]`
+    // Library docs use a distinct marker so chatStore can read from the library API
+    const inserted = target.kind === 'library'
+      ? `@[lib:${target.id}|${target.title}]`
+      : `@[${target.title}]`
     const newValue = before + inserted + after
     setValue(newValue)
     setMentionQuery(null)
@@ -224,20 +251,26 @@ export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps
             ref={dropdownRef}
             className="absolute bottom-full mb-1 left-0 right-0 bg-cortx-surface border border-cortx-border rounded-card shadow-xl z-50 max-h-52 overflow-y-auto"
           >
-            {mentionResults.map((f, i) => (
-              <li key={f.path}>
+            {mentionResults.map((target, i) => (
+              <li key={target.kind === 'file' ? target.path : target.id}>
                 <button
                   type="button"
-                  onMouseDown={(e) => { e.preventDefault(); handleSelect(f) }}
+                  onMouseDown={(e) => { e.preventDefault(); handleSelect(target) }}
                   className={`w-full text-left px-3 py-2 flex items-center gap-2 transition-colors cursor-pointer ${
                     i === mentionIndex
                       ? 'bg-cortx-accent/15 text-cortx-text-primary'
                       : 'hover:bg-cortx-elevated text-cortx-text-secondary'
                   }`}
                 >
-                  <AtSign size={11} className="flex-shrink-0 text-cortx-accent" />
-                  <span className="text-xs font-medium truncate">{f.title}</span>
-                  <span className="text-2xs text-cortx-text-secondary/40 truncate ml-auto">{f.path}</span>
+                  {target.kind === 'library'
+                    ? <BookOpen size={11} className="flex-shrink-0 text-amber-400" />
+                    : <AtSign size={11} className="flex-shrink-0 text-cortx-accent" />
+                  }
+                  <span className="text-xs font-medium truncate">{target.title}</span>
+                  {target.kind === 'library'
+                    ? <span className="text-2xs text-amber-400/60 flex-shrink-0 ml-auto">lecture seule</span>
+                    : <span className="text-2xs text-cortx-text-secondary/40 truncate ml-auto">{target.path}</span>
+                  }
                 </button>
               </li>
             ))}

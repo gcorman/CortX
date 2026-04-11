@@ -1,10 +1,10 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { X, Pencil, Save, RotateCcw, Trash2, RefreshCw } from 'lucide-react'
 import { MarkdownRenderer } from './MarkdownRenderer'
 import { useUIStore } from '../../stores/uiStore'
 import { useGraphStore } from '../../stores/graphStore'
 import { useFileStore } from '../../stores/fileStore'
-import type { FileContent } from '../../../shared/types'
+import type { FileContent, CortxFile } from '../../../shared/types'
 
 interface FilePreviewProps {
   path: string
@@ -20,9 +20,64 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
   const [isRewriting, setIsRewriting] = useState(false)
   const [rewriteUndo, setRewriteUndo] = useState<{ commitHash: string } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  // --- [[ wikilink autocomplete ---
+  const [wikilinkQuery, setWikilinkQuery] = useState<string | null>(null)
+  const [wikilinkStart, setWikilinkStart] = useState(-1)
+  const [wikilinkIndex, setWikilinkIndex] = useState(0)
+  const editorRef = useRef<HTMLTextAreaElement>(null)
+  const wikilinkDropRef = useRef<HTMLUListElement>(null)
+
   const addToast = useUIStore((s) => s.addToast)
   const reloadGraph = useGraphStore((s) => s.loadGraph)
   const reloadFiles = useFileStore((s) => s.loadFiles)
+  const allFiles = useFileStore((s) => s.files)
+
+  const wikilinkResults: CortxFile[] = wikilinkQuery !== null
+    ? allFiles
+        .filter((f) => {
+          const q = wikilinkQuery.toLowerCase()
+          const name = f.path.split('/').pop()?.replace('.md', '') ?? ''
+          return f.title.toLowerCase().includes(q) || name.toLowerCase().includes(q)
+        })
+        .slice(0, 8)
+    : []
+
+  function detectWikilink(text: string, cursor: number): { query: string; start: number } | null {
+    const before = text.slice(0, cursor)
+    const idx = before.lastIndexOf('[[')
+    if (idx === -1) return null
+    const afterOpen = before.slice(idx + 2)
+    // Cancel if there's already a closing bracket or a newline
+    if (afterOpen.includes(']') || afterOpen.includes('\n')) return null
+    return { query: afterOpen, start: idx }
+  }
+
+  function handleWikilinkSelect(file: CortxFile): void {
+    if (wikilinkStart === -1) return
+    const before = draft.slice(0, wikilinkStart)
+    const after = draft.slice(wikilinkStart + 2 + (wikilinkQuery?.length ?? 0))
+    const inserted = `[[${file.title}]]`
+    setDraft(before + inserted + after)
+    setWikilinkQuery(null)
+    setWikilinkStart(-1)
+    setWikilinkIndex(0)
+    setTimeout(() => {
+      const ta = editorRef.current
+      if (ta) {
+        const pos = before.length + inserted.length
+        ta.focus()
+        ta.setSelectionRange(pos, pos)
+      }
+    }, 0)
+  }
+
+  // Scroll selected wikilink item into view
+  useEffect(() => {
+    const list = wikilinkDropRef.current
+    if (!list) return
+    const item = list.children[wikilinkIndex] as HTMLElement | undefined
+    item?.scrollIntoView({ block: 'nearest' })
+  }, [wikilinkIndex])
 
   const loadFile = useCallback(async (): Promise<void> => {
     setIsLoading(true)
@@ -252,19 +307,66 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
             </div>
           ) : content ? (
             isEditing ? (
-              <textarea
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-                    e.preventDefault()
-                    void handleSave()
-                  }
-                }}
-                spellCheck={false}
-                className="w-full h-full min-h-[60vh] bg-cortx-bg text-cortx-text-primary text-sm font-mono p-4 resize-none focus:outline-none border-0"
-                placeholder="Contenu Markdown..."
-              />
+              <div className="relative flex flex-col h-full min-h-[60vh]">
+                {/* [[ wikilink autocomplete dropdown */}
+                {wikilinkQuery !== null && wikilinkResults.length > 0 && (
+                  <ul
+                    ref={wikilinkDropRef}
+                    className="absolute top-2 left-2 right-2 z-50 bg-cortx-surface border border-cortx-border rounded-card shadow-xl max-h-48 overflow-y-auto"
+                  >
+                    {wikilinkResults.map((f, i) => (
+                      <li key={f.path}>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => { e.preventDefault(); handleWikilinkSelect(f) }}
+                          className={`w-full text-left px-3 py-2 flex items-center gap-2 transition-colors cursor-pointer ${
+                            i === wikilinkIndex
+                              ? 'bg-cortx-accent/15 text-cortx-text-primary'
+                              : 'hover:bg-cortx-elevated text-cortx-text-secondary'
+                          }`}
+                        >
+                          <span className="text-xs text-cortx-accent font-mono flex-shrink-0">[[</span>
+                          <span className="text-xs font-medium truncate">{f.title}</span>
+                          <span className="text-2xs text-cortx-text-secondary/40 truncate ml-auto">{f.path}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <textarea
+                  ref={editorRef}
+                  value={draft}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setDraft(val)
+                    const cursor = e.target.selectionStart ?? val.length
+                    const wl = detectWikilink(val, cursor)
+                    if (wl) {
+                      setWikilinkQuery(wl.query)
+                      setWikilinkStart(wl.start)
+                      setWikilinkIndex(0)
+                    } else {
+                      setWikilinkQuery(null)
+                      setWikilinkStart(-1)
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (wikilinkQuery !== null && wikilinkResults.length > 0) {
+                      if (e.key === 'ArrowDown') { e.preventDefault(); setWikilinkIndex((i) => (i + 1) % wikilinkResults.length); return }
+                      if (e.key === 'ArrowUp') { e.preventDefault(); setWikilinkIndex((i) => (i - 1 + wikilinkResults.length) % wikilinkResults.length); return }
+                      if (e.key === 'Tab' || (e.key === 'Enter' && !e.ctrlKey && !e.metaKey)) { e.preventDefault(); handleWikilinkSelect(wikilinkResults[wikilinkIndex]); return }
+                      if (e.key === 'Escape') { setWikilinkQuery(null); setWikilinkStart(-1); return }
+                    }
+                    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                      e.preventDefault()
+                      void handleSave()
+                    }
+                  }}
+                  spellCheck={false}
+                  className="flex-1 bg-cortx-bg text-cortx-text-primary text-sm font-mono p-4 resize-none focus:outline-none border-0 min-h-[60vh]"
+                  placeholder="Contenu Markdown..."
+                />
+              </div>
             ) : (
               <div className="p-6">
                 {/* Frontmatter badges */}

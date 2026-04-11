@@ -180,22 +180,40 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     set((s) => ({ messages: [...s.messages, userMessage], isProcessing: true }))
 
-    // Resolve @[Title] mentions → inject file content as explicit context block
+    // Resolve @[Title] (KB files) and @[lib:id|Title] (library docs) mentions
+    // → inject their content as explicit context blocks for the agent
     const mentionMatches = [...content.matchAll(/@\[([^\]]+)\]/g)]
     let mentionContext = ''
     if (mentionMatches.length > 0) {
       const files = useFileStore.getState().files
       for (const m of mentionMatches) {
-        const title = m[1]
+        const raw = m[1]
+
+        // Library document: @[lib:UUID|Title]
+        const libMatch = raw.match(/^lib:([^|]+)\|(.+)$/)
+        if (libMatch) {
+          const [, docId, docTitle] = libMatch
+          try {
+            const preview = await window.cortx.library.getPreview(docId)
+            if (preview) {
+              mentionContext += `\n--- @${docTitle} [document bibliothèque — LECTURE SEULE, NE PAS MODIFIER] ---\n${preview.markdown}\n---\n`
+            }
+          } catch {
+            // ignore
+          }
+          continue
+        }
+
+        // KB file: @[Title]
         const file = files.find(
-          (f) => f.title === title ||
-            f.path.split('/').pop()?.replace('.md', '') === title
+          (f) => f.title === raw ||
+            f.path.split('/').pop()?.replace('.md', '') === raw
         )
         if (file) {
           try {
             const fc = await window.cortx.files.read(file.path)
             if (fc) {
-              mentionContext += `\n--- @${title} (${file.path}) ---\n${fc.raw}\n---\n`
+              mentionContext += `\n--- @${raw} (${file.path}) ---\n${fc.raw}\n---\n`
             }
           } catch {
             // ignore unreadable files
@@ -204,9 +222,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
     }
 
-    // Strip @[...] markers from the visible text before passing to the LLM
-    // (they are already injected as explicit context above)
-    const strippedContent = content.replace(/@\[([^\]]+)\]/g, '@$1')
+    // Strip @[lib:id|Title] and @[Title] markers from visible text
+    const strippedContent = content
+      .replace(/@\[lib:[^|]+\|([^\]]+)\]/g, '@$1')
+      .replace(/@\[([^\]]+)\]/g, '@$1')
 
     // Intercept slash commands BEFORE injecting mention context.
     // Otherwise the prepended context hides the leading "/" and breaks /brief, /synthese, etc.
