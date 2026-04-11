@@ -1,4 +1,5 @@
 # CortX
+<img width="300" height="400" alt="CortX_logo" src="https://github.com/user-attachments/assets/111a3923-a2d0-47ea-8e2f-50ff7c3aaa50" />
 
 ### Du vibe coding au vibe learning.
 
