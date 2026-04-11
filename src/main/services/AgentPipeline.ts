@@ -620,6 +620,48 @@ export class AgentPipeline {
 
     // Remove DB entries for files that no longer exist on disk (e.g. after deletion).
     this.dbService.purgeStaleFiles(new Set(files))
+
+    // Generate semantic embeddings for new/modified KB files (best-effort, non-blocking).
+    // Runs after the sync indexing so it never delays the agent response.
+    this.updateKbEmbeddingsAsync().catch((err) =>
+      console.warn('[AgentPipeline] KB embedding update failed:', err)
+    )
+  }
+
+  /**
+   * Generate and store semantic embeddings for KB files that are new or stale.
+   * Uses the same e5-small model as the library (via LibraryService.embedText).
+   * Runs asynchronously so it never blocks the agent pipeline.
+   */
+  private async updateKbEmbeddingsAsync(): Promise<void> {
+    const paths = this.dbService.getKbPathsNeedingEmbedding()
+    if (paths.length === 0) return
+    console.log(`[AgentPipeline] Embedding ${paths.length} KB file(s)...`)
+
+    for (const filePath of paths) {
+      try {
+        const content = await this.fileService.readFile(filePath)
+        if (!content) continue
+
+        // Build a compact, representative text for embedding (fits in e5's 512-token window):
+        // frontmatter metadata + first 400 words of body.
+        const fm = content.frontmatter as Record<string, unknown>
+        const lines: string[] = []
+        const title = fm['title'] ?? fm['titre']
+        const type  = fm['type']
+        const tags  = fm['tags']
+        if (title) lines.push(String(title))
+        if (type)  lines.push(`type: ${type}`)
+        if (Array.isArray(tags) && tags.length) lines.push(`tags: ${tags.join(', ')}`)
+        lines.push(content.body.split(/\s+/).slice(0, 400).join(' '))
+
+        const vector = await libraryService.embedText(lines.join('\n'))
+        if (vector) this.dbService.storeKbEmbedding(filePath, vector)
+      } catch (err) {
+        console.warn('[AgentPipeline] Failed to embed KB file:', filePath, err)
+      }
+    }
+    console.log('[AgentPipeline] KB embeddings updated.')
   }
 
   private normalizeActions(rawActions: RawAction[]): Array<{
@@ -819,7 +861,7 @@ export class AgentPipeline {
       }
     }
 
-    // ── (c) KB wikilink expansion: KB file → other KB files ───────────────
+    // ── (c) KB wikilink expansion: KB file → other KB files (forward) ───────
     for (const kbPath of kbPathsInContext) {
       const linkedKbPaths = this.dbService.getKbFilesLinkedFrom(kbPath)
       for (const p of linkedKbPaths) {
@@ -827,10 +869,26 @@ export class AgentPipeline {
       }
     }
 
-    // Fetch extra KB files (cap at 4 to avoid context bloat)
+    // ── (d) Backlink expansion: files that LINK TO the KB files in context ──
+    // e.g. if we found "Julien Robert", also pull in "James Nguyen" which mentions him.
+    // Capped tightly (2) to avoid pulling in the entire graph for popular entities.
+    let backlinkCount = 0
+    for (const kbPath of kbPathsInContext) {
+      if (backlinkCount >= 2) break
+      const backlinks = this.dbService.getKbFilesLinkingTo(kbPath)
+      for (const p of backlinks) {
+        if (!kbPathsInContext.has(p) && !kbPathsToFetch.has(p)) {
+          kbPathsToFetch.add(p)
+          backlinkCount++
+          if (backlinkCount >= 2) break
+        }
+      }
+    }
+
+    // Fetch extra KB files (cap raised to 6 — OR search now returns higher-quality seeds)
     let kbFileCount = 0
     for (const kbPath of kbPathsToFetch) {
-      if (kbFileCount >= 4) break
+      if (kbFileCount >= 6) break
       try {
         const content = await this.fileService.readFile(kbPath)
         if (content) {

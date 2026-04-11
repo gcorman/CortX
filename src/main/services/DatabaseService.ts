@@ -125,6 +125,15 @@ function inferRelationType(
   return defaults[pair] || 'liée_à'
 }
 
+/** Cosine similarity used for KB semantic search (kept local to avoid circular deps). */
+function kbCosineSim(a: number[], b: number[]): number {
+  if (a.length !== b.length || a.length === 0) return 0
+  let dot = 0, na = 0, nb = 0
+  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i] }
+  const d = Math.sqrt(na) * Math.sqrt(nb)
+  return d === 0 ? 0 : dot / d
+}
+
 export class DatabaseService {
   private db!: Database.Database
 
@@ -185,6 +194,15 @@ export class DatabaseService {
         title,
         content,
         content_rowid='rowid'
+      );
+
+      -- Semantic embeddings for KB markdown files.
+      -- One row per file; vector is a JSON-serialised float32 array (e5-small, dim=384).
+      -- embedded_at is compared against files.modified_at for incremental updates.
+      CREATE TABLE IF NOT EXISTS kb_embeddings (
+        file_path TEXT PRIMARY KEY,
+        vector BLOB NOT NULL,
+        embedded_at TEXT NOT NULL
       );
 
       -- ── Library tables ────────────────────────────────────────────────
@@ -449,8 +467,91 @@ export class DatabaseService {
     return null
   }
 
+  // ── KB semantic embeddings ─────────────────────────────────────────────────
+
+  /** Persist an embedding vector for a KB file. */
+  storeKbEmbedding(filePath: string, vector: number[]): void {
+    this.db.prepare(
+      'INSERT OR REPLACE INTO kb_embeddings (file_path, vector, embedded_at) VALUES (?, ?, ?)'
+    ).run(filePath, JSON.stringify(vector), new Date().toISOString())
+  }
+
+  /**
+   * Return paths of KB files that have no embedding yet, or whose file was modified
+   * after the embedding was generated (stale). Capped at 50 to keep reindex snappy.
+   */
+  getKbPathsNeedingEmbedding(): string[] {
+    const rows = this.db.prepare(`
+      SELECT f.path FROM files f
+      LEFT JOIN kb_embeddings ke ON ke.file_path = f.path
+      WHERE ke.file_path IS NULL OR f.modified_at > ke.embedded_at
+      LIMIT 50
+    `).all() as Array<{ path: string }>
+    return rows.map((r) => r.path)
+  }
+
+  /**
+   * Rank all KB files by cosine similarity to a query vector, return top-K paths.
+   * Called by AgentPipeline.retrieveContext when the sidecar is available.
+   */
+  semanticSearchKb(queryVector: number[], limit: number): string[] {
+    type Row = { file_path: string; vector: Buffer }
+    const rows = this.db.prepare(
+      'SELECT ke.file_path, ke.vector FROM kb_embeddings ke JOIN files f ON f.path = ke.file_path'
+    ).all() as Row[]
+
+    if (rows.length === 0) return []
+
+    const scored = rows
+      .map((row) => ({
+        path: row.file_path,
+        score: kbCosineSim(queryVector, JSON.parse(row.vector.toString('utf8')) as number[])
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+
+    return scored.map((s) => s.path)
+  }
+
+  /**
+   * Build an FTS5 OR query from a natural language string.
+   * Raw AND-match fails for questions like "Quelles connexions entre X et Y?" because
+   * no single file contains all words.  Keeping only significant tokens (length ≥ 3,
+   * not common French/English stopwords) joined with OR gives much better recall.
+   */
+  private static buildFtsQuery(raw: string): string {
+    const stopwords = new Set([
+      // French
+      'les', 'des', 'une', 'dans', 'est', 'que', 'qui', 'pour', 'par', 'sur', 'avec',
+      'mais', 'dont', 'moi', 'vous', 'nous', 'tout', 'plus', 'bien', 'tres', 'aussi',
+      'alors', 'quand', 'donne', 'quels', 'quelles', 'quel', 'quelle', 'cette', 'entre',
+      'sont', 'ont', 'peut', 'leurs', 'leur', 'ses', 'mes', 'nos', 'vos', 'aux', 'tes',
+      'elle', 'elles', 'ils', 'lui', 'eux', 'mon', 'ton', 'son', 'mes', 'tes', 'ses',
+      'moi', 'toi', 'lui', 'ils', 'elles', 'car', 'donc', 'lors', 'loin', 'ici',
+      'voici', 'voila', 'comme', 'trop', 'assez', 'tres', 'peu', 'peux', 'deux',
+      'tous', 'toutes', 'autre', 'autres', 'beaucoup', 'toujours', 'jamais',
+      // English passthrough
+      'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'has', 'her',
+      'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'man',
+      'new', 'now', 'old', 'see', 'two', 'way', 'who', 'boy', 'did', 'its', 'let',
+      'put', 'say', 'she', 'too', 'use'
+    ])
+
+    const tokens = raw
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // strip accents for stopword matching
+      .replace(/[^\w\s]/g, ' ')
+      .split(/\s+/)
+      .filter(t => t.length >= 3 && !stopwords.has(t))
+      .slice(0, 15) // cap to keep query sane
+
+    return tokens.length > 0 ? tokens.join(' OR ') : raw
+  }
+
   search(query: string): CortxFile[] {
     if (!query.trim()) return this.getFiles()
+
+    const ftsQuery = DatabaseService.buildFtsQuery(query)
 
     try {
       const rows = this.db.prepare(`
@@ -459,7 +560,7 @@ export class DatabaseService {
         WHERE files_fts MATCH ?
         ORDER BY rank
         LIMIT 20
-      `).all(query) as Array<{
+      `).all(ftsQuery) as Array<{
         path: string; type: string; title: string; tags: string; created_at: string; modified_at: string; status: string
       }>
 
@@ -529,6 +630,24 @@ export class DatabaseService {
       WHERE src.file_path = ?
         AND e.file_path IS NOT NULL
         AND e.file_path != ?
+    `).all(filePath, filePath) as Array<{ file_path: string }>
+    return rows.map((r) => r.file_path).filter(Boolean)
+  }
+
+  /**
+   * Return file paths of KB files that wikilink TO a given KB file (reverse direction).
+   * Used for backlink expansion: if we found "Julien Robert", this returns "James Nguyen"
+   * because James Nguyen's file contains [[Julien Robert]].
+   */
+  getKbFilesLinkingTo(filePath: string): string[] {
+    const rows = this.db.prepare(`
+      SELECT DISTINCT src.file_path
+      FROM relations r
+      JOIN entities src ON src.id = r.source_entity_id
+      JOIN entities e   ON e.id   = r.target_entity_id
+      WHERE e.file_path = ?
+        AND src.file_path IS NOT NULL
+        AND src.file_path != ?
     `).all(filePath, filePath) as Array<{ file_path: string }>
     return rows.map((r) => r.file_path).filter(Boolean)
   }

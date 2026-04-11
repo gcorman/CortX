@@ -744,6 +744,37 @@ export class LibraryService {
     return results.slice(0, limit)
   }
 
+  // ── Sidecar embedding helpers (used by AgentPipeline for KB semantic search) ─
+
+  /**
+   * Embed a passage text (KB file content) using the e5-small model.
+   * Uses the "passage:" prefix convention required by multilingual-e5.
+   * Returns null if the sidecar is unavailable.
+   */
+  async embedText(text: string): Promise<number[] | null> {
+    if (!await pythonSidecar.ensureReady()) return null
+    try {
+      const resp = await pythonSidecar.send({ cmd: 'embed', texts: [text] })
+      if (resp.ok && Array.isArray(resp.vectors) && resp.vectors.length > 0) {
+        return resp.vectors[0] as number[]
+      }
+    } catch { /* sidecar unavailable */ }
+    return null
+  }
+
+  /**
+   * Embed a search query using the "query:" prefix convention required by multilingual-e5.
+   * Returns null if the sidecar is unavailable.
+   */
+  async embedQuery(text: string): Promise<number[] | null> {
+    if (!await pythonSidecar.ensureReady()) return null
+    try {
+      const resp = await pythonSidecar.send({ cmd: 'embed_query', text })
+      if (resp.ok && resp.vector) return resp.vector as number[]
+    } catch { /* sidecar unavailable */ }
+    return null
+  }
+
   /**
    * Public wrapper around _filenameSearch for use by AgentPipeline multi-hop.
    * Returns chunks from library documents whose title/filename matches the target string.
