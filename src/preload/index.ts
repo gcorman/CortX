@@ -68,6 +68,16 @@ const api: CortxAPI = {
     getStatus: () => ipcRenderer.invoke('library:getStatus'),
     openImportDialog: () => ipcRenderer.invoke('library:openImportDialog')
   },
+  idle: {
+    start: () => ipcRenderer.invoke('idle:start'),
+    stop: () => ipcRenderer.invoke('idle:stop'),
+    getInsights: () => ipcRenderer.invoke('idle:getInsights'),
+    dismissInsight: (id: string) => ipcRenderer.invoke('idle:dismissInsight', id),
+    saveInsightAsFiche: (id: string) => ipcRenderer.invoke('idle:saveInsightAsFiche', id),
+    getConfig: () => ipcRenderer.invoke('idle:getConfig'),
+    setConfig: (config: { intervalSeconds?: number; confidenceThreshold?: number }) =>
+      ipcRenderer.invoke('idle:setConfig', config)
+  },
   on: (channel: string, callback: (...args: unknown[]) => void) => {
     ipcRenderer.on(channel, (_event, ...args) => callback(...args))
   },

@@ -1,14 +1,18 @@
 import { useUIStore } from '../../stores/uiStore'
+import { useIdleStore } from '../../stores/idleStore'
 import { GraphView } from '../graph/GraphView'
 import { TagBrowser } from '../tags/TagBrowser'
 import { FilePreview } from '../files/FilePreview'
 import { LibraryPanel } from '../library/LibraryPanel'
-import { Network, Hash, Search, Library } from 'lucide-react'
+import { Network, Hash, Search, Library, Brain } from 'lucide-react'
 import { useState } from 'react'
 
 export function CenterPanel(): React.JSX.Element {
   const { activeCenterView, setActiveCenterView, filePreviewPath, closeFilePreview } = useUIStore()
   const [searchQuery, setSearchQuery] = useState('')
+  const idleActive = useIdleStore((s) => s.isActive)
+  const idlePhase = useIdleStore((s) => s.phase)
+  const toggleIdle = useIdleStore((s) => s.toggle)
 
   const tabs = [
     { id: 'graph' as const, label: 'Graphe', icon: Network },
@@ -41,6 +45,25 @@ export function CenterPanel(): React.JSX.Element {
             )
           })}
         </div>
+
+        {/* Idle toggle button — only shown in graph view */}
+        {activeCenterView === 'graph' && (
+          <button
+            onClick={() => void toggleIdle()}
+            title={idleActive ? 'Désactiver le mode Idle' : 'Activer le mode Idle — l\'agent médite sur le graphe'}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-input text-xs font-medium transition-all duration-200 cursor-pointer flex-shrink-0 ${
+              idleActive
+                ? 'bg-cortx-accent/20 text-cortx-accent border border-cortx-accent/40'
+                : 'text-cortx-text-secondary hover:text-cortx-text-primary hover:bg-cortx-elevated border border-transparent'
+            }`}
+          >
+            <Brain
+              size={13}
+              className={idleActive && (idlePhase === 'thinking' || idlePhase === 'examining') ? 'animate-pulse' : ''}
+            />
+            Idle
+          </button>
+        )}
 
         {/* Search — hidden in library view (library has its own search bar) */}
         {activeCenterView !== 'library' && (

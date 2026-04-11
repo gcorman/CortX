@@ -192,6 +192,36 @@ export interface LibraryIngestProgress {
   message?: string
 }
 
+// --- Idle Mode ---
+
+export interface IdleInsight {
+  id: string
+  timestamp: string
+  entityIds: string[]
+  entityNames: string[]
+  edgeKeys: string[]
+  content: string
+  confidence: number
+  category: 'hidden_connection' | 'pattern' | 'contradiction' | 'gap' | 'cluster'
+  status: 'new' | 'dismissed' | 'saved'
+}
+
+export interface IdleExplorationEvent {
+  phase: 'selecting' | 'examining' | 'thinking' | 'insight' | 'resting'
+  activeNodeIds: string[]
+  activeEdgeKeys: string[]
+  /** Short description of what the agent is currently searching for */
+  currentThought?: string
+  /** Number of draft insights accumulated (not yet promoted) */
+  draftCount?: number
+  insight?: IdleInsight
+}
+
+export interface IdleConfig {
+  intervalSeconds: number
+  confidenceThreshold: number
+}
+
 // --- IPC API surface ---
 
 export interface CortxAPI {
@@ -256,6 +286,15 @@ export interface CortxAPI {
     reindexAll(): Promise<{ added: number; updated: number; removed: number }>
     getStatus(): Promise<{ sidecarReady: boolean; queueLength: number }>
     openImportDialog(): Promise<string[]>
+  }
+  idle: {
+    start(): Promise<void>
+    stop(): Promise<void>
+    getInsights(): Promise<IdleInsight[]>
+    dismissInsight(id: string): Promise<void>
+    saveInsightAsFiche(id: string): Promise<string>
+    getConfig(): Promise<IdleConfig>
+    setConfig(config: Partial<IdleConfig>): Promise<void>
   }
   on(channel: string, callback: (...args: unknown[]) => void): void
   off(channel: string, callback: (...args: unknown[]) => void): void

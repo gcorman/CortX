@@ -1,0 +1,103 @@
+import { create } from 'zustand'
+import type { IdleInsight, IdleExplorationEvent } from '../../shared/types'
+
+interface IdleState {
+  isActive: boolean
+  phase: 'stopped' | 'selecting' | 'examining' | 'thinking' | 'insight' | 'resting'
+  activeNodeIds: string[]
+  activeEdgeKeys: string[]
+  currentThought: string
+  draftCount: number
+  insights: IdleInsight[]
+
+  toggle: () => Promise<void>
+  start: () => Promise<void>
+  stop: () => Promise<void>
+  loadInsights: () => Promise<void>
+  dismissInsight: (id: string) => Promise<void>
+  saveInsightAsFiche: (id: string) => Promise<string>
+  _setExploration: (event: IdleExplorationEvent) => void
+  _addInsight: (insight: IdleInsight) => void
+}
+
+export const useIdleStore = create<IdleState>((set, get) => ({
+  isActive: false,
+  phase: 'stopped',
+  activeNodeIds: [],
+  activeEdgeKeys: [],
+  currentThought: '',
+  draftCount: 0,
+  insights: [],
+
+  toggle: async () => {
+    if (get().isActive) {
+      await get().stop()
+    } else {
+      await get().start()
+    }
+  },
+
+  start: async () => {
+    await window.cortx.idle.start()
+    set({ isActive: true, phase: 'selecting' })
+    await get().loadInsights()
+  },
+
+  stop: async () => {
+    await window.cortx.idle.stop()
+    set({ isActive: false, phase: 'stopped', activeNodeIds: [], activeEdgeKeys: [] })
+  },
+
+  loadInsights: async () => {
+    const insights = await window.cortx.idle.getInsights()
+    set({ insights })
+  },
+
+  dismissInsight: async (id: string) => {
+    await window.cortx.idle.dismissInsight(id)
+    set((state) => ({
+      insights: state.insights.map((i) =>
+        i.id === id ? { ...i, status: 'dismissed' as const } : i
+      )
+    }))
+  },
+
+  saveInsightAsFiche: async (id: string) => {
+    const path = await window.cortx.idle.saveInsightAsFiche(id)
+    set((state) => ({
+      insights: state.insights.map((i) =>
+        i.id === id ? { ...i, status: 'saved' as const } : i
+      )
+    }))
+    return path
+  },
+
+  _setExploration: (event: IdleExplorationEvent) => {
+    set({
+      phase: event.phase,
+      activeNodeIds: event.activeNodeIds,
+      activeEdgeKeys: event.activeEdgeKeys,
+      currentThought: event.currentThought ?? '',
+      draftCount: event.draftCount ?? 0
+    })
+  },
+
+  _addInsight: (insight: IdleInsight) => {
+    set((state) => ({
+      insights: [insight, ...state.insights].slice(0, 100)
+    }))
+  }
+}))
+
+// Subscribe to IPC events from the main process (module-level, like libraryStore)
+if (typeof window !== 'undefined' && window.cortx) {
+  window.cortx.on('idle:exploration', (...args) => {
+    const event = args[0] as IdleExplorationEvent
+    useIdleStore.getState()._setExploration(event)
+  })
+
+  window.cortx.on('idle:insight', (...args) => {
+    const insight = args[0] as IdleInsight
+    useIdleStore.getState()._addInsight(insight)
+  })
+}

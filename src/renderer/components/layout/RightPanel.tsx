@@ -1,5 +1,6 @@
 import { ActivityFeed } from '../agent/ActivityFeed'
 import { FichePanel } from '../agent/FichePanel'
+import { InsightPanel } from '../agent/InsightPanel'
 import { Activity, PanelRightClose } from 'lucide-react'
 import { useUIStore } from '../../stores/uiStore'
 
@@ -24,6 +25,9 @@ export function RightPanel(): React.JSX.Element {
           </button>
         </div>
       </div>
+
+      {/* Idle insights — shown when idle mode is active or has new insights */}
+      <InsightPanel />
 
       {/* Fiches archive — high-value long-form syntheses produced by the agent */}
       <FichePanel />

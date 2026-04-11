@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Wifi, WifiOff, FileText, GitCommit, Settings } from 'lucide-react'
+import { Wifi, WifiOff, FileText, GitCommit, Settings, Brain } from 'lucide-react'
 import { useUIStore } from '../../stores/uiStore'
 import { useChatStore } from '../../stores/chatStore'
+import { useIdleStore } from '../../stores/idleStore'
 
 export function StatusBar(): React.JSX.Element {
   const toggleSettings = useUIStore((s) => s.toggleSettings)
@@ -61,6 +62,9 @@ export function StatusBar(): React.JSX.Element {
     }
   }, [settingsOpen, refresh])
 
+  const idleActive = useIdleStore((s) => s.isActive)
+  const idlePhase = useIdleStore((s) => s.phase)
+
   const showProgress = streamActive || streamProgress > 0
   const clamped = Math.max(0, Math.min(1, streamProgress))
   const progress = showProgress ? clamped : 0
@@ -101,6 +105,29 @@ export function StatusBar(): React.JSX.Element {
           <GitCommit size={11} />
           <span className="truncate max-w-[200px]">{lastCommit}</span>
         </div>
+
+        {/* Idle indicator */}
+        {idleActive && (
+          <>
+            <div className="w-px h-3 bg-cortx-border" />
+            <div className="flex items-center gap-1.5 text-cortx-accent">
+              <span
+                className={`w-1.5 h-1.5 rounded-full bg-cortx-accent ${
+                  idlePhase === 'thinking' || idlePhase === 'insight' ? 'animate-pulse' : ''
+                }`}
+              />
+              <Brain size={10} />
+              <span>
+                {idlePhase === 'selecting' && 'Idle · Sélection'}
+                {idlePhase === 'examining' && 'Idle · Examen'}
+                {idlePhase === 'thinking' && 'Idle · Analyse...'}
+                {idlePhase === 'insight' && 'Idle · Insight !'}
+                {idlePhase === 'resting' && 'Idle · Pause'}
+                {idlePhase === 'stopped' && 'Idle'}
+              </span>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Right section */}

@@ -6,6 +6,7 @@ import { useGraphStore } from '../../stores/graphStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useFileStore } from '../../stores/fileStore'
 import { useLibraryStore } from '../../stores/libraryStore'
+import { useIdleStore } from '../../stores/idleStore'
 import { Network, LayoutGrid, Trash2, RefreshCw, FileText, ExternalLink } from 'lucide-react'
 
 // Register extensions — fcose takes priority over cose-bilkent for all layouts
@@ -159,6 +160,93 @@ function buildCyStyle(): cytoscape.StylesheetStyle[] {
         'target-arrow-color': '#0D9488',
         width: 2
       } as unknown as cytoscape.Css.Edge
+    },
+
+    // ── Idle mode classes (slow transitions for a "meditative" feel) ──────────
+
+    // Nodes being examined by the agent (teal glow)
+    {
+      selector: 'node.idle-examining',
+      style: {
+        opacity: 1,
+        width: 26,
+        height: 26,
+        'border-color': '#14B8A6',
+        'border-opacity': 0.85,
+        'border-width': 3,
+        'background-opacity': 1,
+        'transition-property': 'opacity, width, height, border-width, border-color, border-opacity',
+        'transition-duration': 800
+      } as unknown as cytoscape.Css.Node
+    },
+    // Neighbors of examined nodes (softer teal)
+    {
+      selector: 'node.idle-attended',
+      style: {
+        opacity: 0.85,
+        'border-color': '#14B8A6',
+        'border-opacity': 0.35,
+        'border-width': 2,
+        'transition-property': 'opacity, border-width, border-color, border-opacity',
+        'transition-duration': 600
+      } as unknown as cytoscape.Css.Node
+    },
+    // Insight found! Nodes glow orange
+    {
+      selector: 'node.idle-insight',
+      style: {
+        opacity: 1,
+        width: 30,
+        height: 30,
+        'border-color': '#F97316',
+        'border-opacity': 1,
+        'border-width': 3,
+        'background-opacity': 1,
+        'transition-property': 'opacity, width, height, border-width, border-color, border-opacity',
+        'transition-duration': 400
+      } as unknown as cytoscape.Css.Node
+    },
+    // Background nodes (dimmed subtly during idle)
+    {
+      selector: 'node.idle-bg',
+      style: {
+        opacity: 0.35,
+        'transition-property': 'opacity',
+        'transition-duration': 1200
+      } as unknown as cytoscape.Css.Node
+    },
+    // Edges being examined
+    {
+      selector: 'edge.idle-examining',
+      style: {
+        opacity: 1,
+        'line-color': '#14B8A6',
+        'target-arrow-color': '#14B8A6',
+        width: 2,
+        'transition-property': 'opacity, line-color, width',
+        'transition-duration': 600
+      } as unknown as cytoscape.Css.Edge
+    },
+    // Insight edges
+    {
+      selector: 'edge.idle-insight',
+      style: {
+        opacity: 1,
+        'line-color': '#F97316',
+        'target-arrow-color': '#F97316',
+        width: 2.5,
+        'transition-property': 'opacity, line-color, width',
+        'transition-duration': 400
+      } as unknown as cytoscape.Css.Edge
+    },
+    // Background edges
+    {
+      selector: 'edge.idle-bg',
+      style: {
+        opacity: 0.08,
+        'transition-property': 'opacity',
+        'transition-duration': 1200
+      } as unknown as cytoscape.Css.Edge
     }
   ]
 }
@@ -200,6 +288,169 @@ function makeLiveLayout(fixedId: string, fixedPos: { x: number; y: number }): cy
     gravity: 0.2,
     fixedNodeConstraint: [{ nodeId: fixedId, position: fixedPos }]
   } as unknown as cytoscape.LayoutOptions
+}
+
+// ── Canvas overlay drawing utilities ─────────────────────────────────────────
+
+type Pt = { x: number; y: number }
+
+function bezierPt(p0: Pt, cp: Pt, p1: Pt, t: number): Pt {
+  const mt = 1 - t
+  return { x: mt * mt * p0.x + 2 * mt * t * cp.x + t * t * p1.x, y: mt * mt * p0.y + 2 * mt * t * cp.y + t * t * p1.y }
+}
+
+function controlPoint(p0: Pt, p1: Pt): Pt {
+  const mx = (p0.x + p1.x) / 2
+  const my = (p0.y + p1.y) / 2
+  const dist = Math.sqrt((p1.x - p0.x) ** 2 + (p1.y - p0.y) ** 2)
+  return { x: mx, y: my - Math.max(30, Math.min(dist * 0.28, 90)) }
+}
+
+function drawIdleOverlay(
+  canvas: HTMLCanvasElement,
+  positions: Pt[],
+  phase: string,
+  t: number
+): void {
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  const dpr = window.devicePixelRatio || 1
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+  if (positions.length < 1 || phase === 'stopped' || phase === 'resting' || phase === 'selecting') return
+
+  const isInsight = phase === 'insight'
+  const isThinking = phase === 'thinking'
+  const arcColor = isInsight ? '#F97316' : '#14B8A6'
+
+  // Draw arcs between all pairs of active nodes
+  const pairs: [Pt, Pt][] = []
+  if (positions.length >= 2) {
+    for (let i = 0; i < positions.length - 1; i++) {
+      pairs.push([positions[i], positions[i + 1]])
+    }
+  }
+
+  for (const [p0, p1] of pairs) {
+    const cp = controlPoint(p0, p1)
+    const steps = 60
+
+    if (phase === 'examining') {
+      // Progressive arc drawing (0→1 over 2s)
+      const progress = Math.min(1, t / 1800)
+      const endStep = Math.floor(steps * progress)
+      if (endStep < 1) continue
+
+      ctx.beginPath()
+      ctx.moveTo(p0.x * dpr, p0.y * dpr)
+      for (let s = 1; s <= endStep; s++) {
+        const pt = bezierPt(p0, cp, p1, s / steps)
+        ctx.lineTo(pt.x * dpr, pt.y * dpr)
+      }
+      ctx.strokeStyle = arcColor
+      ctx.globalAlpha = 0.55
+      ctx.lineWidth = 1.5 * dpr
+      ctx.setLineDash([])
+      ctx.stroke()
+
+      // Glowing tip at the arc front
+      if (endStep < steps) {
+        const tipT = endStep / steps
+        const tip = bezierPt(p0, cp, p1, tipT)
+        const grad = ctx.createRadialGradient(tip.x * dpr, tip.y * dpr, 0, tip.x * dpr, tip.y * dpr, 6 * dpr)
+        grad.addColorStop(0, arcColor)
+        grad.addColorStop(1, 'transparent')
+        ctx.globalAlpha = 0.9
+        ctx.fillStyle = grad
+        ctx.beginPath()
+        ctx.arc(tip.x * dpr, tip.y * dpr, 6 * dpr, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    } else {
+      // Full arc (thinking or insight)
+      ctx.beginPath()
+      ctx.moveTo(p0.x * dpr, p0.y * dpr)
+      for (let s = 1; s <= steps; s++) {
+        const pt = bezierPt(p0, cp, p1, s / steps)
+        ctx.lineTo(pt.x * dpr, pt.y * dpr)
+      }
+
+      if (isInsight) {
+        // Glowing thick arc
+        ctx.strokeStyle = arcColor
+        ctx.globalAlpha = 0.85
+        ctx.lineWidth = 2.5 * dpr
+        ctx.shadowColor = arcColor
+        ctx.shadowBlur = 12 * dpr
+        ctx.setLineDash([])
+        ctx.stroke()
+        ctx.shadowBlur = 0
+      } else {
+        // Dashed pulsing arc (thinking)
+        const dashLen = 6 * dpr
+        ctx.setLineDash([dashLen, dashLen * 1.5])
+        ctx.lineDashOffset = -((t / 25) % (dashLen * 2.5))
+        ctx.strokeStyle = arcColor
+        ctx.globalAlpha = 0.35
+        ctx.lineWidth = 1.5 * dpr
+        ctx.stroke()
+        ctx.setLineDash([])
+
+        // Traveling glowing dot
+        const dotT = (t % 2400) / 2400
+        const dotPos = bezierPt(p0, cp, p1, dotT)
+        const grad = ctx.createRadialGradient(dotPos.x * dpr, dotPos.y * dpr, 0, dotPos.x * dpr, dotPos.y * dpr, 8 * dpr)
+        grad.addColorStop(0, arcColor)
+        grad.addColorStop(0.4, arcColor + '88')
+        grad.addColorStop(1, 'transparent')
+        ctx.globalAlpha = 0.9
+        ctx.fillStyle = grad
+        ctx.beginPath()
+        ctx.arc(dotPos.x * dpr, dotPos.y * dpr, 8 * dpr, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+    ctx.globalAlpha = 1
+  }
+
+  // Pulsing rings on active nodes
+  for (const pos of positions) {
+    const pulseT = (t % 2000) / 2000
+    const radius = isInsight
+      ? (14 + 6 * Math.sin(t / 200)) * dpr
+      : (10 + 4 * Math.sin(pulseT * Math.PI * 2)) * dpr
+
+    const grad = ctx.createRadialGradient(pos.x * dpr, pos.y * dpr, 0, pos.x * dpr, pos.y * dpr, radius)
+    grad.addColorStop(0, arcColor + '00')
+    grad.addColorStop(0.5, arcColor + (isInsight ? '55' : '33'))
+    grad.addColorStop(1, 'transparent')
+
+    ctx.globalAlpha = isInsight ? 0.8 : 0.5
+    ctx.fillStyle = grad
+    ctx.beginPath()
+    ctx.arc(pos.x * dpr, pos.y * dpr, radius, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.globalAlpha = 1
+  }
+
+  // Insight: sparkle particles
+  if (isInsight && positions.length > 0) {
+    const seed = Math.floor(t / 80)
+    const center = positions[0]
+    for (let i = 0; i < 6; i++) {
+      const angle = ((seed + i) * 137.5 * Math.PI) / 180
+      const r = (20 + ((seed * i * 17) % 25))
+      const sx = center.x + Math.cos(angle) * r
+      const sy = center.y + Math.sin(angle) * r
+      const alpha = 0.3 + 0.4 * Math.abs(Math.sin((t / 300) + i))
+      ctx.globalAlpha = alpha
+      ctx.fillStyle = '#F97316'
+      ctx.beginPath()
+      ctx.arc(sx * dpr, sy * dpr, 2 * dpr, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.globalAlpha = 1
+    }
+  }
 }
 
 // Settle after drag release
@@ -248,6 +499,29 @@ export function GraphView(): React.JSX.Element {
   const { selectDocument, deleteDocument } = useLibraryStore()
   const openFilePreviewRef = useRef(openFilePreview)
   useEffect(() => { openFilePreviewRef.current = openFilePreview }, [openFilePreview])
+
+  const idlePhase = useIdleStore((s) => s.phase)
+  const idleNodeIds = useIdleStore((s) => s.activeNodeIds)
+  const idleEdgeKeys = useIdleStore((s) => s.activeEdgeKeys)
+  const idleThought = useIdleStore((s) => s.currentThought)
+  const idleDraftCount = useIdleStore((s) => s.draftCount)
+
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null)
+  const animFrameRef = useRef<number | null>(null)
+  const animStartRef = useRef<number>(0)
+  // Refs so rAF callback always reads latest values without stale closures
+  const idlePhaseRef = useRef(idlePhase)
+  const idleNodeIdsRef = useRef(idleNodeIds)
+  const idleActiveRef = useIdleStore((s) => s.isActive)
+
+  const [thoughtBubblePos, setThoughtBubblePos] = useState<Pt | null>(null)
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    idlePhaseRef.current = idlePhase
+    idleNodeIdsRef.current = idleNodeIds
+    animStartRef.current = performance.now()
+  }, [idlePhase, idleNodeIds])
 
   // Close context menu on Escape
   useEffect(() => {
@@ -356,7 +630,7 @@ export function GraphView(): React.JSX.Element {
     }
 
     function clearSelection(): void {
-      cy.elements().removeClass('dimmed highlighted selected-node')
+      cy.elements().removeClass('dimmed highlighted selected-node idle-examining idle-attended idle-bg idle-insight')
       selectedNodeRef.current = null
     }
 
@@ -547,13 +821,203 @@ export function GraphView(): React.JSX.Element {
     applyData(cy, nodes, edges, filterTypes)
   }, [nodes, edges, filterTypes]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Sync idle mode visual classes on the Cytoscape graph
+  useEffect(() => {
+    const cy = cyRef.current
+    if (!cy) return
+
+    // Clear all idle classes first
+    cy.elements().removeClass('idle-examining idle-attended idle-bg idle-insight')
+
+    if (idlePhase === 'stopped' || idlePhase === 'resting' || idleNodeIds.length === 0) return
+
+    const activeSet = new Set(idleNodeIds)
+    const isInsight = idlePhase === 'insight'
+    const nodeClass = isInsight ? 'idle-insight' : 'idle-examining'
+    const edgeClass = isInsight ? 'idle-insight' : 'idle-examining'
+
+    // Dim all nodes/edges first
+    cy.nodes().addClass('idle-bg')
+    cy.edges().addClass('idle-bg')
+
+    // Highlight active nodes
+    for (const nodeId of idleNodeIds) {
+      const node = cy.getElementById(nodeId)
+      if (node.length > 0) {
+        node.removeClass('idle-bg').addClass(nodeClass)
+        // Attended: direct neighbors of examined nodes
+        if (!isInsight) {
+          node.neighborhood().nodes().forEach((nb) => {
+            if (!activeSet.has(nb.id() as string)) {
+              nb.removeClass('idle-bg').addClass('idle-attended')
+            }
+          })
+        }
+      }
+    }
+
+    // Highlight active edges
+    for (const edgeKey of idleEdgeKeys) {
+      const [src, tgt] = edgeKey.split('->')
+      cy.edges().forEach((edge) => {
+        if (
+          (edge.source().id() === src && edge.target().id() === tgt) ||
+          (edge.source().id() === tgt && edge.target().id() === src)
+        ) {
+          edge.removeClass('idle-bg').addClass(edgeClass)
+        }
+      })
+    }
+  }, [idlePhase, idleNodeIds, idleEdgeKeys])
+
+  // Resize overlay canvas to match container
+  useEffect(() => {
+    const canvas = overlayCanvasRef.current
+    const container = containerRef.current
+    if (!canvas || !container) return
+    const ro = new ResizeObserver(() => {
+      const { width, height } = container.getBoundingClientRect()
+      const dpr = window.devicePixelRatio || 1
+      canvas.width = width * dpr
+      canvas.height = height * dpr
+      canvas.style.width = `${width}px`
+      canvas.style.height = `${height}px`
+    })
+    ro.observe(container)
+    return () => ro.disconnect()
+  }, [])
+
+  // Canvas animation loop for idle overlay
+  useEffect(() => {
+    const canvas = overlayCanvasRef.current
+    if (!canvas) return
+
+    let active = true
+
+    function frame(): void {
+      if (!active) return
+      const cv = overlayCanvasRef.current
+      const cy = cyRef.current
+      if (!cv || !cy) { if (active) animFrameRef.current = requestAnimationFrame(frame); return }
+
+      const phase = idlePhaseRef.current
+      const nodeIds = idleNodeIdsRef.current
+      const t = performance.now() - animStartRef.current
+
+      // Get rendered positions from Cytoscape (same coord space as canvas overlay)
+      const positions: Pt[] = []
+      for (const id of nodeIds) {
+        const node = cy.getElementById(id)
+        if (node.length > 0) positions.push(node.renderedPosition() as Pt)
+      }
+
+      drawIdleOverlay(cv, positions, phase, t)
+
+      if (phase !== 'stopped' && phase !== 'resting') {
+        animFrameRef.current = requestAnimationFrame(frame)
+      } else {
+        const ctx = cv.getContext('2d')
+        ctx?.clearRect(0, 0, cv.width, cv.height)
+      }
+    }
+
+    if (idlePhase !== 'stopped' && idlePhase !== 'resting') {
+      animFrameRef.current = requestAnimationFrame(frame)
+    } else {
+      const ctx = canvas.getContext('2d')
+      ctx?.clearRect(0, 0, canvas.width, canvas.height)
+    }
+
+    return () => {
+      active = false
+      if (animFrameRef.current !== null) {
+        cancelAnimationFrame(animFrameRef.current)
+        animFrameRef.current = null
+      }
+    }
+  }, [idlePhase, idleNodeIds]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update thought bubble position when active nodes change
+  useEffect(() => {
+    const cy = cyRef.current
+    if (!cy || idleNodeIds.length === 0 || idlePhase === 'stopped' || idlePhase === 'resting') {
+      setThoughtBubblePos(null)
+      return
+    }
+    // Use top-1 or top-2 nodes, pick the highest on screen (smallest y)
+    const positions: Pt[] = []
+    for (const id of idleNodeIds.slice(0, 2)) {
+      const node = cy.getElementById(id)
+      if (node.length > 0) positions.push(node.renderedPosition() as Pt)
+    }
+    if (positions.length === 0) { setThoughtBubblePos(null); return }
+    const x = positions.reduce((s, p) => s + p.x, 0) / positions.length
+    const y = Math.min(...positions.map((p) => p.y))
+    setThoughtBubblePos({ x, y })
+  }, [idlePhase, idleNodeIds])
+
   // Always render the container div so the Cytoscape setup effect can attach
   // to it on the very first mount — even before data loads.
   // Loading / empty states are overlaid on top rather than replacing the container.
+  const showThoughtBubble = idleActiveRef && thoughtBubblePos && idlePhase !== 'stopped' && idlePhase !== 'resting' && idlePhase !== 'selecting'
+  const isInsightPhase = idlePhase === 'insight'
+
   return (
     <div className="flex-1 relative w-full h-full">
       {/* Cytoscape canvas — always present so the setup effect can attach */}
       <div ref={containerRef} className="absolute inset-0 w-full h-full" />
+
+      {/* Idle canvas overlay — animated arcs drawn on top of Cytoscape */}
+      <canvas
+        ref={overlayCanvasRef}
+        className="absolute inset-0 pointer-events-none"
+        style={{ zIndex: 5 }}
+      />
+
+      {/* Idle thought bubble — floats near active nodes */}
+      {showThoughtBubble && (
+        <div
+          className="absolute pointer-events-none"
+          style={{
+            left: thoughtBubblePos!.x,
+            top: thoughtBubblePos!.y,
+            transform: 'translate(-50%, calc(-100% - 22px))',
+            zIndex: 10,
+            transition: 'left 0.8s ease, top 0.8s ease, opacity 0.4s ease'
+          }}
+        >
+          <div
+            className={`relative backdrop-blur-md rounded-xl px-3 py-2 text-center shadow-xl border transition-all duration-500 max-w-[200px] ${
+              isInsightPhase
+                ? 'bg-orange-950/80 border-orange-400/50 shadow-orange-500/20'
+                : 'bg-cortx-surface/85 border-cortx-accent/35 shadow-cortx-accent/10'
+            }`}
+          >
+            {/* Phase label */}
+            <div className={`text-2xs font-mono uppercase tracking-widest mb-1 ${isInsightPhase ? 'text-orange-400/70' : 'text-cortx-accent/60'}`}>
+              {idlePhase === 'examining' && '⬡ examen'}
+              {idlePhase === 'thinking' && '◌ analyse'}
+              {idlePhase === 'insight' && '✦ insight'}
+            </div>
+            {/* Thought content */}
+            <p className={`text-xs leading-snug font-medium ${isInsightPhase ? 'text-orange-100' : 'text-cortx-text-primary/90'}`}>
+              {idleThought || '…'}
+            </p>
+            {/* Draft count badge */}
+            {idleDraftCount > 0 && !isInsightPhase && (
+              <div className="mt-1.5 text-2xs text-cortx-text-secondary/50">
+                {idleDraftCount} brouillon{idleDraftCount > 1 ? 's' : ''} en mémoire
+              </div>
+            )}
+            {/* Arrow pointing down */}
+            <div
+              className={`absolute left-1/2 -translate-x-1/2 -bottom-[7px] w-3 h-3 rotate-45 border-r border-b ${
+                isInsightPhase ? 'bg-orange-950/80 border-orange-400/50' : 'bg-cortx-surface/85 border-cortx-accent/35'
+              }`}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Loading overlay */}
       {isLoading && nodes.length === 0 && (

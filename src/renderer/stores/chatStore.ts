@@ -5,6 +5,7 @@ import { useUIStore } from './uiStore'
 import { useGraphStore } from './graphStore'
 import { useFileStore } from './fileStore'
 import { useFicheStore } from './ficheStore'
+import { useIdleStore } from './idleStore'
 
 interface ChatState {
   messages: ChatMessage[]
@@ -171,6 +172,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
   dismissedSuggestions: new Set<string>(),
 
   sendMessage: async (content: string) => {
+    // Stop idle mode when user interacts — agent focuses on the conversation
+    const idleState = useIdleStore.getState()
+    if (idleState.isActive) {
+      void idleState.stop()
+    }
+
     const userMessage: ChatMessage = {
       id: Date.now().toString(36) + 'u',
       role: 'user',

@@ -5,13 +5,15 @@ import { registerDatabaseHandlers } from './ipc/database'
 import { registerFileHandlers } from './ipc/files'
 import { registerLLMHandlers } from './ipc/llm'
 import { registerGitHandlers } from './ipc/git'
-import { registerAgentHandlers } from './ipc/agent'
+import { registerAgentHandlers, setIdleServiceForAgent } from './ipc/agent'
 import { registerLibraryHandlers } from './ipc/library'
+import { registerIdleHandlers } from './ipc/idle'
 import { DatabaseService } from './services/DatabaseService'
 import { FileService } from './services/FileService'
 import { GitService } from './services/GitService'
 import { LLMService } from './services/LLMService'
 import { AgentPipeline } from './services/AgentPipeline'
+import { IdleService } from './services/IdleService'
 import { libraryService } from './services/LibraryService'
 import { pythonSidecar } from './services/PythonSidecar'
 import type { AppConfig } from '../shared/types'
@@ -72,6 +74,7 @@ let fileService: FileService
 let gitService: GitService
 let llmService: LLMService
 let agentPipeline: AgentPipeline
+let idleService: IdleService
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -124,6 +127,9 @@ async function initializeServices(): Promise<void> {
 
   // Initialise library service (creates Bibliotheque/ if needed)
   libraryService.initialize(dbService.getDb(), config.basePath)
+
+  // Initialise idle service
+  idleService = new IdleService(dbService, fileService, llmService, config.basePath)
 
   // Index existing files
   await indexAllFiles()
@@ -275,8 +281,12 @@ app.whenReady().then(async () => {
   registerGitHandlers(() => gitService)
   registerAgentHandlers(() => agentPipeline)
   registerLibraryHandlers(() => libraryService, () => mainWindow)
+  registerIdleHandlers(() => idleService)
+  setIdleServiceForAgent(idleService)
 
   createWindow()
+  // Give IdleService access to the main window for IPC events
+  if (mainWindow) idleService.setWindow(mainWindow)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
