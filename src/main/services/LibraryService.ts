@@ -447,9 +447,17 @@ export class LibraryService {
   }
 
   private _lexicalSearch(query: string, limit: number): LibraryChunkResult[] {
-    // Escape FTS5 special characters
-    const safeQuery = query.replace(/['"*^()]/g, ' ').trim()
-    if (!safeQuery) return []
+    // Build an OR query from the meaningful tokens in the user query.
+    // FTS5 default mode is AND (all terms must appear in a single chunk),
+    // which almost always fails for natural-language questions.
+    // OR mode finds any chunk containing at least one significant term.
+    const tokens = query
+      .replace(/['"*^()]/g, ' ')
+      .split(/\s+/)
+      .map((t) => t.trim())
+      .filter((t) => t.length >= 3) // drop stopwords / short particles
+    if (tokens.length === 0) return []
+    const safeQuery = tokens.join(' OR ')
 
     type FtsRow = {
       id: number
@@ -642,9 +650,98 @@ export class LibraryService {
   /**
    * Returns the top chunks for a query, formatted for prompt injection.
    * Called by AgentPipeline.process().
+   *
+   * Strategy:
+   *  1. Check whether the query explicitly mentions a document by name
+   *     (title or filename).  If so, return ALL chunks of that document
+   *     first — this handles "que contient le fichier X ?" perfectly.
+   *  2. Fill remaining slots with the standard hybrid (lexical + semantic)
+   *     search on chunk content.
    */
   async getContextChunks(query: string, limit = 6): Promise<LibraryChunkResult[]> {
+    const nameMatches = this._filenameSearch(query, limit)
+
+    if (nameMatches.length > 0) {
+      // User is explicitly asking about one or more documents by name.
+      // Give priority to all their chunks, then fill with hybrid results.
+      const remaining = Math.max(0, limit - nameMatches.length)
+      const namedDocIds = new Set(nameMatches.map((m) => m.documentId))
+      const hybrid = remaining > 0 ? await this.search(query, 'hybrid', limit) : []
+      const extra = hybrid.filter((h) => !namedDocIds.has(h.documentId)).slice(0, remaining)
+      return [...nameMatches, ...extra]
+    }
+
     return this.search(query, 'hybrid', limit)
+  }
+
+  /**
+   * Detect whether the query contains a document title or filename token.
+   * Returns up to `limit` chunks from the matching documents, ordered by
+   * chunk_index so the agent sees the document in reading order.
+   *
+   * Matching rules (OR):
+   *  - Any query token (≥ 4 chars) is a substring of the document title
+   *  - Any query token (≥ 4 chars) is a substring of the filename
+   * This catches "Q6_2026_OKRs.xls", "Q6_2026_OKRs", "OKRs 2026", etc.
+   */
+  private _filenameSearch(query: string, limit: number): LibraryChunkResult[] {
+    // Tokenise: split on whitespace + common punctuation, keep tokens ≥ 4 chars
+    const tokens = query
+      .toLowerCase()
+      .split(/[\s.,;:!?''"()\[\]/\\]+/)
+      .filter((t) => t.length >= 4)
+
+    if (tokens.length === 0) return []
+
+    type DocRow = { id: string; title: string | null; path: string }
+    const matchedDocIds = new Set<string>()
+
+    for (const token of tokens) {
+      const docs = this.db.prepare(`
+        SELECT id FROM library_documents
+        WHERE status = 'indexed' AND (
+          LOWER(title) LIKE ? OR
+          LOWER(filename) LIKE ?
+        )
+        LIMIT 5
+      `).all(`%${token}%`, `%${token}%`) as DocRow[]
+      docs.forEach((d) => matchedDocIds.add(d.id))
+    }
+
+    if (matchedDocIds.size === 0) return []
+
+    const chunkLimit = Math.max(2, Math.ceil(limit / matchedDocIds.size))
+    const results: LibraryChunkResult[] = []
+
+    for (const docId of matchedDocIds) {
+      type ChunkRow = {
+        id: number; document_id: string; heading: string | null; text: string
+        page_from: number | null; page_to: number | null; title: string | null; path: string
+      }
+      const chunks = this.db.prepare(`
+        SELECT lc.id, lc.document_id, lc.heading, lc.text, lc.page_from, lc.page_to,
+               ld.title, ld.path
+        FROM library_chunks lc
+        JOIN library_documents ld ON ld.id = lc.document_id
+        WHERE lc.document_id = ?
+        ORDER BY lc.chunk_index
+        LIMIT ?
+      `).all(docId, chunkLimit) as ChunkRow[]
+
+      results.push(...chunks.map((r) => ({
+        chunkId: r.id,
+        documentId: r.document_id,
+        documentTitle: r.title,
+        documentPath: r.path,
+        heading: r.heading,
+        text: r.text,
+        pageFrom: r.page_from,
+        pageTo: r.page_to,
+        score: 2.0, // explicit name match → always higher priority than FTS/semantic
+      })))
+    }
+
+    return results.slice(0, limit)
   }
 
   /** Lists documents linked to a specific entity. */

@@ -103,8 +103,13 @@ L'heure actuelle est : {{now}}`
 /** Format library chunks for prompt injection. */
 function formatLibraryContext(chunks: LibraryChunkResult[]): string {
   if (chunks.length === 0) return ''
-  const lines: string[] = ['', '## Documents de référence (bibliothèque)']
-  lines.push('Ces extraits proviennent de documents importés en lecture seule. Cite-les avec [doc:<id>] si tu t\'en sers.')
+  const lines: string[] = [
+    '',
+    '## Documents de référence (bibliothèque)',
+    'IMPORTANT : Ces extraits font partie du contexte disponible, au même titre que les fichiers Markdown ci-dessus.',
+    'Pour toute question portant sur un document listé ici, tu DOIS répondre en te basant sur son contenu.',
+    'Cite les sources avec [doc:<id>] quand tu utilises ces informations.'
+  ]
   for (const chunk of chunks) {
     const title = chunk.documentTitle || chunk.documentPath
     const loc = chunk.heading ? ` — § ${chunk.heading}` : ''
@@ -192,9 +197,10 @@ MODIFICATIONS DE FICHIERS EXISTANTS :
 5. Toute violation de ces regles ECRASERA des donnees utilisateur. C'est inacceptable.
 
 POUR LES QUESTIONS :
-6. Le contexte ci-dessus contient deja les fichiers pertinents. Tu n'as AUCUN outil pour chercher davantage.
-7. Reponds IMMEDIATEMENT et COMPLETEMENT dans "response". Pas de "je vais chercher", pas de "un instant", pas de promesse — la reponse finale, maintenant.
-8. Si l'info n'est pas dans le contexte, dis-le clairement, ne stub pas.
+6. Le contexte ci-dessus contient deja les fichiers pertinents (section "FICHIERS PERTINENTS") ET les extraits de la bibliotheque (section "Documents de reference"). Tu n'as AUCUN outil pour chercher davantage.
+7. Si la question porte sur un document de la bibliotheque (PDF, XLSX, DOCX, etc.), reponds en te basant sur les extraits fournis dans "Documents de reference". Ces extraits contiennent le texte extrait du document.
+8. Reponds IMMEDIATEMENT et COMPLETEMENT dans "response". Pas de "je vais chercher", pas de "un instant", pas de promesse — la reponse finale, maintenant.
+9. Si l'info n'est pas dans le contexte, dis-le clairement, ne stub pas.
 
 DEMANDER UNE CLARIFICATION :
 9. Si tu hesites entre plusieurs interpretations OU plusieurs cibles possibles (ex: "Sophie" peut designer plusieurs personnes connues, ou tu ne sais pas s'il faut creer une nouvelle entite ou modifier une existante), N'AGIS PAS. A la place, retourne un champ "clarification" avec une question et des options claires.

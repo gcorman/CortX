@@ -1,12 +1,14 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { useChatStore } from '../../stores/chatStore'
-import { Brain, Sparkles } from 'lucide-react'
+import { Brain, Sparkles, FileText } from 'lucide-react'
 
 export function ChatView(): React.JSX.Element {
-  const { messages, isProcessing, sendMessage, streamProgress } = useChatStore()
+  const { messages, isProcessing, sendMessage, importMarkdown, streamProgress } = useChatStore()
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [globalDragOver, setGlobalDragOver] = useState(false)
+  const dragCounterRef = useRef(0)
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -14,8 +16,67 @@ export function ChatView(): React.JSX.Element {
     }
   }, [messages])
 
+  // Global drag & drop — listens on the whole ChatView container
+  const handleGlobalDragEnter = useCallback((e: React.DragEvent) => {
+    if (!Array.from(e.dataTransfer.types).includes('Files')) return
+    dragCounterRef.current++
+    setGlobalDragOver(true)
+  }, [])
+
+  const handleGlobalDragLeave = useCallback(() => {
+    dragCounterRef.current--
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0
+      setGlobalDragOver(false)
+    }
+  }, [])
+
+  const handleGlobalDragOver = useCallback((e: React.DragEvent) => {
+    if (!Array.from(e.dataTransfer.types).includes('Files')) return
+    e.preventDefault()
+  }, [])
+
+  const handleGlobalDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault()
+    dragCounterRef.current = 0
+    setGlobalDragOver(false)
+
+    const droppedFiles = Array.from(e.dataTransfer.files)
+    for (const file of droppedFiles) {
+      const filePath = (file as File & { path: string }).path
+      const name = file.name.toLowerCase()
+      if (!name.endsWith('.md') && !name.endsWith('.txt')) continue
+      try {
+        const result = await window.cortx.files.readExternal(filePath)
+        if (result) {
+          await importMarkdown(result.filename, result.content)
+        }
+      } catch (err) {
+        console.error('[ChatView] drop error:', err)
+      }
+    }
+  }, [importMarkdown])
+
   return (
-    <div className="flex-1 flex flex-col min-h-0">
+    <div
+      className="flex-1 flex flex-col min-h-0 relative"
+      onDragEnter={handleGlobalDragEnter}
+      onDragLeave={handleGlobalDragLeave}
+      onDragOver={handleGlobalDragOver}
+      onDrop={handleGlobalDrop}
+    >
+      {/* Global drag overlay */}
+      {globalDragOver && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <div className="absolute inset-0 bg-cortx-accent/5 border-2 border-dashed border-cortx-accent/50 rounded-lg m-2" />
+          <div className="relative flex flex-col items-center gap-3 bg-cortx-surface/95 border border-cortx-accent/40 rounded-xl px-8 py-6 shadow-2xl">
+            <FileText size={32} className="text-cortx-accent" />
+            <p className="text-sm font-medium text-cortx-text-primary">Déposer le fichier .md</p>
+            <p className="text-xs text-cortx-text-secondary">L'agent va l'analyser et proposer son intégration</p>
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
         {messages.length === 0 ? (
@@ -44,7 +105,11 @@ export function ChatView(): React.JSX.Element {
       </div>
 
       {/* Input */}
-      <ChatInput onSend={sendMessage} disabled={isProcessing} />
+      <ChatInput
+        onSend={sendMessage}
+        onImportMarkdown={importMarkdown}
+        disabled={isProcessing}
+      />
     </div>
   )
 }

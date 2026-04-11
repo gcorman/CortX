@@ -25,15 +25,19 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     if (get().nodes.length === 0) set({ isLoading: true })
     try {
       const data: GraphData = await window.cortx.db.getGraphData()
-      console.log('[GraphStore] Loaded graph data:', data.nodes.length, 'nodes,', data.edges.length, 'edges')
-      // Only update if data actually changed (avoid unnecessary re-renders)
       const current = get()
-      if (
-        data.nodes.length !== current.nodes.length ||
-        data.edges.length !== current.edges.length ||
-        JSON.stringify(data.nodes.map((n) => n.id)) !== JSON.stringify(current.nodes.map((n) => n.id))
-      ) {
+
+      // Compare nodes AND edges — a manual edit can add/remove wikilinks
+      // without changing node count, so we must compare edges too.
+      const nodesKey = data.nodes.map((n) => n.id).join(',')
+      const prevNodesKey = current.nodes.map((n) => n.id).join(',')
+      const edgesKey = data.edges.map((e) => `${e.source}->${e.target}`).sort().join(',')
+      const prevEdgesKey = current.edges.map((e) => `${e.source}->${e.target}`).sort().join(',')
+
+      if (nodesKey !== prevNodesKey || edgesKey !== prevEdgesKey) {
         set({ nodes: data.nodes, edges: data.edges, isLoading: false })
+      } else {
+        set({ isLoading: false })
       }
     } catch (err) {
       console.error('[GraphStore] Failed to load graph:', err)
@@ -56,3 +60,19 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       return { filterTypes: next }
     })
 }))
+
+// Listen for db:changed events pushed by the main process file-watcher.
+// This fires whenever a .md file is saved outside of the agent (manual edit).
+// fileStore is imported lazily to avoid circular dependencies at module init time.
+let _fileStoreRef: (() => void) | null = null
+
+export function registerDbChangedListener(onChanged: () => void): void {
+  _fileStoreRef = onChanged
+}
+
+if (typeof window !== 'undefined' && window.cortx) {
+  window.cortx.on('db:changed', () => {
+    useGraphStore.getState().loadGraph()
+    _fileStoreRef?.()
+  })
+}

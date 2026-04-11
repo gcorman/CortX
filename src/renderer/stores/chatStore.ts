@@ -14,6 +14,8 @@ interface ChatState {
   /** Set of suggestion texts the user has dismissed — hides them from chat AND right panel */
   dismissedSuggestions: Set<string>
   sendMessage: (content: string) => Promise<void>
+  /** Analyze a dropped/imported .md file and ask the agent how to integrate it. */
+  importMarkdown: (filename: string, content: string) => Promise<void>
   acceptActions: (messageId: string) => Promise<void>
   rejectActions: (messageId: string) => void
   undoActions: (commitHash: string, messageId: string) => Promise<void>
@@ -274,6 +276,77 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
       set((s) => ({ messages: [...s.messages, errorMessage], isProcessing: false }))
       useUIStore.getState().addToast('Erreur lors du traitement', 'error')
+    } finally {
+      stopStream()
+    }
+  },
+
+  /**
+   * Import a .md file: show it in chat as a user message, then have the agent
+   * analyze it and propose how to integrate it into the knowledge base.
+   */
+  importMarkdown: async (filename: string, content: string) => {
+    if (get().isProcessing) {
+      useUIStore.getState().addToast("L'agent est occupé, réessaie dans un instant", 'info')
+      return
+    }
+
+    // Show only the filename in chat — full content goes to the agent only
+    const wordCount = content.split(/\s+/).length
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(36) + 'u',
+      role: 'user',
+      content: `📄 Importer **${filename}** (${wordCount} mots) dans la base de connaissance`,
+      timestamp: new Date().toISOString()
+    }
+    set((s) => ({ messages: [...s.messages, userMessage], isProcessing: true }))
+
+    // Full content sent to agent only — never shown raw in the chat
+    const agentPrompt = `[IMPORT FICHIER MARKDOWN]
+
+L'utilisateur importe le fichier "${filename}" (${wordCount} mots) pour l'intégrer dans la base de connaissance.
+
+Voici son contenu COMPLET :
+
+\`\`\`markdown
+${content}
+\`\`\`
+
+[INSTRUCTION CRITIQUE]
+Analyse ce fichier en détail et propose des actions concrètes :
+1. De quoi parle-t-il ? (personne, entreprise, projet, domaine, note, journal ?)
+2. Quelles entités sont mentionnées ? (noms, organisations, projets…)
+3. Crée ou met à jour les fichiers appropriés dans les bons dossiers (Reseau/, Entreprises/, Projets/, Domaines/, Journal/) avec frontmatter YAML + corps Markdown structuré.
+4. Reprend fidèlement les informations — n'invente RIEN.
+5. Utilise des wikilinks [[Nom]] pour relier les entités entre elles.
+input_type="information"`
+
+    const requestId = Date.now().toString(36) + 'r'
+    const stopStream = startStreamSession(requestId, 'default', set, get)
+
+    try {
+      const result = await window.cortx.agent.processStream(agentPrompt, requestId) as AgentResponse
+      const agentMessage: ChatMessage = {
+        id: Date.now().toString(36) + 'a',
+        role: 'agent',
+        content: result.summary || result.response || `Analyse de "${filename}" terminée.`,
+        timestamp: new Date().toISOString(),
+        agentResponse: result
+      }
+      set((s) => ({ messages: [...s.messages, agentMessage], isProcessing: false }))
+
+      // Register proposed actions in agent store so right panel shows them
+      if (result.actions.length > 0) {
+        useAgentStore.getState().addActions(result)
+      }
+    } catch (err) {
+      const errorMessage: ChatMessage = {
+        id: Date.now().toString(36) + 'e',
+        role: 'agent',
+        content: `❌ Erreur lors de l'analyse de "${filename}" : ${(err as Error).message}`,
+        timestamp: new Date().toISOString()
+      }
+      set((s) => ({ messages: [...s.messages, errorMessage], isProcessing: false }))
     } finally {
       stopStream()
     }

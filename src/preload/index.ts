@@ -14,7 +14,9 @@ const api: CortxAPI = {
     read: (path: string) => ipcRenderer.invoke('files:read', path),
     write: (path: string, content: string) => ipcRenderer.invoke('files:write', path, content),
     list: (dir?: string) => ipcRenderer.invoke('files:list', dir),
-    exists: (path: string) => ipcRenderer.invoke('files:exists', path)
+    exists: (path: string) => ipcRenderer.invoke('files:exists', path),
+    openMarkdownDialog: () => ipcRenderer.invoke('files:openMarkdownDialog'),
+    readExternal: (absolutePath: string) => ipcRenderer.invoke('files:readExternal', absolutePath)
   },
   llm: {
     send: (messages, systemPrompt?) => ipcRenderer.invoke('llm:send', messages, systemPrompt),

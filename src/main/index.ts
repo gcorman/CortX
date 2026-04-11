@@ -143,6 +143,44 @@ async function indexAllFiles(): Promise<void> {
   }
 }
 
+// ── File-system watcher ───────────────────────────────────────────────────────
+// Reindex any .md that changes outside of the agent (manual edits, external tools)
+// and push a 'db:changed' event so the renderer refreshes the graph + file list.
+
+let fsWatcher: fs.FSWatcher | null = null
+let reindexTimer: ReturnType<typeof setTimeout> | null = null
+
+function startFileWatcher(basePath: string): void {
+  if (fsWatcher) { fsWatcher.close(); fsWatcher = null }
+
+  try {
+    fsWatcher = fs.watch(basePath, { recursive: true }, (_event, filename) => {
+      if (!filename) return
+      // Only care about .md files outside _System/ and Bibliotheque/
+      if (!filename.endsWith('.md')) return
+      if (filename.startsWith('_System') || filename.startsWith('Bibliotheque')) return
+
+      // Debounce: coalesce rapid saves (editors write multiple times) into one reindex
+      if (reindexTimer) clearTimeout(reindexTimer)
+      reindexTimer = setTimeout(async () => {
+        reindexTimer = null
+        try {
+          await indexAllFiles()
+          // Notify renderer so graph + file list refresh immediately
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('db:changed')
+          }
+        } catch (err) {
+          console.error('[FileWatcher] reindex error:', err)
+        }
+      }, 800)
+    })
+  } catch (err) {
+    // fs.watch recursive not supported on all platforms — silently skip
+    console.warn('[FileWatcher] Could not start watcher:', err)
+  }
+}
+
 function registerAppHandlers(): void {
   ipcMain.handle('app:getBasePath', () => config.basePath)
 
@@ -157,6 +195,7 @@ function registerAppHandlers(): void {
     await gitService.initialize()
     agentPipeline = new AgentPipeline(fileService, dbService, gitService, llmService, path)
     await indexAllFiles()
+    startFileWatcher(path)
   })
 
   ipcMain.handle('app:openDirectoryDialog', async () => {
@@ -227,6 +266,7 @@ function registerAppHandlers(): void {
 
 app.whenReady().then(async () => {
   await initializeServices()
+  startFileWatcher(config.basePath)
 
   registerAppHandlers()
   registerDatabaseHandlers(() => dbService)

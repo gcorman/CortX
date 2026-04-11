@@ -82,8 +82,10 @@ def _get_embed_model():
     global _embed_model
     if _embed_model is None:
         from sentence_transformers import SentenceTransformer
-        # Multilingual model, ~120 MB, works for FR and EN
-        _embed_model = SentenceTransformer("intfloat/multilingual-e5-small")
+        # Multilingual model, ~120 MB, works for FR and EN.
+        # Force CPU: the GPU is reserved for llama.cpp (the LLM agent).
+        # e5-small is fast enough on CPU (~50ms/batch).
+        _embed_model = SentenceTransformer("intfloat/multilingual-e5-small", device="cpu")
     return _embed_model
 
 

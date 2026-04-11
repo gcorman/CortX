@@ -241,6 +241,14 @@ export class DatabaseService {
         link_type TEXT NOT NULL DEFAULT 'mention_auto',
         PRIMARY KEY (document_id, entity_id, link_type)
       );
+
+      -- Links FROM .md knowledge-base files TO library documents via [[wikilinks]].
+      -- Populated by indexEntitiesFromFile() when a wikilink matches a library doc title.
+      CREATE TABLE IF NOT EXISTS file_library_links (
+        file_path TEXT NOT NULL,
+        document_id TEXT NOT NULL REFERENCES library_documents(id) ON DELETE CASCADE,
+        PRIMARY KEY (file_path, document_id)
+      );
     `)
   }
 
@@ -303,14 +311,15 @@ export class DatabaseService {
     // Clear previous relations coming from this file — they may be stale
     // (a line was edited, a link removed, or the inferred type changed).
     this.db.prepare('DELETE FROM relations WHERE source_file = ?').run(fileContent.path)
+    this.db.prepare('DELETE FROM file_library_links WHERE file_path = ?').run(fileContent.path)
 
     const sourceEntity = this.db.prepare('SELECT id, type FROM entities WHERE file_path = ?').get(fileContent.path) as { id: number; type: string } | undefined
-    if (!sourceEntity) return
 
     // Walk the body line by line to keep the surrounding context for each link.
     // This lets us infer the relation type from verbs like "travaille", "connait", etc.
     const lines = fileContent.body.split('\n')
     const seen = new Set<string>() // dedupe per (target, type) within this file
+    const seenLibLinks = new Set<string>() // dedupe library doc links
 
     let currentHeading = ''
     for (const rawLine of lines) {
@@ -325,6 +334,31 @@ export class DatabaseService {
 
       for (const m of linkMatches) {
         const targetName = m[1].trim()
+
+        // --- Check library documents (title, full filename, or filename without extension) ---
+        // Matches: [[Q6_2026_OKRs.xlsx]] → filename exact match
+        // Matches: [[Q6_2026_OKRs]]      → filename stripped of extension
+        // Matches: [[GUIDE DE NOTATION]] → title match
+        type LibDocRow = { id: string }
+        const libDoc = this.db.prepare(`
+          SELECT id FROM library_documents
+          WHERE status = 'indexed' AND (
+            LOWER(title) = LOWER(?) OR
+            LOWER(filename) = LOWER(?) OR
+            LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(filename, '.pdf',''), '.docx',''), '.xlsx',''), '.txt',''), '.pptx','')) = LOWER(?)
+          )
+          LIMIT 1
+        `).get(targetName, targetName, targetName) as LibDocRow | undefined
+
+        if (libDoc && !seenLibLinks.has(libDoc.id)) {
+          seenLibLinks.add(libDoc.id)
+          this.db.prepare(
+            'INSERT OR IGNORE INTO file_library_links (file_path, document_id) VALUES (?, ?)'
+          ).run(fileContent.path, libDoc.id)
+        }
+
+        // --- Check knowledge-base entities ---
+        if (!sourceEntity) continue
         const targetEntity = this.db.prepare('SELECT id, type FROM entities WHERE LOWER(name) = LOWER(?)').get(targetName) as { id: number; type: string } | undefined
         if (!targetEntity || targetEntity.id === sourceEntity.id) continue
 
@@ -497,6 +531,55 @@ export class DatabaseService {
         target: String(r.target_entity_id),
         label: r.relation_type
       }))
+
+    // --- Library documents as graph nodes ---
+    try {
+      const libDocs = this.db.prepare(
+        "SELECT id, title, filename, path FROM library_documents WHERE status = 'indexed'"
+      ).all() as Array<{ id: string; title: string | null; filename: string; path: string }>
+
+      for (const doc of libDocs) {
+        nodes.push({
+          id: `lib:${doc.id}`,
+          label: doc.title || doc.filename,
+          type: 'document' as GraphNode['type'],
+          filePath: doc.path,
+        })
+      }
+
+      // Library links: library doc → entity (auto-detected during ingest)
+      const libLinks = this.db.prepare(
+        'SELECT document_id, entity_id, link_type FROM library_links'
+      ).all() as Array<{ document_id: string; entity_id: number; link_type: string }>
+
+      for (const link of libLinks) {
+        if (entityIds.has(link.entity_id)) {
+          edges.push({
+            source: `lib:${link.document_id}`,
+            target: String(link.entity_id),
+            label: link.link_type,
+          })
+        }
+      }
+
+      // File→library links: entity → library doc via [[wikilinks]] in .md files
+      const fileLibLinks = this.db.prepare(
+        'SELECT fl.file_path, fl.document_id, e.id as entity_id FROM file_library_links fl JOIN entities e ON e.file_path = fl.file_path'
+      ).all() as Array<{ file_path: string; document_id: string; entity_id: number }>
+
+      const libDocIds = new Set(libDocs.map(d => d.id))
+      for (const link of fileLibLinks) {
+        if (entityIds.has(link.entity_id) && libDocIds.has(link.document_id)) {
+          edges.push({
+            source: String(link.entity_id),
+            target: `lib:${link.document_id}`,
+            label: 'réf. doc',
+          })
+        }
+      }
+    } catch {
+      // Library tables may not exist yet — silently skip
+    }
 
     return { nodes, edges }
   }

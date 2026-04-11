@@ -5,7 +5,8 @@ import fcose from 'cytoscape-fcose'
 import { useGraphStore } from '../../stores/graphStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useFileStore } from '../../stores/fileStore'
-import { Network, LayoutGrid, Trash2, RefreshCw } from 'lucide-react'
+import { useLibraryStore } from '../../stores/libraryStore'
+import { Network, LayoutGrid, Trash2, RefreshCw, FileText, ExternalLink } from 'lucide-react'
 
 // Register extensions — fcose takes priority over cose-bilkent for all layouts
 try { cytoscape.use(fcose as unknown as cytoscape.Ext) } catch { /* already registered */ }
@@ -31,7 +32,8 @@ const NODE_COLORS: Record<string, string> = {
   projet:     '#F97316',
   note:       '#94A3B8',
   journal:    '#64748B',
-  fiche:      '#EC4899'
+  fiche:      '#EC4899',
+  document:   '#F59E0B'
 }
 
 function buildCyStyle(): cytoscape.StylesheetStyle[] {
@@ -98,6 +100,16 @@ function buildCyStyle(): cytoscape.StylesheetStyle[] {
         'transition-property': 'opacity, line-color, width',
         'transition-duration': 180
       } as unknown as cytoscape.Css.Edge
+    },
+
+    // --- Document nodes (library) — diamond shape to stand out ---
+    {
+      selector: 'node[type = "document"]',
+      style: {
+        shape: 'diamond',
+        width: 22,
+        height: 22,
+      } as unknown as cytoscape.Css.Node
     },
 
     // --- Dimmed (non-selected neighborhood) ---
@@ -221,7 +233,7 @@ export function GraphView(): React.JSX.Element {
   const pendingDataRef = useRef<{ nodes: typeof nodes; edges: typeof edges; filterTypes: Set<string> } | null>(null)
 
   const [contextMenu, setContextMenu] = useState<{
-    x: number; y: number; filePath: string; label: string
+    x: number; y: number; nodeId: string; filePath: string; label: string; isLibDoc: boolean
   } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [isRewriting, setIsRewriting] = useState(false)
@@ -229,9 +241,11 @@ export function GraphView(): React.JSX.Element {
 
   const { nodes, edges, isLoading, loadGraph, filterTypes, toggleFilterType } = useGraphStore()
   const openFilePreview = useUIStore((s) => s.openFilePreview)
+  const setActiveCenterView = useUIStore((s) => s.setActiveCenterView)
   const addToast = useUIStore((s) => s.addToast)
   const theme = useUIStore((s) => s.theme)
   const loadFiles = useFileStore((s) => s.loadFiles)
+  const { selectDocument, deleteDocument } = useLibraryStore()
   const openFilePreviewRef = useRef(openFilePreview)
   useEffect(() => { openFilePreviewRef.current = openFilePreview }, [openFilePreview])
 
@@ -265,15 +279,42 @@ export function GraphView(): React.JSX.Element {
   async function handleDelete(): Promise<void> {
     if (!contextMenu) return
     try {
-      await window.cortx.agent.deleteFile(contextMenu.filePath)
+      if (contextMenu.isLibDoc) {
+        const docId = contextMenu.nodeId.replace('lib:', '')
+        await deleteDocument(docId)
+        addToast('Document supprimé de la bibliothèque', 'info')
+      } else {
+        await window.cortx.agent.deleteFile(contextMenu.filePath)
+        await loadFiles()
+        addToast('Fichier supprimé', 'info')
+      }
       setContextMenu(null)
       setConfirmDelete(false)
-      await Promise.all([loadGraph(), loadFiles()])
-      addToast('Fichier supprimé', 'info')
+      await loadGraph()
     } catch (err) {
       console.error(err)
       addToast('Erreur lors de la suppression', 'error')
     }
+  }
+
+  async function handleOpenOriginal(): Promise<void> {
+    if (!contextMenu) return
+    const docId = contextMenu.nodeId.replace('lib:', '')
+    try {
+      await window.cortx.library.openOriginal(docId)
+    } catch {
+      addToast('Impossible d\'ouvrir le fichier original', 'error')
+    }
+    setContextMenu(null)
+  }
+
+  async function handleOpenTranscription(): Promise<void> {
+    if (!contextMenu) return
+    const docId = contextMenu.nodeId.replace('lib:', '')
+    setContextMenu(null)
+    // Switch to library view and select the document to show its preview
+    setActiveCenterView('library')
+    await selectDocument(docId)
   }
 
   // Rebuild Cytoscape style when theme changes (colors come from CSS variables)
@@ -337,17 +378,28 @@ export function GraphView(): React.JSX.Element {
     })
 
     cy.on('dbltap', 'node', (evt) => {
-      const fp = (evt.target as cytoscape.NodeSingular).data('filePath') as string
+      const node = evt.target as cytoscape.NodeSingular
+      const nodeId = node.id() as string
+      // Library document nodes: open original file
+      if (nodeId.startsWith('lib:')) {
+        const docId = nodeId.replace('lib:', '')
+        window.cortx.library.openOriginal(docId).catch(() => {})
+        return
+      }
+      const fp = node.data('filePath') as string
       if (fp) openFilePreviewRef.current(fp)
     })
 
     cy.on('cxttap', 'node', (evt) => {
       const node = evt.target as cytoscape.NodeSingular
+      const nodeId = node.id() as string
       const fp = node.data('filePath') as string
       const label = node.data('label') as string
-      if (!fp) return
+      const isLibDoc = nodeId.startsWith('lib:')
+      // Library doc nodes: always show menu even without a filePath
+      if (!fp && !isLibDoc) return
       const pos = evt.renderedPosition
-      setContextMenu({ x: pos.x, y: pos.y, filePath: fp, label })
+      setContextMenu({ x: pos.x, y: pos.y, nodeId, filePath: fp, label, isLibDoc })
       setConfirmDelete(false)
     })
 
@@ -570,46 +622,87 @@ export function GraphView(): React.JSX.Element {
             onClick={() => { setContextMenu(null); setConfirmDelete(false) }}
           />
           <div
-            className="absolute z-20 bg-cortx-surface border border-cortx-border rounded-card shadow-xl py-1 min-w-[200px]"
+            className="absolute z-20 bg-cortx-surface border border-cortx-border rounded-card shadow-xl py-1 min-w-[210px]"
             style={{ left: contextMenu.x, top: contextMenu.y }}
           >
-            <div className="px-3 py-1.5 text-2xs text-cortx-text-secondary/60 border-b border-cortx-border truncate">
+            <div className="px-3 py-1.5 text-2xs text-cortx-text-secondary/60 border-b border-cortx-border truncate flex items-center gap-1.5">
+              {contextMenu.isLibDoc && <FileText size={10} className="text-amber-400 flex-shrink-0" />}
               {contextMenu.label}
             </div>
-            <button
-              onClick={handleRewrite}
-              disabled={isRewriting}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-cortx-text-primary hover:bg-cortx-elevated transition-colors cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw size={13} className={isRewriting ? 'animate-spin' : ''} />
-              {isRewriting ? 'Réorganisation...' : 'Reprendre la rédaction'}
-            </button>
-            {!confirmDelete ? (
-              <button
-                onClick={() => setConfirmDelete(true)}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-              >
-                <Trash2 size={13} />
-                Supprimer
-              </button>
-            ) : (
-              <div className="px-3 py-2 space-y-1.5">
-                <p className="text-xs text-red-400">Supprimer définitivement ?</p>
-                <div className="flex gap-1.5">
+
+            {contextMenu.isLibDoc ? (
+              /* ── Library document actions ── */
+              <>
+                <button
+                  onClick={handleOpenOriginal}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-cortx-text-primary hover:bg-cortx-elevated transition-colors cursor-pointer"
+                >
+                  <ExternalLink size={13} />
+                  Ouvrir le fichier original
+                </button>
+                <button
+                  onClick={handleOpenTranscription}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-cortx-text-primary hover:bg-cortx-elevated transition-colors cursor-pointer"
+                >
+                  <FileText size={13} />
+                  Voir la transcription Markdown
+                </button>
+                <div className="border-t border-cortx-border mt-1" />
+                {!confirmDelete ? (
                   <button
-                    onClick={handleDelete}
-                    className="flex-1 text-xs bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded px-2 py-1 transition-colors cursor-pointer"
+                    onClick={() => setConfirmDelete(true)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
                   >
+                    <Trash2 size={13} />
+                    Supprimer de la bibliothèque
+                  </button>
+                ) : (
+                  <div className="px-3 py-2 space-y-1.5">
+                    <p className="text-xs text-red-400">Supprimer définitivement ?</p>
+                    <div className="flex gap-1.5">
+                      <button onClick={handleDelete} className="flex-1 text-xs bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded px-2 py-1 transition-colors cursor-pointer">
+                        Supprimer
+                      </button>
+                      <button onClick={() => setConfirmDelete(false)} className="flex-1 text-xs bg-cortx-elevated hover:bg-cortx-border text-cortx-text-secondary rounded px-2 py-1 transition-colors cursor-pointer">
+                        Annuler
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              /* ── Knowledge-base entity actions ── */
+              <>
+                <button
+                  onClick={handleRewrite}
+                  disabled={isRewriting}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-cortx-text-primary hover:bg-cortx-elevated transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw size={13} className={isRewriting ? 'animate-spin' : ''} />
+                  {isRewriting ? 'Réorganisation...' : 'Reprendre la rédaction'}
+                </button>
+                {!confirmDelete ? (
+                  <button
+                    onClick={() => setConfirmDelete(true)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                  >
+                    <Trash2 size={13} />
                     Supprimer
                   </button>
-                  <button
-                    onClick={() => setConfirmDelete(false)}
-                    className="flex-1 text-xs bg-cortx-elevated hover:bg-cortx-border text-cortx-text-secondary rounded px-2 py-1 transition-colors cursor-pointer"
-                  >
-                    Annuler
-                  </button>
-                </div>
-              </div>
+                ) : (
+                  <div className="px-3 py-2 space-y-1.5">
+                    <p className="text-xs text-red-400">Supprimer définitivement ?</p>
+                    <div className="flex gap-1.5">
+                      <button onClick={handleDelete} className="flex-1 text-xs bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded px-2 py-1 transition-colors cursor-pointer">
+                        Supprimer
+                      </button>
+                      <button onClick={() => setConfirmDelete(false)} className="flex-1 text-xs bg-cortx-elevated hover:bg-cortx-border text-cortx-text-secondary rounded px-2 py-1 transition-colors cursor-pointer">
+                        Annuler
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </>
@@ -627,7 +720,8 @@ const LEGEND_ITEMS = [
   { type: 'projet',     label: 'Projet',     color: NODE_COLORS.projet },
   { type: 'note',       label: 'Note',       color: NODE_COLORS.note },
   { type: 'journal',    label: 'Journal',    color: NODE_COLORS.journal },
-  { type: 'fiche',      label: 'Fiche',      color: NODE_COLORS.fiche }
+  { type: 'fiche',      label: 'Fiche',      color: NODE_COLORS.fiche },
+  { type: 'document',   label: 'Document',   color: NODE_COLORS.document }
 ]
 
 function GraphFilterBar({

@@ -8,6 +8,7 @@ import { SettingsDialog } from '../settings/SettingsDialog'
 import { PanelRightOpen } from 'lucide-react'
 import { useUIStore } from '../../stores/uiStore'
 import { useFileStore } from '../../stores/fileStore'
+import { registerDbChangedListener } from '../../stores/graphStore'
 
 export function AppShell(): React.JSX.Element {
   const { rightPanelVisible, toggleRightPanel, theme } = useUIStore()
@@ -23,6 +24,12 @@ export function AppShell(): React.JSX.Element {
     loadFiles()
     const id = setInterval(loadFiles, 5000)
     return () => clearInterval(id)
+  }, [loadFiles])
+
+  // Register file-store reload callback so graphStore can trigger it
+  // when the main process signals a manual .md change (db:changed event).
+  useEffect(() => {
+    registerDbChangedListener(loadFiles)
   }, [loadFiles])
 
   // Panel widths in pixels

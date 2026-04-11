@@ -45,7 +45,7 @@ export interface Relation {
 export interface GraphNode {
   id: string
   label: string
-  type: 'personne' | 'entreprise' | 'domaine' | 'projet' | 'note' | 'journal'
+  type: 'personne' | 'entreprise' | 'domaine' | 'projet' | 'note' | 'journal' | 'document'
   filePath: string
 }
 
@@ -208,6 +208,8 @@ export interface CortxAPI {
     write(path: string, content: string): Promise<void>
     list(dir?: string): Promise<string[]>
     exists(path: string): Promise<boolean>
+    openMarkdownDialog(): Promise<{ path: string; filename: string; content: string } | null>
+    readExternal(absolutePath: string): Promise<{ path: string; filename: string; content: string } | null>
   }
   llm: {
     send(messages: Array<{ role: string; content: string }>, systemPrompt?: string): Promise<string>

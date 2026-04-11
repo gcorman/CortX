@@ -1,14 +1,16 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { SendHorizontal, Slash, AtSign } from 'lucide-react'
+import { SendHorizontal, Slash, AtSign, Plus, FileText } from 'lucide-react'
 import { useFileStore } from '../../stores/fileStore'
 
 interface ChatInputProps {
   onSend: (message: string) => void
+  onImportMarkdown?: (filename: string, content: string) => void
   disabled: boolean
 }
 
-export function ChatInput({ onSend, disabled }: ChatInputProps): React.JSX.Element {
+export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps): React.JSX.Element {
   const [value, setValue] = useState('')
+  const [isDragOver, setIsDragOver] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const files = useFileStore((s) => s.files)
 
@@ -43,13 +45,10 @@ export function ChatInput({ onSend, disabled }: ChatInputProps): React.JSX.Eleme
   // Parse text to detect an active @query at current cursor position
   function detectMention(text: string, cursor: number): { query: string; start: number } | null {
     const before = text.slice(0, cursor)
-    // Find the last @ that isn't inside a @[...] already-completed mention
     const atIdx = before.lastIndexOf('@')
     if (atIdx === -1) return null
     const afterAt = before.slice(atIdx + 1)
-    // If there's a space/newline after the @ it's not an active query
     if (/[\s\n]/.test(afterAt)) return null
-    // If the @ is inside a completed @[...] mention, ignore
     if (afterAt.startsWith('[')) return null
     return { query: afterAt, start: atIdx }
   }
@@ -71,7 +70,6 @@ export function ChatInput({ onSend, disabled }: ChatInputProps): React.JSX.Eleme
 
   function handleSelect(file: { path: string; title: string }): void {
     if (mentionStart === -1) return
-    // Replace "@query" with "@[Title]" — brackets make parsing unambiguous
     const before = value.slice(0, mentionStart)
     const after = value.slice(mentionStart + 1 + (mentionQuery?.length ?? 0))
     const inserted = `@[${file.title}]`
@@ -80,7 +78,6 @@ export function ChatInput({ onSend, disabled }: ChatInputProps): React.JSX.Eleme
     setMentionQuery(null)
     setMentionStart(-1)
     setMentionIndex(0)
-    // Restore focus
     setTimeout(() => {
       const ta = textareaRef.current
       if (ta) {
@@ -130,6 +127,55 @@ export function ChatInput({ onSend, disabled }: ChatInputProps): React.JSX.Eleme
     setMentionStart(-1)
   }
 
+  // --- Markdown import via button ---
+  async function handleImportClick(): Promise<void> {
+    if (disabled) return
+    try {
+      const result = await window.cortx.files.openMarkdownDialog()
+      if (result && onImportMarkdown) {
+        onImportMarkdown(result.filename, result.content)
+      }
+    } catch (err) {
+      console.error('[ChatInput] openMarkdownDialog error:', err)
+    }
+  }
+
+  // --- Drag & drop on the chat input zone ---
+  function handleDragOver(e: React.DragEvent): void {
+    const hasFiles = Array.from(e.dataTransfer.types).includes('Files')
+    if (!hasFiles) return
+    e.preventDefault()
+    setIsDragOver(true)
+  }
+
+  function handleDragLeave(e: React.DragEvent): void {
+    // Only clear if leaving the actual drop zone, not child elements
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false)
+    }
+  }
+
+  async function handleDrop(e: React.DragEvent): Promise<void> {
+    e.preventDefault()
+    setIsDragOver(false)
+    if (!onImportMarkdown || disabled) return
+
+    const droppedFiles = Array.from(e.dataTransfer.files)
+    for (const file of droppedFiles) {
+      const filePath = (file as File & { path: string }).path
+      const name = file.name.toLowerCase()
+      if (!name.endsWith('.md') && !name.endsWith('.txt')) continue
+      try {
+        const result = await window.cortx.files.readExternal(filePath)
+        if (result) {
+          onImportMarkdown(result.filename, result.content)
+        }
+      } catch (err) {
+        console.error('[ChatInput] readExternal error:', err)
+      }
+    }
+  }
+
   // Close dropdown when clicking outside
   useEffect(() => {
     function onMouseDown(e: MouseEvent): void {
@@ -153,9 +199,26 @@ export function ChatInput({ onSend, disabled }: ChatInputProps): React.JSX.Eleme
   const showDropdown = mentionQuery !== null && mentionResults.length > 0
 
   return (
-    <div className="flex-shrink-0 border-t border-cortx-border p-3">
+    <div
+      className={`flex-shrink-0 border-t transition-colors duration-150 p-3 ${
+        isDragOver ? 'border-cortx-accent bg-cortx-accent/5' : 'border-cortx-border'
+      }`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay hint */}
+      {isDragOver && (
+        <div className="absolute inset-x-3 -top-12 flex items-center justify-center pointer-events-none">
+          <div className="flex items-center gap-2 bg-cortx-accent/15 border border-cortx-accent/40 rounded-card px-4 py-2">
+            <FileText size={14} className="text-cortx-accent" />
+            <span className="text-xs text-cortx-accent font-medium">Déposer pour analyser et intégrer</span>
+          </div>
+        </div>
+      )}
+
       <div className="relative">
-        {/* @mention dropdown — rendered above the input */}
+        {/* @mention dropdown */}
         {showDropdown && (
           <ul
             ref={dropdownRef}
@@ -181,25 +244,39 @@ export function ChatInput({ onSend, disabled }: ChatInputProps): React.JSX.Eleme
           </ul>
         )}
 
-        <div className="bg-cortx-bg rounded-card border border-cortx-border focus-within:border-cortx-accent transition-colors">
-          <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            disabled={disabled}
-            placeholder="Tape une info, pose une question, ou /commande... (@fichier pour citer)"
-            rows={1}
-            className="w-full bg-transparent text-sm text-cortx-text-primary placeholder:text-cortx-text-secondary/40 px-3 py-2.5 pr-10 resize-none focus:outline-none disabled:opacity-50"
-          />
-          <button
-            onClick={handleSubmit}
-            disabled={disabled || !value.trim()}
-            className="absolute right-2 bottom-2 p-1.5 rounded-md text-cortx-text-secondary hover:text-cortx-accent hover:bg-cortx-accent/10 disabled:opacity-30 disabled:hover:text-cortx-text-secondary disabled:hover:bg-transparent transition-colors cursor-pointer"
-            title="Envoyer (Ctrl+Enter)"
-          >
-            <SendHorizontal size={16} />
-          </button>
+        <div className={`bg-cortx-bg rounded-card border transition-colors ${isDragOver ? 'border-cortx-accent' : 'border-cortx-border focus-within:border-cortx-accent'}`}>
+          <div className="flex items-end gap-1 px-2 pb-1 pt-1">
+            {/* + button for .md import */}
+            <button
+              type="button"
+              onClick={handleImportClick}
+              disabled={disabled}
+              title="Importer un fichier .md dans la base"
+              className="flex-shrink-0 p-1.5 rounded-md text-cortx-text-secondary hover:text-cortx-accent hover:bg-cortx-accent/10 disabled:opacity-30 disabled:hover:text-cortx-text-secondary disabled:hover:bg-transparent transition-colors cursor-pointer mb-0.5"
+            >
+              <Plus size={15} />
+            </button>
+
+            <textarea
+              ref={textareaRef}
+              value={value}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              disabled={disabled}
+              placeholder="Tape une info, pose une question, ou /commande... (@fichier pour citer)"
+              rows={1}
+              className="flex-1 bg-transparent text-sm text-cortx-text-primary placeholder:text-cortx-text-secondary/40 py-2 resize-none focus:outline-none disabled:opacity-50"
+            />
+
+            <button
+              onClick={handleSubmit}
+              disabled={disabled || !value.trim()}
+              className="flex-shrink-0 p-1.5 rounded-md text-cortx-text-secondary hover:text-cortx-accent hover:bg-cortx-accent/10 disabled:opacity-30 disabled:hover:text-cortx-text-secondary disabled:hover:bg-transparent transition-colors cursor-pointer mb-0.5"
+              title="Envoyer (Ctrl+Enter)"
+            >
+              <SendHorizontal size={16} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -211,6 +288,10 @@ export function ChatInput({ onSend, disabled }: ChatInputProps): React.JSX.Eleme
         <span className="text-2xs text-cortx-text-secondary/40 flex items-center gap-1">
           <AtSign size={9} />
           citer un fichier
+        </span>
+        <span className="text-2xs text-cortx-text-secondary/40 flex items-center gap-1">
+          <Plus size={9} />
+          importer .md
         </span>
         <span className="text-2xs text-cortx-text-secondary/40 ml-auto">Ctrl+Enter</span>
       </div>
