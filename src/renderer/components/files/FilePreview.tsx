@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { X, Pencil, Save, RotateCcw, Trash2, RefreshCw } from 'lucide-react'
+import { X, Pencil, Save, RotateCcw, Trash2, RefreshCw, Lock } from 'lucide-react'
 import { MarkdownRenderer } from './MarkdownRenderer'
 import { useUIStore } from '../../stores/uiStore'
 import { useGraphStore } from '../../stores/graphStore'
@@ -20,6 +20,10 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
   const [isRewriting, setIsRewriting] = useState(false)
   const [rewriteUndo, setRewriteUndo] = useState<{ commitHash: string } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  // --- Title editing ---
+  const [isTitleEditing, setIsTitleEditing] = useState(false)
+  const [editedTitle, setEditedTitle] = useState('')
+  const [isSavingTitle, setIsSavingTitle] = useState(false)
   // --- [[ wikilink autocomplete ---
   const [wikilinkQuery, setWikilinkQuery] = useState<string | null>(null)
   const [wikilinkStart, setWikilinkStart] = useState(-1)
@@ -85,6 +89,9 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
       const result = await window.cortx.files.read(path)
       setContent(result)
       setDraft(result?.raw || '')
+      // Initialize edited title with the current filename
+      const fileName = path.split('/').pop()?.replace('.md', '') ?? path
+      setEditedTitle(fileName)
     } catch {
       setContent(null)
     }
@@ -170,7 +177,39 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
     }
   }
 
+  async function handleSaveTitle(): Promise<void> {
+    const fileName = path.split('/').pop()?.replace('.md', '') || path
+    if (editedTitle.trim() === fileName || !editedTitle.trim()) {
+      setIsTitleEditing(false)
+      setEditedTitle(fileName)
+      return
+    }
+
+    setIsSavingTitle(true)
+    try {
+      await window.cortx.files.updateTitle(path, editedTitle)
+      addToast('Titre mis à jour', 'success')
+      await loadFile()
+      setIsTitleEditing(false)
+      reloadGraph()
+      reloadFiles()
+    } catch (err) {
+      console.error('[FilePreview] title update failed', err)
+      addToast('Erreur lors de la mise à jour du titre', 'error')
+      const fileName = path.split('/').pop()?.replace('.md', '') || path
+      setEditedTitle(fileName)
+      setIsTitleEditing(false)
+    }
+    setIsSavingTitle(false)
+  }
+
   const fileName = path.split('/').pop() || path
+  // Detect if this is a library file (no valid KB entity type)
+  const isLibraryFile =
+    !content?.frontmatter?.type ||
+    !['personne', 'entreprise', 'domaine', 'projet', 'journal', 'note', 'fiche'].includes(
+      String(content?.frontmatter?.type)
+    )
 
   return (
     <div className="absolute inset-0 z-40 flex">
@@ -187,7 +226,42 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-cortx-border flex-shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            <h3 className="text-sm font-semibold text-cortx-text-primary truncate">{fileName}</h3>
+            {isTitleEditing && !isLibraryFile ? (
+              <input
+                autoFocus
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    void handleSaveTitle()
+                  }
+                  if (e.key === 'Escape') {
+                    setIsTitleEditing(false)
+                    const fileName = path.split('/').pop()?.replace('.md', '') || path
+                    setEditedTitle(fileName)
+                  }
+                }}
+                onBlur={() => void handleSaveTitle()}
+                className="flex-1 text-sm font-semibold bg-cortx-bg border border-cortx-accent rounded px-2 py-1 text-cortx-text-primary focus:outline-none"
+                disabled={isSavingTitle}
+              />
+            ) : (
+              <>
+                <h3
+                  className={`text-sm font-semibold truncate ${
+                    !isLibraryFile
+                      ? 'text-cortx-text-primary cursor-pointer hover:text-cortx-accent transition-colors'
+                      : 'text-cortx-text-primary'
+                  }`}
+                  onClick={() => !isLibraryFile && setIsTitleEditing(true)}
+                >
+                  {fileName}
+                </h3>
+                {isLibraryFile && (
+                  <Lock size={14} className="flex-shrink-0 text-cortx-text-secondary/50" title="Fichier de la bibliothèque (lecture seule)" />
+                )}
+              </>
+            )}
             <span className="text-2xs text-cortx-text-secondary font-mono truncate">{path}</span>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">

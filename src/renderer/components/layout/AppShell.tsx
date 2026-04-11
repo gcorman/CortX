@@ -5,6 +5,7 @@ import { RightPanel } from './RightPanel'
 import { StatusBar } from './StatusBar'
 import { Toast } from '../common/Toast'
 import { SettingsDialog } from '../settings/SettingsDialog'
+import { CreateFileDialog } from '../dialogs/CreateFileDialog'
 import { PanelRightOpen } from 'lucide-react'
 import { useUIStore } from '../../stores/uiStore'
 import { useFileStore } from '../../stores/fileStore'
@@ -84,6 +85,9 @@ export function AppShell(): React.JSX.Element {
 
       {/* Settings Dialog */}
       <SettingsDialog />
+
+      {/* Create File Dialog */}
+      <CreateFileDialog />
     </div>
   )
 }

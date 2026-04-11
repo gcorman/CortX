@@ -30,7 +30,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps): React.JSX.
             <h1 className="text-lg font-bold text-cortx-text-primary mb-3 mt-0">{children}</h1>
           ),
           h2: ({ children }) => (
-            <h2 className="text-base font-semibold text-cortx-text-primary mb-2 mt-5 pb-1 border-b border-cortx-border">{children}</h2>
+            <h2 className="text-base font-semibold text-cortx-text-primary mb-3 mt-4 pb-2 border-b border-cortx-border/60">{children}</h2>
           ),
           h3: ({ children }) => (
             <h3 className="text-sm font-semibold text-cortx-text-primary mb-1.5 mt-4">{children}</h3>

@@ -1,7 +1,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import matter from 'gray-matter'
-import type { FileContent } from '../../shared/types'
+import type { FileContent, EntityType } from '../../shared/types'
 
 const BASE_DIRS = [
   'Reseau',
@@ -91,6 +91,78 @@ export class FileService {
     const lines: string[] = []
     this.buildTree(this.basePath, '', lines, 0)
     return lines.join('\n')
+  }
+
+  private getDirectoryForType(type: EntityType): string {
+    const dirMap: Record<EntityType, string> = {
+      personne: 'Reseau',
+      entreprise: 'Entreprises',
+      domaine: 'Domaines',
+      projet: 'Projets',
+      journal: 'Journal',
+      note: 'Reseau'
+    }
+    return dirMap[type]
+  }
+
+  private slugify(text: string): string {
+    return text
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+      .replace(/\s+/g, '-') // Replace spaces with hyphens
+      .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+      .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
+  }
+
+  async createNewFile(type: EntityType, title: string): Promise<string> {
+    const dir = this.getDirectoryForType(type)
+    const slug = this.slugify(title)
+    if (!slug) {
+      throw new Error('Invalid title: cannot create slug')
+    }
+
+    // Check if file already exists, append number if needed
+    let filePath = `${dir}/${slug}.md`
+    let counter = 1
+    while (await this.fileExists(filePath)) {
+      filePath = `${dir}/${slug}-${counter}.md`
+      counter++
+    }
+
+    const now = new Date().toISOString()
+    const frontmatter = {
+      type,
+      title,
+      created: now,
+      modified: now,
+      status: 'actif',
+      tags: []
+    }
+
+    const content = matter.stringify(`# ${title}\n\n_Nouvelle fiche. À compléter._\n`, frontmatter)
+    await this.writeFile(filePath, content)
+    return filePath
+  }
+
+  async updateFileTitle(filePath: string, newTitle: string): Promise<void> {
+    const file = await this.readFile(filePath)
+    if (!file) {
+      throw new Error(`File not found: ${filePath}`)
+    }
+
+    // Update frontmatter
+    const updatedFrontmatter = { ...file.frontmatter, title: newTitle, modified: new Date().toISOString() }
+
+    // Update H1 heading if it exists
+    let updatedBody = file.body
+    const h1Match = updatedBody.match(/^# .+$/m)
+    if (h1Match) {
+      updatedBody = updatedBody.replace(h1Match[0], `# ${newTitle}`)
+    }
+
+    const content = matter.stringify(updatedBody, updatedFrontmatter)
+    await this.writeFile(filePath, content)
   }
 
   private buildTree(dir: string, prefix: string, lines: string[], depth: number): void {

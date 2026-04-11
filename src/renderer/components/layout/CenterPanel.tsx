@@ -4,11 +4,11 @@ import { GraphView } from '../graph/GraphView'
 import { TagBrowser } from '../tags/TagBrowser'
 import { FilePreview } from '../files/FilePreview'
 import { LibraryPanel } from '../library/LibraryPanel'
-import { Network, Hash, Search, Library, Brain } from 'lucide-react'
+import { Network, Hash, Search, Library, Brain, Plus } from 'lucide-react'
 import { useState } from 'react'
 
 export function CenterPanel(): React.JSX.Element {
-  const { activeCenterView, setActiveCenterView, filePreviewPath, closeFilePreview } = useUIStore()
+  const { activeCenterView, setActiveCenterView, filePreviewPath, closeFilePreview, toggleCreateFileDialog } = useUIStore()
   const [searchQuery, setSearchQuery] = useState('')
   const idleActive = useIdleStore((s) => s.isActive)
   const idlePhase = useIdleStore((s) => s.phase)
@@ -62,6 +62,18 @@ export function CenterPanel(): React.JSX.Element {
               className={idleActive && (idlePhase === 'thinking' || idlePhase === 'examining') ? 'animate-pulse' : ''}
             />
             Idle
+          </button>
+        )}
+
+        {/* Create new file button — only shown in graph view */}
+        {activeCenterView === 'graph' && (
+          <button
+            onClick={() => toggleCreateFileDialog()}
+            title="Créer une nouvelle fiche"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-input text-xs font-medium text-cortx-text-secondary hover:text-cortx-text-primary hover:bg-cortx-elevated transition-colors cursor-pointer flex-shrink-0"
+          >
+            <Plus size={14} />
+            Nouveau
           </button>
         )}
 

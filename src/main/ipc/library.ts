@@ -85,6 +85,20 @@ export function registerLibraryHandlers(
     }
   )
 
+  /**
+   * Retrieve context chunks for a [[wikilink]]-referenced library document.
+   * - ref: the wikilink target (e.g. "personnel_marine_nationale")
+   * - contextQuery: surrounding text that helps find the relevant row/section
+   *   (e.g. "Julien Robert matelot" extracted from the KB file line containing the wikilink)
+   * Returns: chunk 0 (headers) + semantically relevant chunks scoped to that doc.
+   */
+  ipcMain.handle(
+    'library:getLinkedContext',
+    (_event, ref: string, contextQuery: string, limit?: number) => {
+      return getLibrary().getLinkedDocContext(ref, contextQuery, limit)
+    }
+  )
+
   // ── Maintenance ──────────────────────────────────────────────────────────
 
   ipcMain.handle('library:reindexAll', () => {

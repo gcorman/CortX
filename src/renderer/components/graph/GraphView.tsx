@@ -7,7 +7,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useFileStore } from '../../stores/fileStore'
 import { useLibraryStore } from '../../stores/libraryStore'
 import { useIdleStore } from '../../stores/idleStore'
-import { Network, LayoutGrid, Trash2, RefreshCw, FileText, ExternalLink } from 'lucide-react'
+import { Network, LayoutGrid, Trash2, RefreshCw, FileText, ExternalLink, Plus } from 'lucide-react'
 
 // Register extensions — fcose takes priority over cose-bilkent for all layouts
 try { cytoscape.use(fcose as unknown as cytoscape.Ext) } catch { /* already registered */ }
@@ -486,6 +486,7 @@ export function GraphView(): React.JSX.Element {
   const [contextMenu, setContextMenu] = useState<{
     x: number; y: number; nodeId: string; filePath: string; label: string; isLibDoc: boolean
   } | null>(null)
+  const [canvasContextMenu, setCanvasContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [isRewriting, setIsRewriting] = useState(false)
   const [rewriteUndo, setRewriteUndo] = useState<{ commitHash: string } | null>(null)
@@ -499,6 +500,10 @@ export function GraphView(): React.JSX.Element {
   const { selectDocument, deleteDocument } = useLibraryStore()
   const openFilePreviewRef = useRef(openFilePreview)
   useEffect(() => { openFilePreviewRef.current = openFilePreview }, [openFilePreview])
+
+  const toggleCreateFileDialog = useUIStore((s) => s.toggleCreateFileDialog)
+  const toggleCreateFileDialogRef = useRef(toggleCreateFileDialog)
+  useEffect(() => { toggleCreateFileDialogRef.current = toggleCreateFileDialog }, [toggleCreateFileDialog])
 
   const idlePhase = useIdleStore((s) => s.phase)
   const idleNodeIds = useIdleStore((s) => s.activeNodeIds)
@@ -523,15 +528,19 @@ export function GraphView(): React.JSX.Element {
     animStartRef.current = performance.now()
   }, [idlePhase, idleNodeIds])
 
-  // Close context menu on Escape
+  // Close context menus on Escape
   useEffect(() => {
-    if (!contextMenu) return
+    if (!contextMenu && !canvasContextMenu) return
     const handler = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') { setContextMenu(null); setConfirmDelete(false) }
+      if (e.key === 'Escape') {
+        setContextMenu(null)
+        setConfirmDelete(false)
+        setCanvasContextMenu(null)
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [contextMenu])
+  }, [contextMenu, canvasContextMenu])
 
   async function handleRewrite(): Promise<void> {
     if (!contextMenu) return
@@ -664,6 +673,15 @@ export function GraphView(): React.JSX.Element {
       if (fp) openFilePreviewRef.current(fp)
     })
 
+    // Right-click on empty canvas → show mini context menu
+    cy.on('cxttap', (evt) => {
+      if ((evt.target as unknown) === cy) {
+        const pos = evt.renderedPosition
+        setCanvasContextMenu({ x: pos.x, y: pos.y })
+        setContextMenu(null)
+      }
+    })
+
     cy.on('cxttap', 'node', (evt) => {
       const node = evt.target as cytoscape.NodeSingular
       const nodeId = node.id() as string
@@ -673,6 +691,7 @@ export function GraphView(): React.JSX.Element {
       // Library doc nodes: always show menu even without a filePath
       if (!fp && !isLibDoc) return
       const pos = evt.renderedPosition
+      setCanvasContextMenu(null)
       setContextMenu({ x: pos.x, y: pos.y, nodeId, filePath: fp, label, isLibDoc })
       setConfirmDelete(false)
     })
@@ -1076,6 +1095,31 @@ export function GraphView(): React.JSX.Element {
             ×
           </button>
         </div>
+      )}
+
+      {/* Canvas context menu (right-click in void) */}
+      {canvasContextMenu && (
+        <>
+          <div
+            className="absolute inset-0 z-10"
+            onClick={() => setCanvasContextMenu(null)}
+          />
+          <div
+            className="absolute z-20 bg-cortx-surface border border-cortx-border rounded-card shadow-xl py-1 min-w-[180px]"
+            style={{ left: canvasContextMenu.x, top: canvasContextMenu.y }}
+          >
+            <button
+              onClick={() => {
+                setCanvasContextMenu(null)
+                toggleCreateFileDialogRef.current()
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-cortx-text-primary hover:bg-cortx-elevated transition-colors cursor-pointer"
+            >
+              <Plus size={13} className="text-cortx-accent" />
+              Créer un nouveau fichier
+            </button>
+          </div>
+        </>
       )}
 
       {/* Context menu */}

@@ -4,9 +4,11 @@
 
 // --- File system ---
 
+export type EntityType = 'personne' | 'entreprise' | 'domaine' | 'projet' | 'journal' | 'note'
+
 export interface CortxFile {
   path: string
-  type: 'personne' | 'entreprise' | 'domaine' | 'projet' | 'journal' | 'note'
+  type: EntityType
   title: string
   tags: string[]
   created: string
@@ -240,6 +242,8 @@ export interface CortxAPI {
     exists(path: string): Promise<boolean>
     openMarkdownDialog(): Promise<{ path: string; filename: string; content: string } | null>
     readExternal(absolutePath: string): Promise<{ path: string; filename: string; content: string } | null>
+    create(type: EntityType, title: string): Promise<{ path: string }>
+    updateTitle(filePath: string, newTitle: string): Promise<void>
   }
   llm: {
     send(messages: Array<{ role: string; content: string }>, systemPrompt?: string): Promise<string>
@@ -283,6 +287,7 @@ export interface CortxAPI {
     getPreview(id: string): Promise<{ markdown: string; pageCount: number | null }>
     openOriginal(id: string): Promise<void>
     search(query: string, mode?: 'lexical' | 'semantic' | 'hybrid', limit?: number): Promise<LibraryChunkResult[]>
+    getLinkedContext(ref: string, contextQuery: string, limit?: number): Promise<LibraryChunkResult[]>
     reindexAll(): Promise<{ added: number; updated: number; removed: number }>
     getStatus(): Promise<{ sidecarReady: boolean; queueLength: number }>
     openImportDialog(): Promise<string[]>

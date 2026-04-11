@@ -744,6 +744,212 @@ export class LibraryService {
     return results.slice(0, limit)
   }
 
+  /**
+   * Public wrapper around _filenameSearch for use by AgentPipeline multi-hop.
+   * Returns chunks from library documents whose title/filename matches the target string.
+   */
+  getChunksByNameMatch(target: string, limit = 4): LibraryChunkResult[] {
+    return this._filenameSearch(target, limit)
+  }
+
+  /**
+   * Fetch all chunks for a specific library document by its ID.
+   * Used by multi-hop retrieval to resolve [[wikilinks]] in KB files.
+   */
+  getChunksByDocId(docId: string, limit = 10): LibraryChunkResult[] {
+    type ChunkRow = {
+      id: number; document_id: string; heading: string | null; text: string
+      page_from: number | null; page_to: number | null; title: string | null; path: string
+    }
+    const chunks = this.db.prepare(`
+      SELECT lc.id, lc.document_id, lc.heading, lc.text, lc.page_from, lc.page_to,
+             ld.title, ld.path
+      FROM library_chunks lc
+      JOIN library_documents ld ON ld.id = lc.document_id
+      WHERE lc.document_id = ? AND ld.status = 'indexed'
+      ORDER BY lc.chunk_index
+      LIMIT ?
+    `).all(docId, limit) as ChunkRow[]
+
+    return chunks.map((r) => ({
+      chunkId: r.id,
+      documentId: r.document_id,
+      documentTitle: r.title,
+      documentPath: r.path,
+      heading: r.heading,
+      text: r.text,
+      pageFrom: r.page_from,
+      pageTo: r.page_to,
+      score: 1.8, // wikilink-resolved → high priority
+    }))
+  }
+
+  /**
+   * Retrieve context for a [[wikilink]]-referenced library document.
+   *
+   * Strategy (in order):
+   *  1. Find the document by name/filename (ref = wikilink target like "personnel_marine_nationale")
+   *  2. Always include chunk 0 — for spreadsheets this is the header row, critical for column context
+   *  3. Scoped semantic/lexical search *within this doc* for contextQuery (e.g. "Julien Robert matelot")
+   *  4. Fill remaining slots with sequential chunks for surrounding context
+   *
+   * This avoids context saturation by returning only the most relevant portions of large files,
+   * while guaranteeing that table headers are always present.
+   */
+  async getLinkedDocContext(ref: string, contextQuery: string, limit = 8): Promise<LibraryChunkResult[]> {
+    // 1. Find document by name
+    const nameHits = this._filenameSearch(ref, 1)
+    if (nameHits.length === 0) {
+      // No doc found by name → fall back to general context retrieval
+      return this.getContextChunks(`${ref} ${contextQuery}`.trim(), limit)
+    }
+
+    const docId = nameHits[0].documentId
+    const result: LibraryChunkResult[] = []
+    const seenIds = new Set<number>()
+
+    // 2. Always include chunk 0 (table headers / doc structure)
+    const header = this._getChunkByIndex(docId, 0)
+    if (header) { result.push(header); seenIds.add(header.chunkId) }
+
+    // 3. Scoped search for contextQuery within this doc
+    const remaining = limit - result.length
+    if (contextQuery.trim() && remaining > 0) {
+      const scopedChunks = await this._searchWithinDoc(docId, contextQuery, remaining + 2)
+      for (const chunk of scopedChunks) {
+        if (!seenIds.has(chunk.chunkId)) {
+          result.push(chunk)
+          seenIds.add(chunk.chunkId)
+          if (result.length >= limit) break
+        }
+      }
+    }
+
+    // 4. Fill remaining slots with sequential chunks (ensures surrounding context)
+    if (result.length < limit) {
+      const sequential = this.getChunksByDocId(docId, limit)
+      for (const chunk of sequential) {
+        if (!seenIds.has(chunk.chunkId)) {
+          result.push(chunk)
+          seenIds.add(chunk.chunkId)
+          if (result.length >= limit) break
+        }
+      }
+    }
+
+    return result
+  }
+
+  /** Fetch a single chunk by its sequential index within a document. */
+  private _getChunkByIndex(docId: string, index: number): LibraryChunkResult | null {
+    type Row = {
+      id: number; document_id: string; heading: string | null; text: string
+      page_from: number | null; page_to: number | null; title: string | null; path: string
+    }
+    const row = this.db.prepare(`
+      SELECT lc.id, lc.document_id, lc.heading, lc.text, lc.page_from, lc.page_to,
+             ld.title, ld.path
+      FROM library_chunks lc
+      JOIN library_documents ld ON ld.id = lc.document_id
+      WHERE lc.document_id = ? AND lc.chunk_index = ? AND ld.status = 'indexed'
+    `).get(docId, index) as Row | undefined
+    if (!row) return null
+    return {
+      chunkId: row.id, documentId: row.document_id, documentTitle: row.title,
+      documentPath: row.path, heading: row.heading, text: row.text,
+      pageFrom: row.page_from, pageTo: row.page_to, score: 2.0
+    }
+  }
+
+  /**
+   * Search within a single document's chunks.
+   * Uses scoped semantic search (only loads embeddings for this doc) when sidecar is ready,
+   * falls back to lexical LIKE search otherwise.
+   */
+  private async _searchWithinDoc(docId: string, query: string, limit: number): Promise<LibraryChunkResult[]> {
+    type ChunkRow = {
+      id: number; document_id: string; heading: string | null; text: string
+      page_from: number | null; page_to: number | null; title: string | null; path: string
+    }
+
+    // ── Semantic path ─────────────────────────────────────────────────────
+    if (await pythonSidecar.ensureReady()) {
+      try {
+        const resp = await pythonSidecar.send({ cmd: 'embed_query', text: query })
+        if (resp.ok && resp.vector) {
+          const queryVec = resp.vector as number[]
+
+          // Only load embeddings for THIS document (much cheaper than loading all)
+          type EmbRow = { chunk_id: number; vector: Buffer }
+          const embedRows = this.db.prepare(`
+            SELECT e.chunk_id, e.vector
+            FROM library_embeddings e
+            JOIN library_chunks lc ON lc.id = e.chunk_id
+            WHERE lc.document_id = ?
+          `).all(docId) as EmbRow[]
+
+          if (embedRows.length > 0) {
+            const scored = embedRows
+              .map(row => ({
+                chunkId: row.chunk_id,
+                score: cosineSimilarity(queryVec, JSON.parse(row.vector.toString('utf8')) as number[])
+              }))
+              .sort((a, b) => b.score - a.score)
+              .slice(0, limit)
+
+            const ids = scored.map(s => s.chunkId)
+            const placeholders = ids.map(() => '?').join(',')
+            const rows = this.db.prepare(`
+              SELECT lc.id, lc.document_id, lc.heading, lc.text, lc.page_from, lc.page_to,
+                     ld.title, ld.path
+              FROM library_chunks lc
+              JOIN library_documents ld ON ld.id = lc.document_id
+              WHERE lc.id IN (${placeholders})
+            `).all(...ids) as ChunkRow[]
+
+            const scoreMap = new Map(scored.map(s => [s.chunkId, s.score]))
+            return rows.map(r => ({
+              chunkId: r.id, documentId: r.document_id, documentTitle: r.title,
+              documentPath: r.path, heading: r.heading, text: r.text,
+              pageFrom: r.page_from, pageTo: r.page_to, score: scoreMap.get(r.id) ?? 0
+            }))
+          }
+        }
+      } catch { /* fall through to lexical */ }
+    }
+
+    // ── Lexical fallback ──────────────────────────────────────────────────
+    const tokens = query.toLowerCase().split(/\s+/).filter(t => t.length >= 3).slice(0, 8)
+    if (tokens.length === 0) return []
+    const likeConditions = tokens.map(() => 'LOWER(lc.text) LIKE ?').join(' OR ')
+    const rows = this.db.prepare(`
+      SELECT lc.id, lc.document_id, lc.heading, lc.text, lc.page_from, lc.page_to,
+             ld.title, ld.path
+      FROM library_chunks lc
+      JOIN library_documents ld ON ld.id = lc.document_id
+      WHERE lc.document_id = ? AND (${likeConditions}) AND ld.status = 'indexed'
+      ORDER BY lc.chunk_index
+      LIMIT ?
+    `).all(docId, ...tokens.map(t => `%${t}%`), limit) as ChunkRow[]
+
+    return rows.map(r => ({
+      chunkId: r.id, documentId: r.document_id, documentTitle: r.title,
+      documentPath: r.path, heading: r.heading, text: r.text,
+      pageFrom: r.page_from, pageTo: r.page_to, score: 1.0
+    }))
+  }
+
+  /**
+   * Given a library document ID, return the IDs of all *other* library documents
+   * that share KB files linking to them (indirect co-reference context).
+   */
+  getDocumentById(docId: string): LibraryDocument | null {
+    const row = this.db.prepare(
+      'SELECT * FROM library_documents WHERE id = ?'
+    ).get(docId) as RawDoc | undefined
+    return row ? this._toDoc(row) : null
+  }
+
   /** Lists documents linked to a specific entity. */
   getLinkedDocuments(entityId: number): LibraryDocument[] {
     const rows = this.db.prepare(`

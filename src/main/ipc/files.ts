@@ -1,8 +1,10 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron'
 import * as fs from 'fs'
 import type { FileService } from '../services/FileService'
+import type { DatabaseService } from '../services/DatabaseService'
+import type { EntityType } from '../../shared/types'
 
-export function registerFileHandlers(getFiles: () => FileService): void {
+export function registerFileHandlers(getFiles: () => FileService, getDatabase?: () => DatabaseService): void {
   ipcMain.handle('files:read', (_event, path: string) => getFiles().readFile(path))
   ipcMain.handle('files:write', (_event, path: string, content: string) => getFiles().writeFile(path, content))
   ipcMain.handle('files:list', (_event, dir?: string) => getFiles().listMarkdownFiles(dir))
@@ -38,5 +40,24 @@ export function registerFileHandlers(getFiles: () => FileService): void {
     const content = fs.readFileSync(absolutePath, 'utf-8')
     const filename = absolutePath.split(/[\\/]/).pop() ?? absolutePath
     return { path: absolutePath, filename, content }
+  })
+
+  /**
+   * Creates a new Markdown file with the given type and title.
+   */
+  ipcMain.handle('files:create', async (_event, { type, title }: { type: EntityType; title: string }) => {
+    const filePath = await getFiles().createNewFile(type, title)
+    return { path: filePath }
+  })
+
+  /**
+   * Updates the title of a Markdown file (in frontmatter and H1 heading).
+   */
+  ipcMain.handle('files:updateTitle', async (_event, { path: filePath, newTitle }: { path: string; newTitle: string }) => {
+    await getFiles().updateFileTitle(filePath, newTitle)
+    // Reindex the modified file if database service is available
+    if (getDatabase) {
+      await getDatabase().indexFile(filePath)
+    }
   })
 }

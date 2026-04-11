@@ -184,21 +184,19 @@ export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps
 
   async function handleDrop(e: React.DragEvent): Promise<void> {
     e.preventDefault()
+    e.stopPropagation() // Prevent ChatView from also handling the same drop
     setIsDragOver(false)
     if (!onImportMarkdown || disabled) return
 
     const droppedFiles = Array.from(e.dataTransfer.files)
     for (const file of droppedFiles) {
-      const filePath = (file as File & { path: string }).path
       const name = file.name.toLowerCase()
       if (!name.endsWith('.md') && !name.endsWith('.txt')) continue
       try {
-        const result = await window.cortx.files.readExternal(filePath)
-        if (result) {
-          onImportMarkdown(result.filename, result.content)
-        }
+        const content = await file.text()
+        onImportMarkdown(file.name, content)
       } catch (err) {
-        console.error('[ChatInput] readExternal error:', err)
+        console.error('[ChatInput] file read error:', err)
       }
     }
   }

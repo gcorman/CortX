@@ -59,12 +59,25 @@ export class AgentPipeline {
       this.retrieveLibraryContext(input),
     ])
 
+    // ── Multi-hop expansion ─────────────────────────────────────────────────
+    // Round 1 KB files + Round 1 library chunks may reference each other via
+    // [[wikilinks]].  We do one additional pass to pull in the linked resources
+    // so the agent sees a coherent, cross-file picture.
+    const [extraLibraryChunks, extraKbText] = await this.expandMultiHop(
+      contextFiles, libraryChunks
+    )
+
+    const mergedLibraryChunks = this.deduplicateChunks([...libraryChunks, ...extraLibraryChunks])
+    const mergedContextFiles = extraKbText
+      ? contextFiles + '\n\n' + extraKbText
+      : contextFiles
+
     const systemPrompt = buildSystemPrompt(
       this.dbService,
       this.fileService,
-      contextFiles,
+      mergedContextFiles,
       this.basePath,
-      libraryChunks
+      mergedLibraryChunks
     )
 
     const rawResponse = await this.llmService.sendMessage(
@@ -728,6 +741,118 @@ export class AgentPipeline {
       } catch { /* skip */ }
     }
     return contextParts.join('\n\n') || 'Aucun fichier pertinent trouve.'
+  }
+
+  /**
+   * Multi-hop expansion: given the KB text and library chunks from round 1,
+   * follow [[wikilinks]] and file_library_links to pull in additional resources.
+   *
+   * Handles three cases:
+   *  a) KB file → library doc (forward):   project.md has [[planning.xlsx]] → fetch its chunks
+   *  b) Library doc → KB files (reverse):  found planning.xlsx → find all .md files mentioning it
+   *  c) KB file → other KB files (wikilink expansion): one level deep for cross-file context
+   *
+   * Limits: max 3 extra library docs × 6 chunks + max 4 extra KB files to keep context sane.
+   */
+  private async expandMultiHop(
+    kbContext: string,
+    libraryChunks: LibraryChunkResult[]
+  ): Promise<[LibraryChunkResult[], string]> {
+    const extraLibChunks: LibraryChunkResult[] = []
+    const extraKbParts: string[] = []
+
+    // ── Extract file paths already in KB context ──────────────────────────
+    const kbPathsInContext = new Set<string>()
+    for (const m of kbContext.matchAll(/^--- (.+?) ---$/gm)) {
+      kbPathsInContext.add(m[1])
+    }
+
+    // ── (a) KB files → linked library docs (forward wikilink) ─────────────
+    const libDocIdsAlreadyInContext = new Set(libraryChunks.map((c) => c.documentId))
+    const libDocIdsToFetch = new Set<string>()
+
+    for (const kbPath of kbPathsInContext) {
+      const docIds = this.dbService.getLibraryDocIdsLinkedFrom(kbPath)
+      for (const docId of docIds) {
+        if (!libDocIdsAlreadyInContext.has(docId)) {
+          libDocIdsToFetch.add(docId)
+        }
+      }
+    }
+
+    // Also parse raw [[wikilinks]] from KB context text for docs not yet in DB links
+    // (handles the case where indexing is slightly behind)
+    // NOTE: try name-match for ALL wikilinks, not just those with file extensions —
+    // wikilinks like [[personnel_marine_nationale]] (no extension) are valid library refs.
+    const wikilinkTargets = [...kbContext.matchAll(/\[\[([^\]]+)\]\]/g)].map((m) => m[1])
+    for (const target of wikilinkTargets) {
+      const chunks = libraryService.getChunksByNameMatch(target, 4)
+      for (const chunk of chunks) {
+        if (!libDocIdsAlreadyInContext.has(chunk.documentId) && !libDocIdsToFetch.has(chunk.documentId)) {
+          libDocIdsToFetch.add(chunk.documentId)
+        }
+      }
+    }
+
+    // Fetch chunks for all newly discovered library docs (cap at 3 docs)
+    let libDocCount = 0
+    for (const docId of libDocIdsToFetch) {
+      if (libDocCount >= 3) break
+      const chunks = libraryService.getChunksByDocId(docId, 6)
+      if (chunks.length > 0) {
+        extraLibChunks.push(...chunks)
+        libDocCount++
+      }
+    }
+
+    // ── (b) Library docs found → reverse: which KB files mention them? ────
+    const allLibDocIds = new Set([
+      ...libDocIdsAlreadyInContext,
+      ...libDocIdsToFetch
+    ])
+    const kbPathsToFetch = new Set<string>()
+
+    for (const docId of allLibDocIds) {
+      const kbPaths = this.dbService.getKbFilesLinkingTo(docId)
+      for (const kbPath of kbPaths) {
+        if (!kbPathsInContext.has(kbPath)) kbPathsToFetch.add(kbPath)
+      }
+    }
+
+    // ── (c) KB wikilink expansion: KB file → other KB files ───────────────
+    for (const kbPath of kbPathsInContext) {
+      const linkedKbPaths = this.dbService.getKbFilesLinkedFrom(kbPath)
+      for (const p of linkedKbPaths) {
+        if (!kbPathsInContext.has(p)) kbPathsToFetch.add(p)
+      }
+    }
+
+    // Fetch extra KB files (cap at 4 to avoid context bloat)
+    let kbFileCount = 0
+    for (const kbPath of kbPathsToFetch) {
+      if (kbFileCount >= 4) break
+      try {
+        const content = await this.fileService.readFile(kbPath)
+        if (content) {
+          extraKbParts.push(`--- ${kbPath} [contexte lié] ---\n${content.raw}`)
+          kbFileCount++
+        }
+      } catch { /* skip */ }
+    }
+
+    return [extraLibChunks, extraKbParts.join('\n\n')]
+  }
+
+  /** Remove duplicate library chunks (same chunkId), keeping the highest-score copy. */
+  private deduplicateChunks(chunks: LibraryChunkResult[]): LibraryChunkResult[] {
+    const seen = new Map<number, LibraryChunkResult>()
+    for (const chunk of chunks) {
+      const existing = seen.get(chunk.chunkId)
+      if (!existing || chunk.score > existing.score) {
+        seen.set(chunk.chunkId, chunk)
+      }
+    }
+    return [...seen.values()]
   }
 
   private parseResponse(raw: string): RawAgentResponse {

@@ -494,6 +494,45 @@ export class DatabaseService {
     }
   }
 
+  /**
+   * Return library document IDs referenced by a KB file via [[wikilinks]].
+   * Used for multi-hop retrieval: "this project mentions planning.xlsx → fetch its chunks".
+   */
+  getLibraryDocIdsLinkedFrom(filePath: string): string[] {
+    const rows = this.db.prepare(
+      'SELECT document_id FROM file_library_links WHERE file_path = ?'
+    ).all(filePath) as Array<{ document_id: string }>
+    return rows.map((r) => r.document_id)
+  }
+
+  /**
+   * Return KB file paths that contain a [[wikilink]] to a specific library document.
+   * Used for reverse lookup: "which project uses this .xlsx file?".
+   */
+  getKbFilesLinkingTo(docId: string): string[] {
+    const rows = this.db.prepare(
+      'SELECT file_path FROM file_library_links WHERE document_id = ?'
+    ).all(docId) as Array<{ file_path: string }>
+    return rows.map((r) => r.file_path)
+  }
+
+  /**
+   * Return file paths of KB entities wikilinked from a given KB file.
+   * Used for KB→KB multi-hop: a project file links to a person or company file.
+   */
+  getKbFilesLinkedFrom(filePath: string): string[] {
+    const rows = this.db.prepare(`
+      SELECT DISTINCT e.file_path
+      FROM relations r
+      JOIN entities src ON src.id = r.source_entity_id
+      JOIN entities e   ON e.id   = r.target_entity_id
+      WHERE src.file_path = ?
+        AND e.file_path IS NOT NULL
+        AND e.file_path != ?
+    `).all(filePath, filePath) as Array<{ file_path: string }>
+    return rows.map((r) => r.file_path).filter(Boolean)
+  }
+
   getTags(): Array<{ tag: string; count: number }> {
     const rows = this.db.prepare('SELECT tags FROM files').all() as Array<{ tags: string }>
     const tagCounts = new Map<string, number>()

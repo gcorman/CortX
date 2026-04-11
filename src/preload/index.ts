@@ -16,7 +16,9 @@ const api: CortxAPI = {
     list: (dir?: string) => ipcRenderer.invoke('files:list', dir),
     exists: (path: string) => ipcRenderer.invoke('files:exists', path),
     openMarkdownDialog: () => ipcRenderer.invoke('files:openMarkdownDialog'),
-    readExternal: (absolutePath: string) => ipcRenderer.invoke('files:readExternal', absolutePath)
+    readExternal: (absolutePath: string) => ipcRenderer.invoke('files:readExternal', absolutePath),
+    create: (type: string, title: string) => ipcRenderer.invoke('files:create', { type, title }),
+    updateTitle: (path: string, newTitle: string) => ipcRenderer.invoke('files:updateTitle', { path, newTitle })
   },
   llm: {
     send: (messages, systemPrompt?) => ipcRenderer.invoke('llm:send', messages, systemPrompt),
@@ -64,6 +66,8 @@ const api: CortxAPI = {
     openOriginal: (id: string) => ipcRenderer.invoke('library:openOriginal', id),
     search: (query: string, mode?: 'lexical' | 'semantic' | 'hybrid', limit?: number) =>
       ipcRenderer.invoke('library:search', query, mode, limit),
+    getLinkedContext: (ref: string, contextQuery: string, limit?: number) =>
+      ipcRenderer.invoke('library:getLinkedContext', ref, contextQuery, limit),
     reindexAll: () => ipcRenderer.invoke('library:reindexAll'),
     getStatus: () => ipcRenderer.invoke('library:getStatus'),
     openImportDialog: () => ipcRenderer.invoke('library:openImportDialog')

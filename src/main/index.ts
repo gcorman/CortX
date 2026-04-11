@@ -276,7 +276,7 @@ app.whenReady().then(async () => {
 
   registerAppHandlers()
   registerDatabaseHandlers(() => dbService)
-  registerFileHandlers(() => fileService)
+  registerFileHandlers(() => fileService, () => dbService)
   registerLLMHandlers(llmService)
   registerGitHandlers(() => gitService)
   registerAgentHandlers(() => agentPipeline)

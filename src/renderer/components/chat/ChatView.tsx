@@ -43,14 +43,11 @@ export function ChatView(): React.JSX.Element {
 
     const droppedFiles = Array.from(e.dataTransfer.files)
     for (const file of droppedFiles) {
-      const filePath = (file as File & { path: string }).path
       const name = file.name.toLowerCase()
       if (!name.endsWith('.md') && !name.endsWith('.txt')) continue
       try {
-        const result = await window.cortx.files.readExternal(filePath)
-        if (result) {
-          await importMarkdown(result.filename, result.content)
-        }
+        const content = await file.text()
+        await importMarkdown(file.name, content)
       } catch (err) {
         console.error('[ChatView] drop error:', err)
       }

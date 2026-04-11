@@ -221,6 +221,49 @@ export const useChatStore = create<ChatState>((set, get) => ({
             const fc = await window.cortx.files.read(file.path)
             if (fc) {
               mentionContext += `\n--- @${raw} (${file.path}) ---\n${fc.raw}\n---\n`
+
+              // Follow [[wikilinks]] one hop deep so the agent has the linked content
+              // without requiring the user to explicitly @mention each linked file.
+              const wikiRefs = [...new Set(
+                [...fc.raw.matchAll(/\[\[([^\]]+)\]\]/g)].map((m) => m[1])
+              )].slice(0, 6)
+
+              if (wikiRefs.length > 0) {
+                const linkedParts: string[] = []
+                await Promise.all(wikiRefs.map(async (ref) => {
+                  // 1. Try KB file
+                  const linkedFile = files.find(
+                    (f) => f.path !== file.path && (
+                      f.title === ref ||
+                      f.path.split('/').pop()?.replace('.md', '') === ref
+                    )
+                  )
+                  if (linkedFile) {
+                    try {
+                      const linked = await window.cortx.files.read(linkedFile.path)
+                      if (linked) {
+                        linkedParts.push(`\n--- [[${ref}]] (${linkedFile.path}) [lié via @${raw}] ---\n${linked.raw}\n---`)
+                      }
+                    } catch { /* ignore */ }
+                    return
+                  }
+                  // 2. Try library via getLinkedContext:
+                  //    chunk 0 (headers) + scoped semantic search within the doc
+                  try {
+                    const srcLine = fc.raw.split('\n').find((l) => l.includes(`[[${ref}]]`)) ?? ''
+                    const surrounding = srcLine.replace(`[[${ref}]]`, '').replace(/[^\w\s]/g, ' ').trim()
+                    const libChunks = await window.cortx.library.getLinkedContext(ref, surrounding, 8)
+                    if (libChunks.length > 0) {
+                      const docTitle = libChunks[0].documentTitle ?? ref
+                      const chunkText = libChunks
+                        .map((c) => (c.heading ? `**${c.heading}**\n${c.text}` : c.text))
+                        .join('\n\n')
+                      linkedParts.push(`\n--- [[${ref}]] [${docTitle} — bibliothèque] ---\n${chunkText}\n---`)
+                    }
+                  } catch { /* ignore */ }
+                }))
+                mentionContext += linkedParts.join('\n')
+              }
             }
           } catch {
             // ignore unreadable files

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { EntityType } from '../../shared/types'
 
 export type CenterView = 'graph' | 'tags' | 'files' | 'library'
 export type Theme = 'dark' | 'light'
@@ -11,6 +12,14 @@ interface UIState {
   theme: Theme
   toasts: Array<{ id: string; message: string; type: 'success' | 'error' | 'info' }>
 
+  // File creation dialog
+  createFileDialogOpen: boolean
+  createFileType: EntityType | null
+  createFileTitle: string
+
+  // Title editing
+  titleEditingPath: string | null
+
   setActiveCenterView: (view: CenterView) => void
   toggleRightPanel: () => void
   openFilePreview: (path: string) => void
@@ -19,6 +28,15 @@ interface UIState {
   setTheme: (theme: Theme) => void
   addToast: (message: string, type: 'success' | 'error' | 'info') => void
   removeToast: (id: string) => void
+
+  // File creation actions
+  toggleCreateFileDialog: () => void
+  setCreateFileType: (type: EntityType | null) => void
+  setCreateFileTitle: (title: string) => void
+  resetCreateFile: () => void
+
+  // Title editing actions
+  setTitleEditingPath: (path: string | null) => void
 }
 
 const savedTheme = ((): Theme => {
@@ -32,6 +50,14 @@ export const useUIStore = create<UIState>((set) => ({
   settingsOpen: false,
   theme: savedTheme,
   toasts: [],
+
+  // File creation dialog
+  createFileDialogOpen: false,
+  createFileType: null,
+  createFileTitle: '',
+
+  // Title editing
+  titleEditingPath: null,
 
   setActiveCenterView: (view) => set({ activeCenterView: view }),
   toggleRightPanel: () => set((s) => ({ rightPanelVisible: !s.rightPanelVisible })),
@@ -50,5 +76,14 @@ export const useUIStore = create<UIState>((set) => ({
       set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }))
     }, 4000)
   },
-  removeToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }))
+  removeToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+
+  // File creation actions
+  toggleCreateFileDialog: () => set((s) => ({ createFileDialogOpen: !s.createFileDialogOpen })),
+  setCreateFileType: (type) => set({ createFileType: type }),
+  setCreateFileTitle: (title) => set({ createFileTitle: title }),
+  resetCreateFile: () => set({ createFileType: null, createFileTitle: '', createFileDialogOpen: false }),
+
+  // Title editing actions
+  setTitleEditingPath: (path) => set({ titleEditingPath: path })
 }))
