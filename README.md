@@ -1,15 +1,19 @@
 
 # CortX
 <img width="300" height="400" alt="CortX_logo" src="https://github.com/user-attachments/assets/111a3923-a2d0-47ea-8e2f-50ff7c3aaa50" />
+
 ### From vibe coding to vibe learning.
 > A second brain powered by AI. You speak, the AI organizes. You search, the AI connects. You forget, the AI remembers.
 
 CortX is a desktop application that applies the **Claude Code** paradigm to personal knowledge management. The user speaks in natural language — something learned, a person met, an idea — and an AI agent structures everything into Markdown files on their machine. No folders to create, no tags to invent. The agent decides where to store things, creates links between notes, and suggests unexpected connections.
 
 Everything runs **locally** with an open-source model (Ollama, llama.cpp, LM Studio), or via an **API** (Claude, OpenAI) for more power. Your data stays on your machine.
+
 ---
 ## Features
+
 ### AI Structuring Agent
+
 The agent doesn’t just answer — it **writes and modifies** the files in your knowledge base:
 - **Fluid capture** — type raw text, the agent identifies entities (people, companies, concepts), creates or updates the corresponding Markdown files, and adds cross-links
 - **Questions on the base** — ask your knowledge base without modifying it; the agent cites sources
