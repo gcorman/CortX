@@ -1,4 +1,4 @@
-```markdown
+
 # CortX
 <img width="300" height="400" alt="CortX_logo" src="https://github.com/user-attachments/assets/111a3923-a2d0-47ea-8e2f-50ff7c3aaa50" />
 ### From vibe coding to vibe learning.
@@ -38,7 +38,7 @@ Full interface available in French and English.
 ---
 ## Demo
 <!-- TODO: Add screenshots or a demo GIF -->
-```
+
 User:
   Lunch with Sophie Martin. She’s leaving Thales to join
   Dassault Aviation as Technical Director. She told me about
