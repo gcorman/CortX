@@ -58,7 +58,7 @@ Agent:
     ➕ News: 6-month delay on the SCAF program
   [✓ Approve] [↩ Cancel]
 
-```
+
 With a single raw text input, the agent identifies 1 person, 2 companies, and 1 program, modifies 3 files, creates 1 new file, and maintains all cross-links.
 ---
 
