@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { EntityType } from '../../shared/types'
+import type { EntityType, AppLanguage } from '../../shared/types'
 
 export type CenterView = 'graph' | 'tags' | 'files' | 'library'
 export type Theme = 'dark' | 'light'
@@ -10,6 +10,7 @@ interface UIState {
   filePreviewPath: string | null
   settingsOpen: boolean
   theme: Theme
+  language: AppLanguage
   toasts: Array<{ id: string; message: string; type: 'success' | 'error' | 'info' }>
 
   // File creation dialog
@@ -26,6 +27,7 @@ interface UIState {
   closeFilePreview: () => void
   toggleSettings: () => void
   setTheme: (theme: Theme) => void
+  setLanguage: (language: AppLanguage) => void
   addToast: (message: string, type: 'success' | 'error' | 'info') => void
   removeToast: (id: string) => void
 
@@ -43,12 +45,17 @@ const savedTheme = ((): Theme => {
   try { return (localStorage.getItem('cortx-theme') as Theme) || 'dark' } catch { return 'dark' }
 })()
 
+const savedLanguage = ((): AppLanguage => {
+  try { return (localStorage.getItem('cortx-language') as AppLanguage) || 'fr' } catch { return 'fr' }
+})()
+
 export const useUIStore = create<UIState>((set) => ({
   activeCenterView: 'graph',
   rightPanelVisible: true,
   filePreviewPath: null,
   settingsOpen: false,
   theme: savedTheme,
+  language: savedLanguage,
   toasts: [],
 
   // File creation dialog
@@ -68,6 +75,10 @@ export const useUIStore = create<UIState>((set) => ({
     try { localStorage.setItem('cortx-theme', theme) } catch { /* ignore */ }
     document.documentElement.setAttribute('data-theme', theme)
     set({ theme })
+  },
+  setLanguage: (language) => {
+    try { localStorage.setItem('cortx-language', language) } catch { /* ignore */ }
+    set({ language })
   },
   addToast: (message, type) => {
     const id = Date.now().toString(36)

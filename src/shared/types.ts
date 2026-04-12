@@ -141,10 +141,13 @@ export interface LLMConfig {
 
 // --- App Config ---
 
+export type AppLanguage = 'fr' | 'en'
+
 export interface AppConfig {
   basePath: string
   llm: LLMConfig
   validationMode: 'always' | 'creations-only' | 'automatic'
+  language: AppLanguage
 }
 
 // --- Library ---

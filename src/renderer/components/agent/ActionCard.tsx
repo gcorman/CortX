@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { FilePlus, FileEdit, ChevronDown, ChevronRight } from 'lucide-react'
+import { useT } from '../../i18n'
 import type { AgentAction } from '../../../shared/types'
 
 interface ActionCardProps {
@@ -8,6 +9,7 @@ interface ActionCardProps {
 
 export function ActionCard({ action }: ActionCardProps): React.JSX.Element {
   const [expanded, setExpanded] = useState(false)
+  const t = useT()
 
   const isCreate = action.action === 'create'
   const Icon = isCreate ? FilePlus : FileEdit
@@ -22,11 +24,11 @@ export function ActionCard({ action }: ActionCardProps): React.JSX.Element {
   }
 
   const statusLabels: Record<string, string> = {
-    proposed: 'en attente',
-    pending: 'en cours',
-    validated: 'applique',
-    rejected: 'refuse',
-    undone: 'annule'
+    proposed: t.actionCard.pending,
+    pending: t.actionCard.inProgress,
+    validated: t.actionCard.applied,
+    rejected: t.actionCard.rejected,
+    undone: t.actionCard.cancelled
   }
 
   return (

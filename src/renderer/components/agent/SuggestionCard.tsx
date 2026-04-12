@@ -1,5 +1,6 @@
 import { Lightbulb, Check, X } from 'lucide-react'
 import { useChatStore } from '../../stores/chatStore'
+import { useT } from '../../i18n'
 
 interface SuggestionCardProps {
   suggestion: string
@@ -8,6 +9,7 @@ interface SuggestionCardProps {
 export function SuggestionCard({ suggestion }: SuggestionCardProps): React.JSX.Element {
   const acceptSuggestion = useChatStore((s) => s.acceptSuggestion)
   const dismissSuggestion = useChatStore((s) => s.dismissSuggestion)
+  const t = useT()
 
   return (
     <div className="bg-cortx-accent/5 border border-cortx-accent/20 rounded-card px-3 py-2">
@@ -21,14 +23,14 @@ export function SuggestionCard({ suggestion }: SuggestionCardProps): React.JSX.E
           className="flex items-center gap-1 text-2xs px-2 py-1 rounded bg-cortx-accent/10 text-cortx-accent hover:bg-cortx-accent/20 transition-colors cursor-pointer"
         >
           <Check size={10} />
-          Accepter
+          {t.actionButtons.accept}
         </button>
         <button
           onClick={() => dismissSuggestion(suggestion)}
           className="flex items-center gap-1 text-2xs px-2 py-1 rounded bg-cortx-elevated text-cortx-text-secondary hover:text-cortx-text-primary transition-colors cursor-pointer"
         >
           <X size={10} />
-          Ignorer
+          {t.insightCard.ignore}
         </button>
       </div>
     </div>

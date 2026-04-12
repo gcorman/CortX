@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { SendHorizontal, Slash, AtSign, Plus, FileText, BookOpen } from 'lucide-react'
 import { useFileStore } from '../../stores/fileStore'
 import { useLibraryStore } from '../../stores/libraryStore'
+import { useT } from '../../i18n'
 
 interface ChatInputProps {
   onSend: (message: string) => void
@@ -14,6 +15,7 @@ export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps
   const [isDragOver, setIsDragOver] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const files = useFileStore((s) => s.files)
+  const t = useT()
 
   // --- @mention state ---
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
@@ -237,7 +239,7 @@ export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps
         <div className="absolute inset-x-3 -top-12 flex items-center justify-center pointer-events-none">
           <div className="flex items-center gap-2 bg-cortx-accent/15 border border-cortx-accent/40 rounded-card px-4 py-2">
             <FileText size={14} className="text-cortx-accent" />
-            <span className="text-xs text-cortx-accent font-medium">Déposer pour analyser et intégrer</span>
+            <span className="text-xs text-cortx-accent font-medium">{t.chat.dropToAnalyze}</span>
           </div>
         </div>
       )}
@@ -266,7 +268,7 @@ export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps
                   }
                   <span className="text-xs font-medium truncate">{target.title}</span>
                   {target.kind === 'library'
-                    ? <span className="text-2xs text-amber-400/60 flex-shrink-0 ml-auto">lecture seule</span>
+                    ? <span className="text-2xs text-amber-400/60 flex-shrink-0 ml-auto">{t.chat.readOnly}</span>
                     : <span className="text-2xs text-cortx-text-secondary/40 truncate ml-auto">{target.path}</span>
                   }
                 </button>
@@ -282,7 +284,7 @@ export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps
               type="button"
               onClick={handleImportClick}
               disabled={disabled}
-              title="Importer un fichier .md dans la base"
+              title={t.chat.importMd}
               className="flex-shrink-0 p-1.5 rounded-md text-cortx-text-secondary hover:text-cortx-accent hover:bg-cortx-accent/10 disabled:opacity-30 disabled:hover:text-cortx-text-secondary disabled:hover:bg-transparent transition-colors cursor-pointer mb-0.5"
             >
               <Plus size={15} />
@@ -294,7 +296,7 @@ export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps
               onChange={handleChange}
               onKeyDown={handleKeyDown}
               disabled={disabled}
-              placeholder="Tape une info, pose une question, ou /commande... (@fichier pour citer)"
+              placeholder={t.chat.placeholder}
               rows={1}
               className="flex-1 bg-transparent text-sm text-cortx-text-primary placeholder:text-cortx-text-secondary/40 py-2 resize-none focus:outline-none disabled:opacity-50"
             />
@@ -303,7 +305,7 @@ export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps
               onClick={handleSubmit}
               disabled={disabled || !value.trim()}
               className="flex-shrink-0 p-1.5 rounded-md text-cortx-text-secondary hover:text-cortx-accent hover:bg-cortx-accent/10 disabled:opacity-30 disabled:hover:text-cortx-text-secondary disabled:hover:bg-transparent transition-colors cursor-pointer mb-0.5"
-              title="Envoyer (Ctrl+Enter)"
+              title={t.chat.sendTooltip}
             >
               <SendHorizontal size={16} />
             </button>
@@ -314,17 +316,17 @@ export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps
       <div className="flex items-center gap-3 mt-1.5 px-1">
         <span className="text-2xs text-cortx-text-secondary/40 flex items-center gap-1">
           <Slash size={9} />
-          ask, brief, undo, status, digest
+          {t.chat.commands}
         </span>
         <span className="text-2xs text-cortx-text-secondary/40 flex items-center gap-1">
           <AtSign size={9} />
-          citer un fichier
+          {t.chat.citeFile}
         </span>
         <span className="text-2xs text-cortx-text-secondary/40 flex items-center gap-1">
           <Plus size={9} />
-          importer .md
+          {t.chat.importMdShort}
         </span>
-        <span className="text-2xs text-cortx-text-secondary/40 ml-auto">Ctrl+Enter</span>
+        <span className="text-2xs text-cortx-text-secondary/40 ml-auto">{t.chat.ctrlEnter}</span>
       </div>
     </div>
   )

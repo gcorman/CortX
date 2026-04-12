@@ -5,7 +5,7 @@ import { GitService } from './GitService'
 import { LLMService } from './LLMService'
 import { libraryService } from './LibraryService'
 import { buildSystemPrompt } from '../utils/promptBuilder'
-import type { AgentResponse, AgentAction, LibraryChunkResult } from '../../shared/types'
+import type { AgentResponse, AgentAction, LibraryChunkResult, AppLanguage } from '../../shared/types'
 
 interface RawAction {
   action?: string
@@ -46,8 +46,13 @@ export class AgentPipeline {
     private dbService: DatabaseService,
     private gitService: GitService,
     private llmService: LLMService,
-    private basePath: string
+    private basePath: string,
+    private language: AppLanguage = 'fr'
   ) {}
+
+  setLanguage(language: AppLanguage): void {
+    this.language = language
+  }
 
   /**
    * Process user input: call LLM, parse response, return proposed actions.
@@ -77,7 +82,8 @@ export class AgentPipeline {
       this.fileService,
       mergedContextFiles,
       this.basePath,
-      mergedLibraryChunks
+      mergedLibraryChunks,
+      this.language
     )
 
     const rawResponse = await this.llmService.sendMessage(

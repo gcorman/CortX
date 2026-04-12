@@ -10,9 +10,11 @@ import { PanelRightOpen } from 'lucide-react'
 import { useUIStore } from '../../stores/uiStore'
 import { useFileStore } from '../../stores/fileStore'
 import { registerDbChangedListener } from '../../stores/graphStore'
+import { useT } from '../../i18n'
 
 export function AppShell(): React.JSX.Element {
   const { rightPanelVisible, toggleRightPanel, theme } = useUIStore()
+  const t = useT()
   const loadFiles = useFileStore((s) => s.loadFiles)
 
   // Apply theme attribute to <html> on mount and whenever it changes
@@ -70,7 +72,7 @@ export function AppShell(): React.JSX.Element {
           <button
             onClick={toggleRightPanel}
             className="flex-shrink-0 w-8 h-full flex items-center justify-center bg-cortx-surface border-l border-cortx-border hover:bg-cortx-elevated transition-colors cursor-pointer"
-            title="Ouvrir le panneau agent"
+            title={t.appShell.openAgentPanel}
           >
             <PanelRightOpen size={14} className="text-cortx-text-secondary" />
           </button>

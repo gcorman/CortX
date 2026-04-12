@@ -6,6 +6,7 @@ import { FilePreview } from '../files/FilePreview'
 import { LibraryPanel } from '../library/LibraryPanel'
 import { Network, Hash, Search, Library, Brain, Plus } from 'lucide-react'
 import { useState } from 'react'
+import { useT } from '../../i18n'
 
 export function CenterPanel(): React.JSX.Element {
   const { activeCenterView, setActiveCenterView, filePreviewPath, closeFilePreview, toggleCreateFileDialog } = useUIStore()
@@ -13,11 +14,12 @@ export function CenterPanel(): React.JSX.Element {
   const idleActive = useIdleStore((s) => s.isActive)
   const idlePhase = useIdleStore((s) => s.phase)
   const toggleIdle = useIdleStore((s) => s.toggle)
+  const t = useT()
 
   const tabs = [
-    { id: 'graph' as const, label: 'Graphe', icon: Network },
-    { id: 'tags' as const, label: 'Tags', icon: Hash },
-    { id: 'library' as const, label: 'Bibliothèque', icon: Library }
+    { id: 'graph' as const, label: t.centerPanel.graph, icon: Network },
+    { id: 'tags' as const, label: t.centerPanel.tags, icon: Hash },
+    { id: 'library' as const, label: t.centerPanel.library, icon: Library }
   ]
 
   return (
@@ -50,7 +52,7 @@ export function CenterPanel(): React.JSX.Element {
         {activeCenterView === 'graph' && (
           <button
             onClick={() => void toggleIdle()}
-            title={idleActive ? 'Désactiver le mode Idle' : 'Activer le mode Idle — l\'agent médite sur le graphe'}
+            title={idleActive ? t.centerPanel.disableIdle : t.centerPanel.enableIdle}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-input text-xs font-medium transition-all duration-200 cursor-pointer flex-shrink-0 ${
               idleActive
                 ? 'bg-cortx-accent/20 text-cortx-accent border border-cortx-accent/40'
@@ -61,7 +63,7 @@ export function CenterPanel(): React.JSX.Element {
               size={13}
               className={idleActive && (idlePhase === 'thinking' || idlePhase === 'examining') ? 'animate-pulse' : ''}
             />
-            Idle
+            {t.centerPanel.idle}
           </button>
         )}
 
@@ -69,11 +71,11 @@ export function CenterPanel(): React.JSX.Element {
         {activeCenterView === 'graph' && (
           <button
             onClick={() => toggleCreateFileDialog()}
-            title="Créer une nouvelle fiche"
+            title={t.centerPanel.newFile}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-input text-xs font-medium text-cortx-text-secondary hover:text-cortx-text-primary hover:bg-cortx-elevated transition-colors cursor-pointer flex-shrink-0"
           >
             <Plus size={14} />
-            Nouveau
+            {t.centerPanel.newShort}
           </button>
         )}
 
@@ -85,7 +87,7 @@ export function CenterPanel(): React.JSX.Element {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Rechercher dans la base..."
+              placeholder={t.centerPanel.searchPlaceholder}
               className="w-full bg-cortx-surface border border-cortx-border rounded-input pl-9 pr-3 py-1.5 text-xs text-cortx-text-primary placeholder:text-cortx-text-secondary/50 focus:outline-none focus:border-cortx-accent transition-colors"
             />
           </div>

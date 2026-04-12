@@ -4,18 +4,11 @@ import { ActionButtons } from './ActionButtons'
 import { ActionPreview } from './ActionPreview'
 import { WikiText } from '../../utils/wikilink'
 import { useChatStore } from '../../stores/chatStore'
+import { useT } from '../../i18n'
 import type { ChatMessage as ChatMessageType, AgentAction } from '../../../shared/types'
 
 interface ChatMessageProps {
   message: ChatMessageType
-}
-
-const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  proposed: { bg: 'bg-cortx-cta/10', text: 'text-cortx-cta', label: 'en attente' },
-  pending: { bg: 'bg-cortx-accent/10', text: 'text-cortx-accent', label: 'en cours...' },
-  validated: { bg: 'bg-cortx-success/10', text: 'text-cortx-success', label: 'applique' },
-  rejected: { bg: 'bg-cortx-error/10', text: 'text-cortx-error', label: 'refuse' },
-  undone: { bg: 'bg-cortx-cta/10', text: 'text-cortx-cta', label: 'annule' }
 }
 
 export function ChatMessage({ message }: ChatMessageProps): React.JSX.Element {
@@ -26,6 +19,15 @@ export function ChatMessage({ message }: ChatMessageProps): React.JSX.Element {
   const dismissSuggestion = useChatStore((s) => s.dismissSuggestion)
   const acceptSuggestion = useChatStore((s) => s.acceptSuggestion)
   const dismissedSuggestions = useChatStore((s) => s.dismissedSuggestions)
+  const t = useT()
+
+  const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+    proposed: { bg: 'bg-cortx-cta/10', text: 'text-cortx-cta', label: t.chat.pending },
+    pending: { bg: 'bg-cortx-accent/10', text: 'text-cortx-accent', label: t.chat.inProgress },
+    validated: { bg: 'bg-cortx-success/10', text: 'text-cortx-success', label: t.chat.applied },
+    rejected: { bg: 'bg-cortx-error/10', text: 'text-cortx-error', label: t.chat.rejected },
+    undone: { bg: 'bg-cortx-cta/10', text: 'text-cortx-cta', label: t.chat.cancelled }
+  }
 
   function handleCopy(): void {
     const text = isUser
@@ -53,7 +55,7 @@ export function ChatMessage({ message }: ChatMessageProps): React.JSX.Element {
             <button
               onClick={handleCopy}
               className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-cortx-elevated text-cortx-text-secondary/40 hover:text-cortx-text-secondary transition-all cursor-pointer"
-              title="Copier"
+              title={t.chat.copy}
             >
               {copied ? <Check size={11} className="text-cortx-success" /> : <Copy size={11} />}
             </button>
@@ -164,14 +166,14 @@ export function ChatMessage({ message }: ChatMessageProps): React.JSX.Element {
                     <button
                       onClick={() => void acceptSuggestion(suggestion)}
                       className="px-1.5 py-0.5 rounded text-2xs bg-cortx-accent/15 hover:bg-cortx-accent/25 text-cortx-accent transition-colors cursor-pointer"
-                      title="Demander à l'agent d'appliquer cette suggestion"
+                      title={t.chat.applyTooltip}
                     >
-                      Accepter
+                      {t.chat.accept}
                     </button>
                     <button
                       onClick={() => dismissSuggestion(suggestion)}
                       className="p-0.5 rounded hover:bg-cortx-elevated text-cortx-text-secondary/60 hover:text-cortx-text-primary transition-colors cursor-pointer"
-                      title="Ignorer cette suggestion"
+                      title={t.chat.ignoreSuggestion}
                     >
                       <X size={11} />
                     </button>
@@ -211,7 +213,7 @@ export function ChatMessage({ message }: ChatMessageProps): React.JSX.Element {
           <button
             onClick={handleCopy}
             className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-cortx-elevated text-cortx-text-secondary/40 hover:text-cortx-text-secondary transition-all cursor-pointer"
-            title="Copier"
+            title={t.chat.copy}
           >
             {copied ? <Check size={11} className="text-cortx-success" /> : <Copy size={11} />}
           </button>

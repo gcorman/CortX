@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Hash, FileText } from 'lucide-react'
 import { useUIStore } from '../../stores/uiStore'
+import { useT } from '../../i18n'
 
 interface TagInfo {
   tag: string
@@ -12,6 +13,7 @@ export function TagBrowser(): React.JSX.Element {
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
   const [tagFiles, setTagFiles] = useState<Array<{ path: string; title: string }>>([])
   const openFilePreview = useUIStore((s) => s.openFilePreview)
+  const t = useT()
 
   const loadTags = useCallback(async () => {
     try {
@@ -49,9 +51,9 @@ export function TagBrowser(): React.JSX.Element {
         <div className="w-14 h-14 rounded-full bg-cortx-surface flex items-center justify-center mb-4">
           <Hash size={28} className="text-cortx-text-secondary/40" />
         </div>
-        <h3 className="text-sm font-medium text-cortx-text-secondary mb-1">Aucun tag</h3>
+        <h3 className="text-sm font-medium text-cortx-text-secondary mb-1">{t.tags.noTags}</h3>
         <p className="text-xs text-cortx-text-secondary/60 max-w-[280px]">
-          Les tags apparaitront ici au fur et a mesure que tu enrichis ta base de connaissances.
+          {t.tags.noTagsHint}
         </p>
       </div>
     )

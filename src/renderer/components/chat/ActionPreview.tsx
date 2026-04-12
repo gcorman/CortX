@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { X, FilePlus, FileEdit, ArrowRight } from 'lucide-react'
+import { useT } from '../../i18n'
 import type { AgentAction } from '../../../shared/types'
 
 interface ActionPreviewProps {
@@ -11,6 +12,7 @@ export function ActionPreview({ action, onClose }: ActionPreviewProps): React.JS
   const [before, setBefore] = useState<string | null>(null)
   const [after, setAfter] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const t = useT()
 
   useEffect(() => {
     loadPreview()
@@ -42,7 +44,7 @@ export function ActionPreview({ action, onClose }: ActionPreviewProps): React.JS
               <FileEdit size={16} className="text-cortx-accent" />
             )}
             <span className="text-sm font-medium text-cortx-text-primary">
-              {action.action === 'create' ? 'Nouveau fichier' : 'Modification'}
+              {action.action === 'create' ? t.actionPreview.newFile : t.actionPreview.modification}
             </span>
             <span className="text-xs font-mono text-cortx-text-secondary bg-cortx-bg px-2 py-0.5 rounded">
               {action.file}
@@ -60,13 +62,13 @@ export function ActionPreview({ action, onClose }: ActionPreviewProps): React.JS
         <div className="flex-1 overflow-hidden min-h-0">
           {isLoading ? (
             <div className="flex items-center justify-center h-full text-cortx-text-secondary text-sm">
-              Chargement de l'apercu...
+              {t.actionPreview.loading}
             </div>
           ) : action.action === 'create' ? (
             /* Create: show new content only */
             <div className="h-full p-4 flex flex-col min-h-0">
               <div className="text-2xs uppercase text-cortx-success font-medium mb-2 tracking-wider flex-shrink-0">
-                Nouveau contenu
+                {t.actionPreview.newContent}
               </div>
               <div className="flex-1 min-h-0 overflow-y-auto">
                 <pre className="text-xs text-cortx-text-primary font-mono whitespace-pre-wrap bg-cortx-bg rounded-card p-4 border border-cortx-success/20">
@@ -80,11 +82,11 @@ export function ActionPreview({ action, onClose }: ActionPreviewProps): React.JS
               {/* Before */}
               <div className="flex-1 p-4 border-r border-cortx-border flex flex-col min-h-0">
                 <div className="text-2xs uppercase text-cortx-text-secondary font-medium mb-2 tracking-wider flex-shrink-0">
-                  Contenu actuel
+                  {t.actionPreview.currentContent}
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto">
                   <pre className="text-xs text-cortx-text-secondary font-mono whitespace-pre-wrap bg-cortx-bg rounded-card p-4 border border-cortx-border">
-                    {before || '(fichier vide)'}
+                    {before || t.actionPreview.emptyFile}
                   </pre>
                 </div>
               </div>
@@ -97,7 +99,7 @@ export function ActionPreview({ action, onClose }: ActionPreviewProps): React.JS
               {/* After */}
               <div className="flex-1 p-4 flex flex-col min-h-0">
                 <div className="text-2xs uppercase text-cortx-success font-medium mb-2 tracking-wider flex-shrink-0">
-                  Apres modification
+                  {t.actionPreview.afterEdit}
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto">
                   <pre className="text-xs text-cortx-text-primary font-mono whitespace-pre-wrap bg-cortx-bg rounded-card p-4 border border-cortx-success/20">

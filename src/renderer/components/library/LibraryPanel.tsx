@@ -3,6 +3,7 @@ import { Upload, Search, RefreshCw, Loader2, AlertCircle } from 'lucide-react'
 import { useLibraryStore } from '../../stores/libraryStore'
 import { LibraryDocumentItem } from './LibraryDocumentItem'
 import { LibraryPreview } from './LibraryPreview'
+import { useT } from '../../i18n'
 
 export function LibraryPanel(): React.JSX.Element {
   const {
@@ -27,6 +28,7 @@ export function LibraryPanel(): React.JSX.Element {
 
   const [isDragOver, setIsDragOver] = useState(false)
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const t = useT()
 
   useEffect(() => {
     loadDocuments()
@@ -73,7 +75,7 @@ export function LibraryPanel(): React.JSX.Element {
             type="text"
             value={searchQuery}
             onChange={e => handleSearchChange(e.target.value)}
-            placeholder="Rechercher dans la bibliothèque…"
+            placeholder={t.library.searchPlaceholder}
             className="w-full bg-cortx-surface border border-cortx-border rounded-input pl-8 pr-3 py-1.5 text-xs text-cortx-text-primary placeholder:text-cortx-text-secondary/50 focus:outline-none focus:border-cortx-accent transition-colors"
           />
           {isSearching && (
@@ -88,27 +90,27 @@ export function LibraryPanel(): React.JSX.Element {
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-cortx-accent/10 hover:bg-cortx-accent/20 text-cortx-accent text-xs font-medium transition-colors"
           >
             <Upload size={12} />
-            Importer
+            {t.library.import}
           </button>
           <button
             onClick={reindexAll}
             disabled={isLoading}
             className="p-1.5 rounded hover:bg-cortx-surface text-cortx-text-secondary hover:text-cortx-text-primary transition-colors disabled:opacity-40"
-            title="Réindexer tous les documents"
+            title={t.library.reindex}
           >
             <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
           </button>
 
           {/* Sidecar status indicator */}
           {status && !status.sidecarReady && (
-            <div className="flex items-center gap-1 text-[10px] text-amber-400 ml-auto" title="Le sidecar Python n'est pas disponible. Seuls les .md/.txt peuvent être importés.">
+            <div className="flex items-center gap-1 text-[10px] text-amber-400 ml-auto" title={t.library.sidecarUnavailable}>
               <AlertCircle size={11} />
-              Mode dégradé
+              {t.library.degradedMode}
             </div>
           )}
 
           <span className="ml-auto text-[10px] text-cortx-text-secondary">
-            {documents.length} doc{documents.length !== 1 ? 's' : ''}
+            {documents.length} {documents.length !== 1 ? t.library.docs : t.library.doc}
           </span>
         </div>
       </div>
@@ -127,7 +129,7 @@ export function LibraryPanel(): React.JSX.Element {
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
               <div className="bg-cortx-elevated/90 border border-cortx-accent rounded-lg px-4 py-3 text-center">
                 <Upload size={20} className="mx-auto mb-1 text-cortx-accent" />
-                <p className="text-xs text-cortx-accent font-medium">Déposer pour importer</p>
+                <p className="text-xs text-cortx-accent font-medium">{t.library.dropToImport}</p>
               </div>
             </div>
           )}
@@ -135,12 +137,12 @@ export function LibraryPanel(): React.JSX.Element {
           {/* Ingestion queue (active imports) */}
           {ingestQueue.length > 0 && (
             <div className="px-3 py-2 border-b border-cortx-border space-y-1">
-              <p className="text-[10px] text-cortx-text-secondary uppercase tracking-wide font-medium">En cours</p>
+              <p className="text-[10px] text-cortx-text-secondary uppercase tracking-wide font-medium">{t.library.processing}</p>
               {ingestQueue.map((item, i) => (
                 <div key={i} className="flex items-center gap-2 text-[10px] text-cortx-text-secondary">
                   <Loader2 size={10} className="animate-spin flex-shrink-0" />
                   <span className="truncate">{item.filename}</span>
-                  <span className="flex-shrink-0">{stageLabel(item.stage)}</span>
+                  <span className="flex-shrink-0">{stageLabel(item.stage, t.library)}</span>
                 </div>
               ))}
             </div>
@@ -150,7 +152,7 @@ export function LibraryPanel(): React.JSX.Element {
           {showSearchResults ? (
             <div className="flex-1 overflow-y-auto">
               {searchResults.length === 0 ? (
-                <p className="text-xs text-cortx-text-secondary px-3 py-4">Aucun résultat</p>
+                <p className="text-xs text-cortx-text-secondary px-3 py-4">{t.library.noResults}</p>
               ) : (
                 searchResults.map((r, i) => (
                   <div
@@ -171,14 +173,14 @@ export function LibraryPanel(): React.JSX.Element {
               {isLoading && documents.length === 0 && (
                 <div className="flex items-center justify-center py-8 text-cortx-text-secondary">
                   <Loader2 size={16} className="animate-spin mr-2" />
-                  <span className="text-xs">Chargement…</span>
+                  <span className="text-xs">{t.library.loading}</span>
                 </div>
               )}
               {!isLoading && documents.length === 0 && (
                 <div className="px-3 py-8 text-center">
                   <Upload size={24} className="mx-auto mb-2 text-cortx-text-secondary/40" />
-                  <p className="text-xs text-cortx-text-secondary">Aucun document</p>
-                  <p className="text-[10px] text-cortx-text-secondary/60 mt-1">Glissez des fichiers ici ou cliquez sur Importer</p>
+                  <p className="text-xs text-cortx-text-secondary">{t.library.noDocuments}</p>
+                  <p className="text-[10px] text-cortx-text-secondary/60 mt-1">{t.library.dropHint}</p>
                 </div>
               )}
               {Object.entries(groupedDocs).map(([folder, docs]) => (
@@ -226,15 +228,15 @@ function groupByFolder(docs: ReturnType<typeof useLibraryStore.getState>['docume
   return result
 }
 
-function stageLabel(stage: string): string {
+function stageLabel(stage: string, tl: { copying: string; extracting: string; chunking: string; embedding: string; linking: string; done: string; error: string }): string {
   const labels: Record<string, string> = {
-    copying: 'copie…',
-    extracting: 'extraction…',
-    chunking: 'découpage…',
-    embedding: 'embeddings…',
-    linking: 'liens…',
-    done: 'terminé',
-    error: 'erreur',
+    copying: tl.copying,
+    extracting: tl.extracting,
+    chunking: tl.chunking,
+    embedding: tl.embedding,
+    linking: tl.linking,
+    done: tl.done,
+    error: tl.error,
   }
   return labels[stage] ?? stage
 }

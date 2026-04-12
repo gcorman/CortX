@@ -3,13 +3,15 @@ import { Wifi, WifiOff, FileText, GitCommit, Settings, Brain } from 'lucide-reac
 import { useUIStore } from '../../stores/uiStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useIdleStore } from '../../stores/idleStore'
+import { useT } from '../../i18n'
 
 export function StatusBar(): React.JSX.Element {
   const toggleSettings = useUIStore((s) => s.toggleSettings)
   const streamProgress = useChatStore((s) => s.streamProgress)
   const streamActive = useChatStore((s) => s.streamActive)
+  const t = useT()
   const [fileCount, setFileCount] = useState(0)
-  const [lastCommit, setLastCommit] = useState('Aucun commit')
+  const [lastCommit, setLastCommit] = useState('')
   const [llmStatus, setLlmStatus] = useState<'configured' | 'unconfigured'>('unconfigured')
 
   const refresh = useCallback(async () => {
@@ -28,10 +30,10 @@ export function StatusBar(): React.JSX.Element {
           : log[0].message
         setLastCommit(msg)
       } else {
-        setLastCommit('Aucun commit')
+        setLastCommit(t.statusBar.noCommit)
       }
     } catch {
-      setLastCommit('Aucun commit')
+      setLastCommit(t.statusBar.noCommit)
     }
 
     try {
@@ -78,12 +80,12 @@ export function StatusBar(): React.JSX.Element {
           {llmStatus === 'configured' ? (
             <>
               <Wifi size={11} className="text-cortx-success" />
-              <span className="text-cortx-success">LLM connecte</span>
+              <span className="text-cortx-success">{t.statusBar.llmConnected}</span>
             </>
           ) : (
             <>
               <WifiOff size={11} className="text-cortx-text-secondary" />
-              <span>LLM non configure</span>
+              <span>{t.statusBar.llmNotConfigured}</span>
             </>
           )}
         </div>
@@ -94,7 +96,7 @@ export function StatusBar(): React.JSX.Element {
         {/* File count */}
         <div className="flex items-center gap-1.5">
           <FileText size={11} />
-          <span>{fileCount} fichier{fileCount !== 1 ? 's' : ''}</span>
+          <span>{fileCount} {fileCount !== 1 ? t.statusBar.files : t.statusBar.file}</span>
         </div>
 
         {/* Separator */}
@@ -118,12 +120,12 @@ export function StatusBar(): React.JSX.Element {
               />
               <Brain size={10} />
               <span>
-                {idlePhase === 'selecting' && 'Idle · Sélection'}
-                {idlePhase === 'examining' && 'Idle · Examen'}
-                {idlePhase === 'thinking' && 'Idle · Analyse...'}
-                {idlePhase === 'insight' && 'Idle · Insight !'}
-                {idlePhase === 'resting' && 'Idle · Pause'}
-                {idlePhase === 'stopped' && 'Idle'}
+                {idlePhase === 'selecting' && t.statusBar.idleSelecting}
+                {idlePhase === 'examining' && t.statusBar.idleExamining}
+                {idlePhase === 'thinking' && t.statusBar.idleThinking}
+                {idlePhase === 'insight' && t.statusBar.idleInsight}
+                {idlePhase === 'resting' && t.statusBar.idleResting}
+                {idlePhase === 'stopped' && t.statusBar.idle}
               </span>
             </div>
           </>
@@ -137,7 +139,7 @@ export function StatusBar(): React.JSX.Element {
           className="flex items-center gap-1.5 hover:text-cortx-text-primary transition-colors cursor-pointer p-0.5 rounded hover:bg-cortx-elevated"
         >
           <Settings size={11} />
-          <span>Settings</span>
+          <span>{t.statusBar.settings}</span>
         </button>
       </div>
 

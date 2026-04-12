@@ -4,6 +4,7 @@ import { MarkdownRenderer } from './MarkdownRenderer'
 import { useUIStore } from '../../stores/uiStore'
 import { useGraphStore } from '../../stores/graphStore'
 import { useFileStore } from '../../stores/fileStore'
+import { useT } from '../../i18n'
 import type { FileContent, CortxFile } from '../../../shared/types'
 
 interface FilePreviewProps {
@@ -35,6 +36,7 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
   const reloadGraph = useGraphStore((s) => s.loadGraph)
   const reloadFiles = useFileStore((s) => s.loadFiles)
   const allFiles = useFileStore((s) => s.files)
+  const t = useT()
 
   const wikilinkResults: CortxFile[] = wikilinkQuery !== null
     ? allFiles
@@ -124,7 +126,7 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
     setIsSaving(true)
     try {
       await window.cortx.agent.saveManualEdit(path, draft)
-      addToast('Fichier enregistré', 'success')
+      addToast(t.filePreview.saved, 'success')
       setIsEditing(false)
       // Reload everything that depends on this file
       await loadFile()
@@ -132,7 +134,7 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
       reloadFiles()
     } catch (err) {
       console.error('[FilePreview] save failed', err)
-      addToast('Erreur lors de l\'enregistrement', 'error')
+      addToast(t.filePreview.saveError, 'error')
     }
     setIsSaving(false)
   }
@@ -158,7 +160,7 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
       setTimeout(() => setRewriteUndo(null), 8000)
     } catch (err) {
       console.error('[FilePreview] rewrite failed', err)
-      addToast('Erreur lors de la réorganisation', 'error')
+      addToast(t.filePreview.rewriteError, 'error')
     } finally {
       setIsRewriting(false)
     }
@@ -167,12 +169,12 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
   async function handleDelete(): Promise<void> {
     try {
       await window.cortx.agent.deleteFile(path)
-      addToast('Fichier supprimé', 'info')
+      addToast(t.filePreview.deleted, 'info')
       await Promise.all([reloadGraph(), reloadFiles()])
       onClose()
     } catch (err) {
       console.error('[FilePreview] delete failed', err)
-      addToast('Erreur lors de la suppression', 'error')
+      addToast(t.filePreview.deleteError, 'error')
       setConfirmDelete(false)
     }
   }
@@ -188,14 +190,14 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
     setIsSavingTitle(true)
     try {
       await window.cortx.files.updateTitle(path, editedTitle)
-      addToast('Titre mis à jour', 'success')
+      addToast(t.filePreview.titleUpdated, 'success')
       await loadFile()
       setIsTitleEditing(false)
       reloadGraph()
       reloadFiles()
     } catch (err) {
       console.error('[FilePreview] title update failed', err)
-      addToast('Erreur lors de la mise à jour du titre', 'error')
+      addToast(t.filePreview.titleError, 'error')
       const fileName = path.split('/').pop()?.replace('.md', '') || path
       setEditedTitle(fileName)
       setIsTitleEditing(false)
@@ -258,7 +260,7 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
                   {fileName}
                 </h3>
                 {isLibraryFile && (
-                  <Lock size={14} className="flex-shrink-0 text-cortx-text-secondary/50" title="Fichier de la bibliothèque (lecture seule)" />
+                  <Lock size={14} className="flex-shrink-0 text-cortx-text-secondary/50" title={t.filePreview.libraryReadOnly} />
                 )}
               </>
             )}
@@ -271,7 +273,7 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
                   onClick={handleRewrite}
                   disabled={isRewriting}
                   className="p-1.5 rounded hover:bg-cortx-elevated text-cortx-text-secondary hover:text-cortx-accent transition-colors cursor-pointer disabled:opacity-40"
-                  title="Reprendre la rédaction (réorganise sans perdre d'information)"
+                  title={t.filePreview.rewrite}
                 >
                   <RefreshCw size={14} className={isRewriting ? 'animate-spin' : ''} />
                 </button>
@@ -279,31 +281,31 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
                   <button
                     onClick={() => setConfirmDelete(true)}
                     className="p-1.5 rounded hover:bg-red-500/10 text-cortx-text-secondary hover:text-red-400 transition-colors cursor-pointer"
-                    title="Supprimer ce fichier"
+                    title={t.filePreview.delete}
                   >
                     <Trash2 size={14} />
                   </button>
                 ) : (
                   <div className="flex items-center gap-1 bg-red-500/10 border border-red-500/30 rounded px-2 py-0.5">
-                    <span className="text-2xs text-red-400">Supprimer ?</span>
+                    <span className="text-2xs text-red-400">{t.filePreview.deleteConfirm}</span>
                     <button
                       onClick={() => void handleDelete()}
                       className="text-2xs text-red-400 hover:text-red-300 font-medium cursor-pointer transition-colors"
                     >
-                      Oui
+                      {t.filePreview.yes}
                     </button>
                     <button
                       onClick={() => setConfirmDelete(false)}
                       className="text-2xs text-cortx-text-secondary hover:text-cortx-text-primary cursor-pointer transition-colors"
                     >
-                      Non
+                      {t.filePreview.no}
                     </button>
                   </div>
                 )}
                 <button
                   onClick={handleEnterEdit}
                   className="p-1.5 rounded hover:bg-cortx-elevated text-cortx-text-secondary hover:text-cortx-accent transition-colors cursor-pointer"
-                  title="Modifier ce fichier"
+                  title={t.filePreview.edit}
                 >
                   <Pencil size={14} />
                 </button>
@@ -315,19 +317,19 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
                   onClick={handleSave}
                   disabled={isSaving || draft === content?.raw}
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs bg-cortx-success/15 text-cortx-success hover:bg-cortx-success/25 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                  title="Enregistrer (Ctrl+S)"
+                  title={t.filePreview.saveShortcut}
                 >
                   <Save size={12} />
-                  {isSaving ? 'Sauvegarde...' : 'Enregistrer'}
+                  {isSaving ? t.filePreview.saving : t.filePreview.save}
                 </button>
                 <button
                   onClick={handleCancel}
                   disabled={isSaving}
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs bg-cortx-elevated text-cortx-text-secondary hover:text-cortx-text-primary transition-colors cursor-pointer"
-                  title="Annuler (Échap)"
+                  title={t.filePreview.cancelShortcut}
                 >
                   <RotateCcw size={12} />
-                  Annuler
+                  {t.filePreview.cancel}
                 </button>
               </>
             )}
@@ -335,7 +337,7 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
               onClick={onClose}
               disabled={isEditing && draft !== content?.raw}
               className="p-1 rounded hover:bg-cortx-elevated text-cortx-text-secondary hover:text-cortx-text-primary transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-              title={isEditing && draft !== content?.raw ? 'Enregistre ou annule avant de fermer' : 'Fermer'}
+              title={isEditing && draft !== content?.raw ? t.filePreview.unsavedWarning : t.filePreview.close}
             >
               <X size={16} />
             </button>
@@ -345,7 +347,7 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
         {/* Rewrite undo bar */}
         {rewriteUndo && (
           <div className="flex items-center justify-between px-4 py-2 bg-cortx-accent/10 border-b border-cortx-accent/20 flex-shrink-0">
-            <span className="text-xs text-cortx-text-primary">Rédaction réorganisée</span>
+            <span className="text-xs text-cortx-text-primary">{t.filePreview.rewritten}</span>
             <div className="flex items-center gap-2">
               <button
                 onClick={async () => {
@@ -354,14 +356,14 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
                     setRewriteUndo(null)
                     await loadFile()
                     reloadGraph()
-                    addToast('Annulé', 'info')
+                    addToast(t.filePreview.undone, 'info')
                   } catch {
-                    addToast("Erreur lors de l'annulation", 'error')
+                    addToast(t.filePreview.undoError, 'error')
                   }
                 }}
                 className="text-xs text-cortx-accent hover:text-cortx-accent-light cursor-pointer transition-colors"
               >
-                Annuler
+                {t.filePreview.cancel}
               </button>
               <button
                 onClick={() => setRewriteUndo(null)}
@@ -377,7 +379,7 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
             <div className="flex items-center justify-center py-12 text-cortx-text-secondary text-sm">
-              Chargement...
+              {t.filePreview.loading}
             </div>
           ) : content ? (
             isEditing ? (
@@ -438,7 +440,7 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
                   }}
                   spellCheck={false}
                   className="flex-1 bg-cortx-bg text-cortx-text-primary text-sm font-mono p-4 resize-none focus:outline-none border-0 min-h-[60vh]"
-                  placeholder="Contenu Markdown..."
+                  placeholder={t.filePreview.placeholder}
                 />
               </div>
             ) : (
@@ -469,7 +471,7 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
             )
           ) : (
             <div className="text-center py-12 text-cortx-text-secondary text-sm">
-              Impossible de charger le fichier.
+              {t.filePreview.loadError}
             </div>
           )}
         </div>

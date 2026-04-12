@@ -33,7 +33,8 @@ function loadConfig(): AppConfig {
       apiKey: '',
       model: 'claude-sonnet-4-20250514'
     },
-    validationMode: 'always'
+    validationMode: 'always',
+    language: 'fr'
   }
 
   try {
@@ -48,7 +49,8 @@ function loadConfig(): AppConfig {
           model: saved.llm?.model || defaults.llm.model,
           baseUrl: saved.llm?.baseUrl
         },
-        validationMode: saved.validationMode || defaults.validationMode
+        validationMode: saved.validationMode || defaults.validationMode,
+        language: saved.language || defaults.language
       }
     }
   } catch (err) {
@@ -122,7 +124,8 @@ async function initializeServices(): Promise<void> {
     dbService,
     gitService,
     llmService,
-    config.basePath
+    config.basePath,
+    config.language
   )
 
   // Initialise library service (creates Bibliotheque/ if needed)
@@ -199,7 +202,7 @@ function registerAppHandlers(): void {
     dbService.initialize()
     gitService = new GitService(path)
     await gitService.initialize()
-    agentPipeline = new AgentPipeline(fileService, dbService, gitService, llmService, path)
+    agentPipeline = new AgentPipeline(fileService, dbService, gitService, llmService, path, config.language)
     await indexAllFiles()
     startFileWatcher(path)
   })
@@ -249,7 +252,7 @@ function registerAppHandlers(): void {
     dbService.initialize()
     gitService = new GitService(basePath)
     await gitService.initialize()
-    agentPipeline = new AgentPipeline(fileService, dbService, gitService, llmService, basePath)
+    agentPipeline = new AgentPipeline(fileService, dbService, gitService, llmService, basePath, config.language)
 
     console.log('[Reset] Base de connaissances réinitialisée')
   })
@@ -265,6 +268,10 @@ function registerAppHandlers(): void {
     }
     if (partial.validationMode) {
       config.validationMode = partial.validationMode
+    }
+    if (partial.language) {
+      config.language = partial.language
+      agentPipeline.setLanguage(config.language)
     }
     saveConfig(config)
   })

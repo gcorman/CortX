@@ -2,13 +2,16 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { useChatStore } from '../../stores/chatStore'
+import { useUIStore } from '../../stores/uiStore'
 import { Brain, Sparkles, FileText } from 'lucide-react'
+import { useT } from '../../i18n'
 
 export function ChatView(): React.JSX.Element {
   const { messages, isProcessing, sendMessage, importMarkdown, streamProgress } = useChatStore()
   const scrollRef = useRef<HTMLDivElement>(null)
   const [globalDragOver, setGlobalDragOver] = useState(false)
   const dragCounterRef = useRef(0)
+  const t = useT()
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -68,8 +71,8 @@ export function ChatView(): React.JSX.Element {
           <div className="absolute inset-0 bg-cortx-accent/5 border-2 border-dashed border-cortx-accent/50 rounded-lg m-2" />
           <div className="relative flex flex-col items-center gap-3 bg-cortx-surface/95 border border-cortx-accent/40 rounded-xl px-8 py-6 shadow-2xl">
             <FileText size={32} className="text-cortx-accent" />
-            <p className="text-sm font-medium text-cortx-text-primary">Déposer le fichier .md</p>
-            <p className="text-xs text-cortx-text-secondary">L'agent va l'analyser et proposer son intégration</p>
+            <p className="text-sm font-medium text-cortx-text-primary">{t.chat.dropMd}</p>
+            <p className="text-xs text-cortx-text-secondary">{t.chat.dropMdHint}</p>
           </div>
         </div>
       )}
@@ -85,7 +88,7 @@ export function ChatView(): React.JSX.Element {
         {isProcessing && (
           streamProgress > 0 ? (
             <div className="flex items-center gap-2 px-3 py-2">
-              <span className="text-xs text-cortx-text-secondary">Rédaction de la réponse</span>
+              <span className="text-xs text-cortx-text-secondary">{t.chat.writingResponse}</span>
               <ProgressRing progress={streamProgress} />
             </div>
           ) : (
@@ -95,7 +98,7 @@ export function ChatView(): React.JSX.Element {
                 <span className="w-1.5 h-1.5 rounded-full bg-cortx-accent animate-bounce" style={{ animationDelay: '150ms' }} />
                 <span className="w-1.5 h-1.5 rounded-full bg-cortx-accent animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
-              <span className="text-xs text-cortx-text-secondary">L'agent analyse...</span>
+              <span className="text-xs text-cortx-text-secondary">{t.chat.agentAnalyzing}</span>
             </div>
           )
         )}
@@ -153,21 +156,30 @@ function ProgressRing({ progress }: { progress: number }): React.JSX.Element {
 }
 
 function EmptyState(): React.JSX.Element {
+  const t = useT()
+  const language = useUIStore((s) => s.language)
+  const examples = language === 'en'
+    ? [
+        'Lunch with Sophie Martin, she is leaving Thales for Dassault.',
+        '/brief Sophie Martin',
+        'Create a domain Industrial Cybersecurity'
+      ]
+    : [
+        'Dejeuner avec Sophie Martin, elle quitte Thales pour Dassault.',
+        '/brief Sophie Martin',
+        'Cree un domaine Cybersecurite Industrielle'
+      ]
   return (
     <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-12">
       <div className="w-12 h-12 rounded-full bg-cortx-accent/10 flex items-center justify-center mb-4">
         <Brain size={24} className="text-cortx-accent" />
       </div>
-      <h3 className="text-sm font-semibold text-cortx-text-primary mb-2">Bienvenue dans CortX</h3>
+      <h3 className="text-sm font-semibold text-cortx-text-primary mb-2">{t.chat.welcome}</h3>
       <p className="text-xs text-cortx-text-secondary leading-relaxed max-w-[240px]">
-        Tape une info, pose une question, ou utilise une commande pour commencer.
+        {t.chat.welcomeHint}
       </p>
       <div className="mt-4 space-y-1.5">
-        {[
-          'Dejeuner avec Sophie Martin, elle quitte Thales pour Dassault.',
-          '/brief Sophie Martin',
-          'Cree un domaine Cybersecurite Industrielle'
-        ].map((example, i) => (
+        {examples.map((example, i) => (
           <div
             key={i}
             className="flex items-center gap-2 text-2xs text-cortx-text-secondary/70 bg-cortx-bg/50 rounded px-2.5 py-1.5"

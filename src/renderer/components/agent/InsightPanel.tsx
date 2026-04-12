@@ -2,6 +2,7 @@ import { Brain, ChevronDown, ChevronUp } from 'lucide-react'
 import { useState } from 'react'
 import { useIdleStore } from '../../stores/idleStore'
 import { InsightCard } from './InsightCard'
+import { useT } from '../../i18n'
 
 export function InsightPanel(): React.JSX.Element | null {
   const insights = useIdleStore((s) => s.insights)
@@ -9,6 +10,7 @@ export function InsightPanel(): React.JSX.Element | null {
   const phase = useIdleStore((s) => s.phase)
   const draftCount = useIdleStore((s) => s.draftCount)
   const [collapsed, setCollapsed] = useState(false)
+  const t = useT()
 
   const newInsights = insights.filter((i) => i.status === 'new')
 
@@ -29,7 +31,7 @@ export function InsightPanel(): React.JSX.Element | null {
               isActive && (phase === 'thinking' || phase === 'examining') ? 'animate-pulse' : ''
             }`}
           />
-          <span className="text-xs font-medium text-cortx-text-primary">Insights</span>
+          <span className="text-xs font-medium text-cortx-text-primary">{t.insightPanel.title}</span>
           {newInsights.length > 0 && (
             <span className="text-2xs px-1.5 py-0.5 rounded-full bg-cortx-accent/20 text-cortx-accent font-medium">
               {newInsights.length}
@@ -37,7 +39,11 @@ export function InsightPanel(): React.JSX.Element | null {
           )}
           {isActive && phase !== 'stopped' && (
             <span className="text-2xs text-cortx-text-secondary/50 italic">
-              {PHASE_LABELS[phase]}
+              {phase === 'selecting' && t.insightPanel.selecting}
+              {phase === 'examining' && t.insightPanel.examining}
+              {phase === 'thinking' && t.insightPanel.analyzing}
+              {phase === 'insight' && t.insightPanel.insightFound}
+              {phase === 'resting' && t.insightPanel.resting}
             </span>
           )}
         </div>
@@ -51,17 +57,17 @@ export function InsightPanel(): React.JSX.Element | null {
               {isActive ? (
                 <div className="space-y-1 text-center">
                   <p className="text-2xs text-cortx-text-secondary/40 italic">
-                    L'agent accumule des intuitions en silence…
+                    {t.insightPanel.accumulating}
                   </p>
                   {draftCount > 0 && (
                     <p className="text-2xs text-cortx-accent/60 font-medium">
-                      {draftCount} brouillon{draftCount > 1 ? 's' : ''} en cours de synthèse
+                      {draftCount} {draftCount > 1 ? t.insightPanel.drafts : t.insightPanel.draft} en cours de synthèse
                     </p>
                   )}
                 </div>
               ) : (
                 <p className="text-2xs text-cortx-text-secondary/40 italic">
-                  Activez le mode Idle pour lancer l'exploration du graphe.
+                  {t.insightPanel.activateIdle}
                 </p>
               )}
             </div>
@@ -76,10 +82,3 @@ export function InsightPanel(): React.JSX.Element | null {
   )
 }
 
-const PHASE_LABELS: Record<string, string> = {
-  selecting: 'Sélection...',
-  examining: 'Examen...',
-  thinking: 'Analyse...',
-  insight: 'Insight trouvé !',
-  resting: 'En pause...'
-}

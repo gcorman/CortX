@@ -3,16 +3,7 @@ import type { IdleInsight } from '../../../shared/types'
 import { useIdleStore } from '../../stores/idleStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useChatStore } from '../../stores/chatStore'
-
-const CATEGORY_LABELS: Record<IdleInsight['category'], string> = {
-  opportunity: 'Opportunité',
-  development: 'À développer',
-  hidden_connection: 'Connexion cachée',
-  pattern: 'Pattern',
-  contradiction: 'Contradiction',
-  gap: 'Lacune',
-  cluster: 'Cluster'
-}
+import { useT } from '../../i18n'
 
 const CATEGORY_ICONS: Record<IdleInsight['category'], React.ComponentType<{ size: number; className?: string }>> = {
   opportunity: Lightbulb,
@@ -43,6 +34,17 @@ export function InsightCard({ insight }: InsightCardProps): React.JSX.Element {
   const saveInsightAsFiche = useIdleStore((s) => s.saveInsightAsFiche)
   const addToast = useUIStore((s) => s.addToast)
   const sendMessage = useChatStore((s) => s.sendMessage)
+  const t = useT()
+
+  const CATEGORY_LABELS: Record<IdleInsight['category'], string> = {
+    opportunity: t.insightCard.opportunity,
+    development: t.insightCard.development,
+    hidden_connection: t.insightCard.hiddenConnection,
+    pattern: t.insightCard.pattern,
+    contradiction: t.insightCard.contradiction,
+    gap: t.insightCard.gap,
+    cluster: t.insightCard.cluster
+  }
 
   const Icon = CATEGORY_ICONS[insight.category]
   const colorClass = CATEGORY_COLORS[insight.category]
@@ -50,9 +52,9 @@ export function InsightCard({ insight }: InsightCardProps): React.JSX.Element {
   async function handleSave(): Promise<void> {
     try {
       await saveInsightAsFiche(insight.id)
-      addToast('Insight sauvegardé en fiche', 'success')
+      addToast(t.insightCard.savedToast, 'success')
     } catch {
-      addToast('Erreur lors de la sauvegarde', 'error')
+      addToast(t.insightCard.saveError, 'error')
     }
   }
 
@@ -64,7 +66,7 @@ export function InsightCard({ insight }: InsightCardProps): React.JSX.Element {
   }
 
   const confidence = Math.round(insight.confidence * 100)
-  const timeAgo = formatTimeAgo(insight.timestamp)
+  const timeAgo = formatTimeAgo(insight.timestamp, t.insightCard)
 
   return (
     <div className="bg-cortx-bg border border-cortx-border rounded-card p-3 space-y-2.5 group hover:border-cortx-accent/30 transition-colors">
@@ -81,7 +83,7 @@ export function InsightCard({ insight }: InsightCardProps): React.JSX.Element {
           <button
             onClick={() => void dismissInsight(insight.id)}
             className="ml-1 p-0.5 rounded hover:bg-cortx-elevated text-cortx-text-secondary/40 hover:text-cortx-text-primary transition-colors cursor-pointer"
-            title="Ignorer"
+            title={t.insightCard.ignore}
           >
             <X size={11} />
           </button>
@@ -110,25 +112,25 @@ export function InsightCard({ insight }: InsightCardProps): React.JSX.Element {
         <button
           onClick={handleExplore}
           className="flex items-center gap-1 text-2xs px-2 py-1 rounded bg-cortx-accent/10 text-cortx-accent hover:bg-cortx-accent/20 transition-colors cursor-pointer"
-          title="Envoyer à l'agent pour développer"
+          title={t.insightCard.explore}
         >
           <MessageSquare size={10} />
-          Explorer
+          {t.insightCard.explore}
         </button>
         {insight.status === 'new' && (
           <button
             onClick={() => void handleSave()}
             className="flex items-center gap-1 text-2xs px-2 py-1 rounded bg-cortx-elevated text-cortx-text-secondary hover:text-cortx-text-primary transition-colors cursor-pointer"
-            title="Sauvegarder en fiche"
+            title={t.insightCard.saveAsFiche}
           >
             <Archive size={10} />
-            Fiche
+            {t.insightCard.fiche}
           </button>
         )}
         {insight.status === 'saved' && (
           <span className="text-2xs text-cortx-success/60 flex items-center gap-1">
             <Archive size={10} />
-            Sauvegardé
+            {t.insightCard.saved}
           </span>
         )}
       </div>
@@ -136,12 +138,12 @@ export function InsightCard({ insight }: InsightCardProps): React.JSX.Element {
   )
 }
 
-function formatTimeAgo(timestamp: string): string {
+function formatTimeAgo(timestamp: string, tc: { justNow: string; minutesAgo: (n: number) => string; hoursAgo: (n: number) => string; daysAgo: (n: number) => string }): string {
   const diff = Date.now() - new Date(timestamp).getTime()
   const minutes = Math.floor(diff / 60000)
-  if (minutes < 1) return 'à l\'instant'
-  if (minutes < 60) return `il y a ${minutes}min`
+  if (minutes < 1) return tc.justNow
+  if (minutes < 60) return tc.minutesAgo(minutes)
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `il y a ${hours}h`
-  return `il y a ${Math.floor(hours / 24)}j`
+  if (hours < 24) return tc.hoursAgo(hours)
+  return tc.daysAgo(Math.floor(hours / 24))
 }

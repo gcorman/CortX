@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { X, Server, Cloud, Cpu, Check, AlertCircle, FolderOpen, Sun, Moon, Trash2 } from 'lucide-react'
+import { X, Server, Cloud, Cpu, Check, AlertCircle, FolderOpen, Sun, Moon, Trash2, Globe } from 'lucide-react'
 import { useUIStore } from '../../stores/uiStore'
 import { useGraphStore } from '../../stores/graphStore'
 import { useFileStore } from '../../stores/fileStore'
 import { useAgentStore } from '../../stores/agentStore'
-import type { LLMConfig } from '../../../shared/types'
+import { useT } from '../../i18n'
+import type { LLMConfig, AppLanguage } from '../../../shared/types'
 
 type Provider = 'anthropic' | 'openai-compatible'
 
@@ -18,26 +19,6 @@ interface ProviderPreset {
   needsApiKey: boolean
 }
 
-const PROVIDER_PRESETS: ProviderPreset[] = [
-  {
-    id: 'anthropic',
-    label: 'Claude (Anthropic)',
-    description: 'API Anthropic — modeles Claude Sonnet, Opus, Haiku',
-    icon: <Cloud size={18} />,
-    defaultModel: 'claude-sonnet-4-20250514',
-    needsApiKey: true
-  },
-  {
-    id: 'openai-compatible',
-    label: 'Local / OpenAI-compatible',
-    description: 'llama.cpp, Ollama, LM Studio, ou toute API compatible OpenAI',
-    icon: <Cpu size={18} />,
-    defaultModel: 'mistral',
-    defaultBaseUrl: 'http://localhost:8080/v1',
-    needsApiKey: false
-  }
-]
-
 const LOCAL_MODEL_EXAMPLES = [
   { name: 'llama.cpp (llama-server)', url: 'http://localhost:8080/v1', model: 'default' },
   { name: 'Ollama', url: 'http://localhost:11434/v1', model: 'mistral' },
@@ -45,10 +26,12 @@ const LOCAL_MODEL_EXAMPLES = [
 ]
 
 export function SettingsDialog(): React.JSX.Element {
-  const { settingsOpen, toggleSettings, addToast, theme, setTheme } = useUIStore()
+  const { settingsOpen, toggleSettings, addToast, theme, setTheme, setLanguage, language } = useUIStore()
   const { loadGraph, clearGraph } = useGraphStore()
   const loadFiles = useFileStore((s) => s.loadFiles)
   const clearActions = useAgentStore((s) => s.clearActions)
+  const t = useT()
+
   const [provider, setProvider] = useState<Provider>('anthropic')
   const [apiKey, setApiKey] = useState('')
   const [model, setModel] = useState('')
@@ -59,6 +42,26 @@ export function SettingsDialog(): React.JSX.Element {
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [resetConfirm, setResetConfirm] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
+
+  const PROVIDER_PRESETS: ProviderPreset[] = [
+    {
+      id: 'anthropic',
+      label: 'Claude (Anthropic)',
+      description: t.settings.anthropicDesc,
+      icon: <Cloud size={18} />,
+      defaultModel: 'claude-sonnet-4-20250514',
+      needsApiKey: true
+    },
+    {
+      id: 'openai-compatible',
+      label: 'Local / OpenAI-compatible',
+      description: t.settings.localDesc,
+      icon: <Cpu size={18} />,
+      defaultModel: 'mistral',
+      defaultBaseUrl: 'http://localhost:8080/v1',
+      needsApiKey: false
+    }
+  ]
 
   // Load current config on open
   useEffect(() => {
@@ -91,7 +94,7 @@ export function SettingsDialog(): React.JSX.Element {
         model,
         ...(provider === 'openai-compatible' ? { baseUrl } : {})
       }
-      await window.cortx.app.setConfig({ llm: llmConfig })
+      await window.cortx.app.setConfig({ llm: llmConfig, language })
 
       // Update base path if changed
       const currentBasePath = await window.cortx.app.getBasePath()
@@ -99,10 +102,10 @@ export function SettingsDialog(): React.JSX.Element {
         await window.cortx.app.setBasePath(basePath)
       }
 
-      addToast('Configuration sauvegardee', 'success')
+      addToast(t.settings.configSaved, 'success')
       toggleSettings()
-    } catch (err) {
-      addToast('Erreur lors de la sauvegarde', 'error')
+    } catch {
+      addToast(t.settings.saveError, 'error')
     }
     setIsSaving(false)
   }
@@ -111,7 +114,6 @@ export function SettingsDialog(): React.JSX.Element {
     setIsTestingConnection(true)
     setConnectionStatus('idle')
     try {
-      // Save config first so the backend uses the new settings
       const llmConfig: LLMConfig = {
         provider,
         apiKey,
@@ -120,21 +122,20 @@ export function SettingsDialog(): React.JSX.Element {
       }
       await window.cortx.app.setConfig({ llm: llmConfig })
 
-      // Send a simple test message
       const response = await window.cortx.llm.send(
-        [{ role: 'user', content: 'Reponds juste "ok".' }]
+        [{ role: 'user', content: 'Reply with just "ok".' }]
       )
       if (response) {
         setConnectionStatus('success')
-        addToast('Connexion reussie !', 'success')
+        addToast(t.settings.connectionOk + ' !', 'success')
       } else {
         setConnectionStatus('error')
-        addToast('Pas de reponse du modele', 'error')
+        addToast(t.settings.connectionFail, 'error')
       }
     } catch (err) {
       setConnectionStatus('error')
       addToast(
-        `Echec de connexion: ${err instanceof Error ? err.message : 'Erreur inconnue'}`,
+        `${t.settings.connectionFail}: ${err instanceof Error ? err.message : ''}`,
         'error'
       )
     }
@@ -148,7 +149,7 @@ export function SettingsDialog(): React.JSX.Element {
         setBasePath(selected)
       }
     } catch {
-      addToast('Erreur lors de la selection du dossier', 'error')
+      addToast(t.settings.folderError, 'error')
     }
   }
 
@@ -167,6 +168,10 @@ export function SettingsDialog(): React.JSX.Element {
     setConnectionStatus('idle')
   }
 
+  function handleSelectLanguage(lang: AppLanguage): void {
+    setLanguage(lang)
+  }
+
   async function handleReset(): Promise<void> {
     if (!resetConfirm) {
       setResetConfirm(true)
@@ -175,15 +180,14 @@ export function SettingsDialog(): React.JSX.Element {
     setIsResetting(true)
     try {
       await window.cortx.app.resetBase()
-      // Immediately clear in-memory state, then reload from the now-empty DB
       clearActions()
       clearGraph()
       await Promise.all([loadFiles(), loadGraph()])
-      addToast('Base de connaissances reinitialise', 'success')
+      addToast('Base de connaissances réinitialisée', 'success')
       setResetConfirm(false)
       toggleSettings()
     } catch (err) {
-      addToast(`Erreur lors de la reinitialisation: ${err instanceof Error ? err.message : 'Erreur inconnue'}`, 'error')
+      addToast(`Erreur: ${err instanceof Error ? err.message : ''}`, 'error')
     }
     setIsResetting(false)
   }
@@ -201,7 +205,7 @@ export function SettingsDialog(): React.JSX.Element {
         <div className="flex items-center justify-between px-6 py-4 border-b border-cortx-border sticky top-0 bg-cortx-surface z-10">
           <div className="flex items-center gap-2">
             <Server size={18} className="text-cortx-accent" />
-            <h2 className="text-base font-semibold text-cortx-text-primary">Configuration</h2>
+            <h2 className="text-base font-semibold text-cortx-text-primary">{t.settings.title}</h2>
           </div>
           <button
             onClick={toggleSettings}
@@ -212,13 +216,38 @@ export function SettingsDialog(): React.JSX.Element {
         </div>
 
         <div className="px-6 py-5 space-y-6">
+          {/* Language */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-cortx-text-secondary uppercase tracking-wider flex items-center gap-1.5">
+              <Globe size={12} />
+              {t.settings.language}
+            </label>
+            <div className="flex gap-2">
+              {([['fr', t.settings.langFr], ['en', t.settings.langEn]] as [AppLanguage, string][]).map(([lang, label]) => (
+                <button
+                  key={lang}
+                  onClick={() => handleSelectLanguage(lang)}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-card border text-sm transition-all cursor-pointer ${
+                    language === lang
+                      ? 'border-cortx-accent bg-cortx-accent/10 text-cortx-accent'
+                      : 'border-cortx-border text-cortx-text-secondary hover:border-cortx-elevated hover:text-cortx-text-primary'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-cortx-border" />
+
           {/* Theme toggle */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-cortx-text-secondary uppercase tracking-wider">
-              Apparence
+              {t.settings.appearance}
             </label>
             <div className="flex gap-2">
-              {([['dark', 'Sombre', Moon], ['light', 'Clair', Sun]] as const).map(([val, label, Icon]) => (
+              {([['dark', t.settings.dark, Moon], ['light', t.settings.light, Sun]] as const).map(([val, label, Icon]) => (
                 <button
                   key={val}
                   onClick={() => setTheme(val)}
@@ -240,27 +269,27 @@ export function SettingsDialog(): React.JSX.Element {
           {/* Base Path */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-cortx-text-secondary uppercase tracking-wider">
-              Emplacement de la base de connaissances
+              {t.settings.knowledgeBasePath}
             </label>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={basePath}
                 onChange={(e) => setBasePath(e.target.value)}
-                placeholder="C:\Users\...\CortX-Base"
+                placeholder={t.settings.pathPlaceholder}
                 className="flex-1 bg-cortx-bg border border-cortx-border rounded-input px-3 py-2 text-sm text-cortx-text-primary placeholder:text-cortx-text-secondary/40 focus:outline-none focus:border-cortx-accent transition-colors font-mono"
               />
               <button
                 onClick={handleBrowseBasePath}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-card text-sm bg-cortx-elevated text-cortx-text-primary hover:bg-cortx-border transition-colors cursor-pointer"
-                title="Parcourir..."
+                title={t.settings.browse}
               >
                 <FolderOpen size={14} />
-                Parcourir
+                {t.settings.browse}
               </button>
             </div>
             <p className="text-2xs text-cortx-text-secondary/50">
-              Dossier ou seront stockes les fichiers Markdown, la base SQLite et le depot Git
+              {t.settings.pathDescription}
             </p>
           </div>
 
@@ -270,7 +299,7 @@ export function SettingsDialog(): React.JSX.Element {
           {/* Provider Selection */}
           <div className="space-y-2">
             <label className="text-xs font-medium text-cortx-text-secondary uppercase tracking-wider">
-              Fournisseur LLM
+              {t.settings.llmProvider}
             </label>
             <div className="space-y-2">
               {PROVIDER_PRESETS.map((preset) => (
@@ -290,7 +319,7 @@ export function SettingsDialog(): React.JSX.Element {
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-cortx-text-primary">{preset.label}</span>
                       {provider === preset.id && (
-                        <span className="text-2xs px-1.5 py-0.5 rounded bg-cortx-accent/10 text-cortx-accent">actif</span>
+                        <span className="text-2xs px-1.5 py-0.5 rounded bg-cortx-accent/10 text-cortx-accent">{t.settings.active}</span>
                       )}
                     </div>
                     <p className="text-xs text-cortx-text-secondary mt-0.5">{preset.description}</p>
@@ -304,7 +333,7 @@ export function SettingsDialog(): React.JSX.Element {
           {provider === 'anthropic' && (
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-cortx-text-secondary uppercase tracking-wider">
-                Cle API Anthropic
+                {t.settings.anthropicApiKey}
               </label>
               <input
                 type="password"
@@ -321,7 +350,7 @@ export function SettingsDialog(): React.JSX.Element {
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-cortx-text-secondary uppercase tracking-wider">
-                  URL du serveur
+                  {t.settings.serverUrl}
                 </label>
                 <input
                   type="text"
@@ -334,7 +363,7 @@ export function SettingsDialog(): React.JSX.Element {
 
               {/* Quick presets */}
               <div className="space-y-1.5">
-                <span className="text-2xs text-cortx-text-secondary">Presets rapides :</span>
+                <span className="text-2xs text-cortx-text-secondary">{t.settings.quickPresets}</span>
                 <div className="flex flex-wrap gap-1.5">
                   {LOCAL_MODEL_EXAMPLES.map((example) => (
                     <button
@@ -355,13 +384,13 @@ export function SettingsDialog(): React.JSX.Element {
               {/* Optional API Key for remote OpenAI-compat */}
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-cortx-text-secondary uppercase tracking-wider">
-                  Cle API <span className="text-cortx-text-secondary/50 normal-case">(optionnel, pour serveurs distants)</span>
+                  {t.settings.apiKeyOptional} <span className="text-cortx-text-secondary/50 normal-case">(optional, for remote servers)</span>
                 </label>
                 <input
                   type="password"
                   value={apiKey}
                   onChange={(e) => { setApiKey(e.target.value); setConnectionStatus('idle') }}
-                  placeholder="Laisser vide pour les serveurs locaux"
+                  placeholder={t.settings.apiKeyLocalPlaceholder}
                   className="w-full bg-cortx-bg border border-cortx-border rounded-input px-3 py-2 text-sm text-cortx-text-primary placeholder:text-cortx-text-secondary/40 focus:outline-none focus:border-cortx-accent transition-colors font-mono"
                 />
               </div>
@@ -371,7 +400,7 @@ export function SettingsDialog(): React.JSX.Element {
           {/* Model */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-cortx-text-secondary uppercase tracking-wider">
-              Modele
+              {t.settings.model}
             </label>
             <input
               type="text"
@@ -382,12 +411,12 @@ export function SettingsDialog(): React.JSX.Element {
             />
             {provider === 'anthropic' && (
               <p className="text-2xs text-cortx-text-secondary/50">
-                claude-sonnet-4-20250514, claude-opus-4-20250514, claude-haiku-4-5-20251001
+                {t.settings.anthropicModelsHint}
               </p>
             )}
             {provider === 'openai-compatible' && (
               <p className="text-2xs text-cortx-text-secondary/50">
-                Nom du modele charge sur le serveur (ex: mistral, llama3, gemma3, qwen3)
+                {t.settings.localModelHint}
               </p>
             )}
           </div>
@@ -396,19 +425,19 @@ export function SettingsDialog(): React.JSX.Element {
           <div className="space-y-3 pt-1">
             <div className="border-t border-cortx-border" />
             <label className="text-xs font-medium text-cortx-error uppercase tracking-wider">
-              Zone dangereuse
+              {t.settings.dangerZone}
             </label>
             <div className="rounded-card border border-cortx-error/30 bg-cortx-error/5 p-4 space-y-3">
               <div>
-                <p className="text-sm font-medium text-cortx-text-primary">Reinitialiser la base de connaissances</p>
+                <p className="text-sm font-medium text-cortx-text-primary">{t.settings.resetTitle}</p>
                 <p className="text-xs text-cortx-text-secondary mt-0.5">
-                  Supprime tous les fichiers Markdown, l'index SQLite et l'historique Git. Cette action est irreversible.
+                  {t.settings.resetDesc}
                 </p>
               </div>
               {resetConfirm ? (
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-cortx-error">
-                    Etes-vous certain ? Toutes les donnees seront perdues.
+                    {t.settings.resetAreYouSure}
                   </p>
                   <div className="flex gap-2">
                     <button
@@ -421,14 +450,14 @@ export function SettingsDialog(): React.JSX.Element {
                       ) : (
                         <Trash2 size={12} />
                       )}
-                      {isResetting ? 'Reinitialisation...' : 'Confirmer la suppression'}
+                      {isResetting ? t.settings.resetting : t.settings.confirmDelete}
                     </button>
                     <button
                       onClick={() => setResetConfirm(false)}
                       disabled={isResetting}
                       className="px-3 py-1.5 rounded-card text-xs text-cortx-text-secondary hover:text-cortx-text-primary hover:bg-cortx-elevated transition-colors cursor-pointer"
                     >
-                      Annuler
+                      {t.settings.cancel}
                     </button>
                   </div>
                 </div>
@@ -438,7 +467,7 @@ export function SettingsDialog(): React.JSX.Element {
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-card text-xs font-medium border border-cortx-error/50 text-cortx-error hover:bg-cortx-error/10 transition-colors cursor-pointer"
                 >
                   <Trash2 size={12} />
-                  Reinitialiser
+                  {t.settings.resetTitle}
                 </button>
               )}
             </div>
@@ -454,23 +483,23 @@ export function SettingsDialog(): React.JSX.Element {
               {isTestingConnection ? (
                 <>
                   <span className="w-3 h-3 border-2 border-cortx-text-secondary/30 border-t-cortx-accent rounded-full animate-spin" />
-                  Test en cours...
+                  {t.settings.testing}
                 </>
               ) : (
-                'Tester la connexion'
+                t.settings.testConnection
               )}
             </button>
 
             {connectionStatus === 'success' && (
               <div className="flex items-center gap-1.5 text-cortx-success text-xs">
                 <Check size={14} />
-                Connexion OK
+                {t.settings.connectionOk}
               </div>
             )}
             {connectionStatus === 'error' && (
               <div className="flex items-center gap-1.5 text-cortx-error text-xs">
                 <AlertCircle size={14} />
-                Echec
+                {t.settings.connectionFail}
               </div>
             )}
           </div>
@@ -482,14 +511,14 @@ export function SettingsDialog(): React.JSX.Element {
             onClick={toggleSettings}
             className="px-4 py-2 rounded-card text-sm text-cortx-text-secondary hover:text-cortx-text-primary hover:bg-cortx-elevated transition-colors cursor-pointer"
           >
-            Annuler
+            {t.settings.cancel}
           </button>
           <button
             onClick={handleSave}
             disabled={isSaving}
             className="px-4 py-2 rounded-card text-sm font-medium bg-cortx-accent text-white hover:bg-cortx-accent-light disabled:opacity-50 transition-colors cursor-pointer"
           >
-            {isSaving ? 'Sauvegarde...' : 'Sauvegarder'}
+            {isSaving ? t.settings.saving : t.settings.save}
           </button>
         </div>
       </div>

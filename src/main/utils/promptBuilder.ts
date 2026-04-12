@@ -2,18 +2,24 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { DatabaseService } from '../services/DatabaseService'
 import { FileService } from '../services/FileService'
-import type { LibraryChunkResult } from '../../shared/types'
+import type { LibraryChunkResult, AppLanguage } from '../../shared/types'
 
 // Extract the raw prompt template from the CortX_Agent_Prompt_V1.md file
 // The prompt is between the first ``` and the last ``` in the "Prompt complet" section
-function loadPromptTemplate(basePath: string): string {
-  // Look for prompt file in various locations
-  const locations = [
+function loadPromptTemplate(basePath: string, language: AppLanguage = 'fr'): string {
+  // Prefer language-specific prompt file, then fall back to French
+  const locationsEn = [
+    path.join(basePath, '..', 'prompts', 'agent_v1_en.txt'),
+    path.join(__dirname, '..', '..', '..', 'prompts', 'agent_v1_en.txt'),
+  ]
+  const locationsFr = [
     path.join(basePath, '..', 'prompts', 'agent_v1.txt'),
     path.join(basePath, '..', 'CortX_Agent_Prompt_V1.md'),
     path.join(__dirname, '..', '..', '..', 'prompts', 'agent_v1.txt'),
     path.join(__dirname, '..', '..', '..', 'CortX_Agent_Prompt_V1.md')
   ]
+
+  const locations = language === 'en' ? [...locationsEn, ...locationsFr] : locationsFr
 
   for (const loc of locations) {
     if (fs.existsSync(loc)) {
@@ -30,7 +36,7 @@ function loadPromptTemplate(basePath: string): string {
   }
 
   // Fallback: embedded minimal prompt
-  return getMinimalPrompt()
+  return language === 'en' ? getMinimalPromptEn() : getMinimalPrompt()
 }
 
 function getMinimalPrompt(): string {
@@ -100,16 +106,91 @@ La date du jour est : {{today}}
 L'heure actuelle est : {{now}}`
 }
 
+function getMinimalPromptEn(): string {
+  return `You are the CortX agent, a personal knowledge management system.
+
+Your role: the user speaks to you in natural language. You analyze what they say, decide which Markdown files to create or modify in their knowledge base, and return a structured JSON action plan.
+
+CURRENT STATE OF THE BASE
+==========================
+File tree:
+{{tree}}
+
+File count: {{file_count}}
+Last modified: {{last_modified}}
+
+Known entities:
+{{entities_summary}}
+
+Most used tags: {{top_tags}}
+
+RELEVANT FILES FOR THIS INPUT
+==============================
+{{context_files}}
+
+RULES:
+1. Detect the input type: capture / question / command / reflection
+2. For "capture": extract entities, modify/create files
+3. For "question": do NOT modify anything, reply with sources
+4. For "reflection": propose actions without executing them
+5. NEVER create duplicates
+6. Add wikilinks [[Name]] between entities
+7. Report contradictions without resolving them
+8. Reply ONLY in valid JSON
+
+MANDATORY ROUTING:
+- PERSON → "Reseau/Firstname_Lastname.md" with type: personne
+- COMPANY → "Entreprises/Name.md" with type: entreprise
+- DOMAIN → "Domaines/Name.md" with type: domaine
+- PROJECT → "Projets/Name.md" with type: projet
+- JOURNAL → "Journal/YYYY-MM-DD.md" with type: journal
+- Folder names WITHOUT accents. FORBIDDEN to write in "Fiches/" (reserved for /brief).
+
+CRITICAL RULES FOR QUESTIONS:
+- You ALREADY have all necessary context in the "RELEVANT FILES FOR THIS INPUT" section above. You have NO tool to search further.
+- FORBIDDEN: "I will look", "Let me check", "One moment". You give the complete answer IMMEDIATELY in the "response" field.
+- If the info is in the context, answer with details. If not, say so clearly ("I don't have this info in your base") and cite what you know nearby.
+- The "response" field must contain the FINAL and COMPLETE answer, not a promise of an answer.
+
+CRITICAL RULES FOR MODIFICATIONS (VERY IMPORTANT):
+- If a file appears in "RELEVANT FILES FOR THIS INPUT" above, it ALREADY EXISTS. You MUST use "action": "modify", NEVER "create".
+- For "modify", NEVER send the full file content in "content". Send ONLY the delta to add (the new line, new paragraph).
+- ALWAYS specify "section" (the markdown heading where you add, e.g. "Interaction history") and "operation" ("append", "prepend", "replace_line", or "add_item").
+- To replace a specific line, use "operation": "replace_line" with "old_content" containing the exact line to replace.
+- To add a wikilink in the frontmatter related field: "section": "frontmatter.related", "operation": "add_item", "content": "\\"[[Name]]\\"".
+- NEVER copy existing file content in "content" — only the new info.
+
+RESPONSE FORMAT:
+For capture/command: { "input_type": "capture", "actions": [...], "summary": "...", "conflicts": [], "ambiguities": [], "suggestions": [] }
+For question: { "input_type": "question", "actions": [], "response": "...", "sources": [...], "suggestions": [] }
+For reflection: { "input_type": "reflexion", "actions": [], "response": "...", "proposed_actions": [...], "suggestions": [] }
+
+Possible actions:
+- "create" → only for files THAT DO NOT EXIST. content = full content.
+- "modify" → for all existing files. content = delta only. section + operation REQUIRED.
+
+Today's date: {{today}}
+Current time: {{now}}`
+}
+
 /** Format library chunks for prompt injection. */
-function formatLibraryContext(chunks: LibraryChunkResult[]): string {
+function formatLibraryContext(chunks: LibraryChunkResult[], language: AppLanguage = 'fr'): string {
   if (chunks.length === 0) return ''
-  const lines: string[] = [
-    '',
-    '## Documents de référence (bibliothèque)',
-    'IMPORTANT : Ces extraits font partie du contexte disponible, au même titre que les fichiers Markdown ci-dessus.',
-    'Pour toute question portant sur un document listé ici, tu DOIS répondre en te basant sur son contenu.',
-    'Cite les sources avec [doc:<id>] quand tu utilises ces informations.'
-  ]
+  const lines: string[] = language === 'en'
+    ? [
+        '',
+        '## Reference documents (library)',
+        'IMPORTANT: These excerpts are part of the available context, just like the Markdown files above.',
+        'For any question about a document listed here, you MUST answer based on its content.',
+        'Cite sources with [doc:<id>] when you use this information.'
+      ]
+    : [
+        '',
+        '## Documents de référence (bibliothèque)',
+        'IMPORTANT : Ces extraits font partie du contexte disponible, au même titre que les fichiers Markdown ci-dessus.',
+        'Pour toute question portant sur un document listé ici, tu DOIS répondre en te basant sur son contenu.',
+        'Cite les sources avec [doc:<id>] quand tu utilises ces informations.'
+      ]
   for (const chunk of chunks) {
     const title = chunk.documentTitle || chunk.documentPath
     const loc = chunk.heading ? ` — § ${chunk.heading}` : ''
@@ -128,13 +209,15 @@ export function buildSystemPrompt(
   fileService: FileService,
   contextFiles: string,
   basePath: string,
-  libraryChunks: LibraryChunkResult[] = []
+  libraryChunks: LibraryChunkResult[] = [],
+  language: AppLanguage = 'fr'
 ): string {
-  const template = loadPromptTemplate(basePath)
+  const template = loadPromptTemplate(basePath, language)
 
   const now = new Date()
   const today = now.toISOString().split('T')[0]
-  const time = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  const locale = language === 'en' ? 'en-US' : 'fr-FR'
+  const time = now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
 
   const variables: Record<string, string> = {
     '{{tree}}': fileService.getTree(),
@@ -153,13 +236,85 @@ export function buildSystemPrompt(
   }
 
   // Inject library context if any documents matched
-  const libSection = formatLibraryContext(libraryChunks)
+  const libSection = formatLibraryContext(libraryChunks, language)
   if (libSection) {
     prompt += libSection
   }
 
   // Append a final critical reminder. Repeated instructions at the end of the
   // prompt are far better respected by LLMs than instructions buried in the middle.
+  if (language === 'en') {
+    prompt += `
+
+==================================================
+FINAL CRITICAL REMINDER — READ BEFORE RESPONDING
+==================================================
+
+FILE ROUTING (GOLDEN RULE — ANY ERROR IS UNACCEPTABLE):
+A. A PERSON always goes in "Reseau/Firstname_Lastname.md" with "type: personne".
+   NEVER in Fiches/, NEVER in Journal/, NEVER at root.
+B. A COMPANY / ORGANIZATION always goes in "Entreprises/Name.md" with "type: entreprise".
+C. A DOMAIN / SUBJECT always goes in "Domaines/Name.md" with "type: domaine".
+D. A PROJECT always goes in "Projets/Name.md" with "type: projet".
+E. A JOURNAL ENTRY always goes in "Journal/${today}.md" with "type: journal".
+F. Folder names are WITHOUT ACCENTS: "Reseau" (not "Réseau"), "Domaines" (not "Domaînes"). Exact, case-sensitive.
+G. File names are ASCII: "Aeronautique.md" (not "Aéronautique.md"), "Reseau_Aero.md". Underscores for spaces, no special characters.
+H. FORBIDDEN: writing in "Fiches/". This folder is reserved for briefings generated by /brief, /synthese, /digest.
+I. FORBIDDEN: using "type: fiche" in action frontmatter. Valid types are ONLY: personne, entreprise, domaine, projet, journal, note.
+
+REQUIRED FRONTMATTER for each "create":
+---
+type: personne|entreprise|domaine|projet|journal|note
+tags: []
+created: ${today}
+modified: ${today}
+related: []
+status: actif
+---
+
+MODIFYING EXISTING FILES:
+1. If a file appears in "RELEVANT FILES FOR THIS INPUT" above, it ALREADY EXISTS. You MUST use "action": "modify", NOT "create".
+2. For "modify", "content" contains ONLY the new information to add (1 line, 1 paragraph, 1 bullet). NEVER copy existing content.
+3. ALWAYS specify "section" (markdown section name) and "operation" ("append" by default).
+4. Correct example to add info:
+   { "action": "modify", "file": "Reseau/Sophie_Martin.md", "section": "Interaction history", "operation": "append", "content": "- **${today}** — New info here." }
+5. Any violation of these rules WILL OVERWRITE user data. This is unacceptable.
+
+FOR QUESTIONS:
+6. The context above already contains relevant files (section "RELEVANT FILES") AND library excerpts (section "Reference documents"). You have NO tool to search further.
+7. If the question concerns a library document (PDF, XLSX, DOCX, etc.), answer based on the excerpts provided in "Reference documents".
+8. Respond IMMEDIATELY and COMPLETELY in "response". No "I will look", no "one moment", no promises — the final answer, now.
+9. If the info is not in the context, say so clearly, do not stub.
+
+ASKING FOR CLARIFICATION:
+9. If you hesitate between several interpretations OR several possible targets (e.g. "Sophie" could refer to several known people), DO NOT ACT. Instead, return a "clarification" field with a question and clear options.
+10. STRICT format for the clarification field:
+    "clarification": {
+      "question": "I see two Sophies in your base, which one do you mean?",
+      "options": ["Sophie Martin (Acme)", "Sophie Dubois (BetaCorp)", "This is a new person"]
+    }
+11. When emitting a clarification: "actions" must be EMPTY ([]). We wait for the user's answer before acting.
+12. Give 2 to 5 short options, each must be a complete and self-contained answer.
+13. Do NOT use clarification for rhetorical questions or to propose actions — use "suggestions" for that. Clarification = true blocking ambiguity.
+14. When the user responds, their message will start with "[ANSWER TO YOUR QUESTION «…»]" — use this context to finish the work without asking again.
+
+SUGGESTIONS — STRICT RULES:
+15. A suggestion = ONE single concrete, atomic and unambiguous action. Valid examples: "Create a card for Jean Dupont", "Add project Apollo to domain Aeronautics", "Link [[Sophie Martin]] to [[Acme]]".
+16. FORBIDDEN to propose multiple choices in a suggestion ("X or Y", "either A or B"). If you hesitate, use "clarification" instead.
+17. Each suggestion must be directly executable without further clarification.
+18. FORBIDDEN vague suggestions ("you could enrich this card", "think about documenting X"). Be specific: WHAT to add, WHERE, how.
+19. When the user accepts a suggestion, their message will start with "[EXPLICIT USER ORDER]" — you MUST return concrete actions, never a new suggestion or question.
+
+CHECKLIST BEFORE EMITTING YOUR JSON RESPONSE:
+[ ] All file paths start with Reseau/, Entreprises/, Domaines/, Projets/, or Journal/ (never Fiches/, never at root).
+[ ] All folder names are WITHOUT accents.
+[ ] Each "create" has complete frontmatter with "type" consistent with the folder.
+[ ] For each entity mentioned that exists in context, I use "modify" not "create".
+[ ] My JSON is valid, no text before or after, no markdown block around it.
+`
+    return prompt
+  }
+
   prompt += `
 
 ==================================================

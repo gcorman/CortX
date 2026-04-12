@@ -1,5 +1,6 @@
 import { FileText, Sheet, Presentation, File, Trash2, ExternalLink, Loader2 } from 'lucide-react'
 import type { LibraryDocument } from '../../../shared/types'
+import { useT } from '../../i18n'
 
 interface Props {
   doc: LibraryDocument
@@ -21,25 +22,27 @@ function MimeIcon({ mime }: { mime: string | null }) {
 }
 
 function StatusBadge({ status, errorMessage }: { status: LibraryDocument['status']; errorMessage?: string }) {
+  const t = useT()
   if (status === 'indexed') return null
   if (status === 'error')
     return (
       <span
         className="text-[10px] text-red-400 px-1.5 py-0.5 bg-red-400/10 rounded"
-        title={errorMessage ?? 'Erreur inconnue'}
+        title={errorMessage ?? t.libraryItem.error}
       >
-        erreur
+        {t.libraryItem.error}
       </span>
     )
   return (
     <span className="flex items-center gap-1 text-[10px] text-cortx-text-secondary">
       <Loader2 size={10} className="animate-spin" />
-      {status === 'extracting' ? 'extraction…' : status === 'embedding' ? 'embeddings…' : 'en attente…'}
+      {status === 'extracting' ? t.libraryItem.extracting : status === 'embedding' ? t.libraryItem.embedding : t.libraryItem.pending}
     </span>
   )
 }
 
 export function LibraryDocumentItem({ doc, isSelected, onSelect, onDelete, onOpenOriginal }: Props): React.JSX.Element {
+  const t = useT()
   return (
     <div
       onClick={onSelect}
@@ -72,14 +75,14 @@ export function LibraryDocumentItem({ doc, isSelected, onSelect, onDelete, onOpe
         <button
           onClick={(e) => { e.stopPropagation(); onOpenOriginal() }}
           className="p-1 rounded hover:bg-cortx-border text-cortx-text-secondary hover:text-cortx-text-primary"
-          title="Ouvrir l'original"
+          title={t.libraryItem.openOriginal}
         >
           <ExternalLink size={12} />
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete() }}
           className="p-1 rounded hover:bg-red-500/10 text-cortx-text-secondary hover:text-red-400"
-          title="Supprimer"
+          title={t.libraryItem.delete}
         >
           <Trash2 size={12} />
         </button>
