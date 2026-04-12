@@ -39,9 +39,9 @@ In the background, the agent explores the base and generates insights: hidden co
 
 ### Bilingual Interface
 Full interface available in French and English.
+
 ---
 ## Demo
-<!-- TODO: Add screenshots or a demo GIF -->
 
 User:
   Lunch with Sophie Martin. She’s leaving Thales to join
@@ -57,11 +57,15 @@ Agent:
   ~ Domains/Aerospace.md
     ➕ News: 6-month delay on the SCAF program
   [✓ Approve] [↩ Cancel]
+
 ```
 With a single raw text input, the agent identifies 1 person, 2 companies, and 1 program, modifies 3 files, creates 1 new file, and maintains all cross-links.
 ---
+
 ## Installation
+
 ### Prerequisites
+
 - **Node.js** 20+
 - **Git**
 - A LLM of your choice:
