@@ -43,12 +43,12 @@ Full interface available in French and English.
 ---
 ## Demo
 
-User:
+**User:** 
   Lunch with Sophie Martin. She’s leaving Thales to join
   Dassault Aviation as Technical Director. She told me about
   the SCAF program — apparently the timeline has slipped by 6 months.
 
-Agent:
+**Agent:**
   ~ Network/Sophie_Martin.md
     ✏️ Position updated: Thales → Dassault Aviation
     ➕ Interaction added: lunch on 06/04/2026
@@ -232,11 +232,9 @@ npm run rebuild  # Recompile better-sqlite3
 ```
 
 No test runner configured yet.
----
-## License
-ISC
----
-*CortX — From vibe coding to vibe learning.*
-```
 
-**Ready to use!** Just copy and paste this into your `README.md` file.
+
+## License
+- ISC
+
+*CortX — From vibe coding to vibe learning.*
