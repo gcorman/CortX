@@ -94,7 +94,7 @@ export function CenterPanel(): React.JSX.Element {
 
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        {activeCenterView === 'graph' && <GraphView />}
+        {activeCenterView === 'graph' && <GraphView searchQuery={searchQuery} />}
         {activeCenterView === 'tags' && <TagBrowser />}
         {activeCenterView === 'library' && <LibraryPanel />}
       </div>

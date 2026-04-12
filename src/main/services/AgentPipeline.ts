@@ -773,14 +773,40 @@ export class AgentPipeline {
   }
 
   private async retrieveContext(input: string): Promise<string> {
-    const results = this.dbService.search(input)
+    // ── 1. Lexical FTS5 OR search ────────────────────────────────────────────
+    const lexicalResults = this.dbService.search(input)
+    const orderedPaths: string[] = []
+    const seenPaths = new Set<string>()
+    for (const r of lexicalResults.slice(0, 8)) {
+      if (r.path && !seenPaths.has(r.path)) {
+        orderedPaths.push(r.path)
+        seenPaths.add(r.path)
+      }
+    }
+
+    // ── 2. Semantic KB search (best-effort — sidecar may not be running) ─────
+    try {
+      const queryVector = await libraryService.embedQuery(input)
+      if (queryVector && queryVector.length > 0) {
+        const semanticPaths = this.dbService.semanticSearchKb(queryVector, 8)
+        for (const p of semanticPaths) {
+          if (!seenPaths.has(p) && orderedPaths.length < 12) {
+            orderedPaths.push(p)
+            seenPaths.add(p)
+          }
+        }
+      }
+    } catch {
+      // Sidecar not ready or embeddings not yet generated — lexical only
+    }
+
+    // ── 3. Read and assemble context ─────────────────────────────────────────
     const contextParts: string[] = []
-    for (const result of results.slice(0, 8)) {
-      if (!result.path) continue
+    for (const filePath of orderedPaths) {
       try {
-        const content = await this.fileService.readFile(result.path)
-        if (content) contextParts.push(`--- ${result.path} ---\n${content.raw}`)
-      } catch { /* skip */ }
+        const content = await this.fileService.readFile(filePath)
+        if (content) contextParts.push(`--- ${filePath} ---\n${content.raw}`)
+      } catch { /* skip missing/unreadable files */ }
     }
     return contextParts.join('\n\n') || 'Aucun fichier pertinent trouve.'
   }

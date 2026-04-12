@@ -162,6 +162,28 @@ function buildCyStyle(): cytoscape.StylesheetStyle[] {
       } as unknown as cytoscape.Css.Edge
     },
 
+    // --- Search match ---
+    {
+      selector: 'node.search-match',
+      style: {
+        opacity: 1,
+        width: 24,
+        height: 24,
+        'border-color': '#F59E0B',
+        'border-opacity': 1,
+        'border-width': 2.5,
+        'background-opacity': 1
+      } as unknown as cytoscape.Css.Node
+    },
+    {
+      selector: 'node.search-dim',
+      style: { opacity: 0.1 } as cytoscape.Css.Node
+    },
+    {
+      selector: 'edge.search-dim',
+      style: { opacity: 0.04 } as cytoscape.Css.Edge
+    },
+
     // ── Idle mode classes (slow transitions for a "meditative" feel) ──────────
 
     // Nodes being examined by the agent (teal glow)
@@ -471,7 +493,7 @@ function makeSettleLayout(): cytoscape.LayoutOptions {
   } as unknown as cytoscape.LayoutOptions
 }
 
-export function GraphView(): React.JSX.Element {
+export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const cyRef = useRef<cytoscape.Core | null>(null)
   const layoutRanOnce = useRef(false)
@@ -514,6 +536,8 @@ export function GraphView(): React.JSX.Element {
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null)
   const animFrameRef = useRef<number | null>(null)
   const animStartRef = useRef<number>(0)
+  const searchQueryRef = useRef(searchQuery)
+  useEffect(() => { searchQueryRef.current = searchQuery }, [searchQuery])
   // Refs so rAF callback always reads latest values without stale closures
   const idlePhaseRef = useRef(idlePhase)
   const idleNodeIdsRef = useRef(idleNodeIds)
@@ -757,6 +781,19 @@ export function GraphView(): React.JSX.Element {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  function applySearchClasses(cy: cytoscape.Core, q: string): void {
+    cy.elements().removeClass('search-match search-dim')
+    const query = q.trim().toLowerCase()
+    if (!query) return
+    const matchingNodes = cy.nodes().filter((n) =>
+      (n.data('label') as string).toLowerCase().includes(query)
+    )
+    if (matchingNodes.length === 0) return
+    cy.nodes().addClass('search-dim')
+    cy.edges().addClass('search-dim')
+    matchingNodes.removeClass('search-dim').addClass('search-match')
+  }
+
   // Extracted so it can be called both from the data effect and from the ResizeObserver
   function applyData(
     cy: cytoscape.Core,
@@ -824,6 +861,7 @@ export function GraphView(): React.JSX.Element {
     )
     layout.run()
     layoutRanOnce.current = true
+    applySearchClasses(cy, searchQueryRef.current)
   }
 
   // Sync elements + relayout when data / filters change
@@ -888,6 +926,13 @@ export function GraphView(): React.JSX.Element {
       })
     }
   }, [idlePhase, idleNodeIds, idleEdgeKeys])
+
+  // Apply search highlight when query changes
+  useEffect(() => {
+    const cy = cyRef.current
+    if (!cy) return
+    applySearchClasses(cy, searchQuery)
+  }, [searchQuery]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Resize overlay canvas to match container
   useEffect(() => {
