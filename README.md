@@ -1,96 +1,70 @@
+```markdown
 # CortX
-
 <img width="300" height="400" alt="CortX_logo" src="https://github.com/user-attachments/assets/111a3923-a2d0-47ea-8e2f-50ff7c3aaa50" />
+### From vibe coding to vibe learning.
+> A second brain powered by AI. You speak, the AI organizes. You search, the AI connects. You forget, the AI remembers.
 
-### Du vibe coding au vibe learning.
+CortX is a desktop application that applies the **Claude Code** paradigm to personal knowledge management. The user speaks in natural language — something learned, a person met, an idea — and an AI agent structures everything into Markdown files on their machine. No folders to create, no tags to invent. The agent decides where to store things, creates links between notes, and suggests unexpected connections.
 
-> Un second cerveau piloté par IA. Tu parles, l'IA range. Tu cherches, l'IA connecte. Tu oublies, l'IA se souvient.
-
-CortX est une application desktop qui applique le paradigme de Claude Code à la gestion de connaissances personnelles. L'utilisateur parle en langage naturel — une info apprise, un contact rencontré, une idée — et un agent IA structure tout dans des fichiers Markdown sur sa machine. Pas de dossiers à créer, pas de tags à inventer. L'agent décide où ranger, crée les liens entre les notes, et suggère des connexions inattendues.
-
-Tout tourne **en local** avec un modèle open source (Ollama, llama.cpp, LM Studio), ou via une **API** (Claude, OpenAI) pour plus de puissance. Les données restent chez l'utilisateur.
-
+Everything runs **locally** with an open-source model (Ollama, llama.cpp, LM Studio), or via an **API** (Claude, OpenAI) for more power. Your data stays on your machine.
 ---
+## Features
+### AI Structuring Agent
+The agent doesn’t just answer — it **writes and modifies** the files in your knowledge base:
+- **Fluid capture** — type raw text, the agent identifies entities (people, companies, concepts), creates or updates the corresponding Markdown files, and adds cross-links
+- **Questions on the base** — ask your knowledge base without modifying it; the agent cites sources
+- **Reflection** — think out loud, the agent suggests actions without executing them
+- **Commands** — `/ask`, `/brief [topic]`, `/synthese`, `/digest`
 
-## Fonctionnalités
+Every action proposed by the agent is previewable (diff before/after) and requires your explicit approval. Nothing is written without your consent.
 
-### Agent IA structurant
+### Interactive Knowledge Graph
+Real-time visualization of relationships between all entities in the base. Nodes are colored by type (person, company, domain, project), with filtering, search, and exploration via double-click.
 
-L'agent ne se contente pas de répondre — il **écrit et modifie les fichiers** de la base de connaissances :
+### Hybrid Search (RAG)
+Search combining full-text indexing (FTS5) and semantic search via embeddings. The agent retrieves relevant files before every response.
 
-- **Capture au fil de l'eau** — tapez du texte brut, l'agent identifie les entités (personnes, entreprises, concepts), crée ou met à jour les fichiers Markdown correspondants, ajoute les liens croisés
-- **Questions sur la base** — interrogez votre base sans la modifier, l'agent cite les sources
-- **Réflexion** — pensez à voix haute, l'agent propose des actions sans les exécuter
-- **Commandes** — `/ask`, `/brief [sujet]`, `/synthese`, `/digest`
+### Document Library
+Import and indexing of PDF, DOCX, PPTX, and XLSX files. Documents are chunked, vectorized, and integrated into the agent’s context.
 
-Chaque action proposée par l'agent est prévisualisable (diff avant/après) et soumise à validation. Rien ne s'écrit sans votre accord.
+### Automatic Versioning
+Every accepted action = a Git commit. Full history, one-click undo (`git revert`), and built-in audit log.
 
-### Graphe de connaissances interactif
+### Idle Mode — Passive Insights
+In the background, the agent explores the base and generates insights: hidden connections, contradictions, gaps, and patterns.
 
-Visualisation en temps réel des relations entre toutes les entités de la base. Nœuds colorés par type (personne, entreprise, domaine, projet), filtrage, recherche, exploration par double-clic.
-
-### Recherche hybride (RAG)
-
-Recherche combinant indexation textuelle (FTS5) et recherche sémantique par embeddings. L'agent retrouve les fichiers pertinents avant chaque réponse.
-
-### Bibliothèque de documents
-
-Import et indexation de fichiers PDF, DOCX, PPTX et XLSX. Les documents sont découpés en chunks, vectorisés, et intégrés au contexte de l'agent.
-
-### Versioning automatique
-
-Chaque action acceptée = un commit Git. Historique complet, annulation en un clic (`git revert`), journal d'audit intégré.
-
-### Mode Idle — Insights passifs
-
-En arrière-plan, l'agent explore la base et génère des insights : connexions cachées, contradictions, lacunes, patterns.
-
-### Interface bilingue
-
-Interface complète en français et en anglais.
-
+### Bilingual Interface
+Full interface available in French and English.
 ---
-
-## Démo
-
-<!-- TODO: Ajouter des captures d'écran ou un GIF de démo -->
-
+## Demo
+<!-- TODO: Add screenshots or a demo GIF -->
 ```
-Utilisateur :
-  Déjeuner avec Sophie Martin. Elle quitte Thales pour rejoindre
-  Dassault Aviation comme directrice technique. Elle m'a parlé du
-  programme SCAF, apparemment le calendrier glisse de 6 mois.
+User:
+  Lunch with Sophie Martin. She’s leaving Thales to join
+  Dassault Aviation as Technical Director. She told me about
+  the SCAF program — apparently the timeline has slipped by 6 months.
 
-Agent :
-  ~ Réseau/Sophie_Martin.md
-    ✏️  Poste mis à jour : Thales → Dassault Aviation
-    ➕  Interaction ajoutée : déjeuner du 06/04/2026
-
-  + Entreprises/Dassault_Aviation.md  [NOUVEAU]
-    📄  Créé avec : secteur aéronautique, contact Sophie Martin
-
-  ~ Domaines/Aéronautique.md
-    ➕  Actualité : retard de 6 mois sur le programme SCAF
-
-  [✓ Valider]  [↩ Annuler]
+Agent:
+  ~ Network/Sophie_Martin.md
+    ✏️ Position updated: Thales → Dassault Aviation
+    ➕ Interaction added: lunch on 06/04/2026
+  + Companies/Dassault_Aviation.md [NEW]
+    📄 Created with: aerospace sector, contact Sophie Martin
+  ~ Domains/Aerospace.md
+    ➕ News: 6-month delay on the SCAF program
+  [✓ Approve] [↩ Cancel]
 ```
-
-En un seul input de texte brut, l'agent identifie 1 personne, 2 entreprises et 1 programme, modifie 3 fichiers, crée 1 nouveau fichier, et maintient les liens croisés.
-
+With a single raw text input, the agent identifies 1 person, 2 companies, and 1 program, modifies 3 files, creates 1 new file, and maintains all cross-links.
 ---
-
 ## Installation
-
-### Prérequis
-
+### Prerequisites
 - **Node.js** 20+
 - **Git**
-- Un LLM au choix :
-  - **Local** : [Ollama](https://ollama.com), [LM Studio](https://lmstudio.ai), ou llama.cpp avec un endpoint OpenAI-compatible
-  - **API** : une clé API [Anthropic](https://console.anthropic.com) (Claude) ou OpenAI
+- A LLM of your choice:
+  - **Local**: [Ollama](https://ollama.com), [LM Studio](https://lmstudio.ai), or llama.cpp with an OpenAI-compatible endpoint
+  - **API**: an API key from [Anthropic](https://console.anthropic.com) (Claude) or OpenAI
 
-### Lancer en développement
-
+### Run in development
 ```bash
 git clone https://github.com/gcorman/CortX.git
 cd CortX
@@ -98,187 +72,162 @@ npm install
 npm run dev
 ```
 
-### Builder pour Windows
-
+### Build for Windows
 ```bash
 npm run build     # Compile TypeScript
-npm run dist      # Génère l'installeur NSIS dans dist/
+npm run dist      # Generate NSIS installer in dist/
 ```
 
-> **Note :** Si `better-sqlite3` échoue au chargement, lancer `npm run rebuild` pour recompiler les bindings natifs.
+> **Note:** If `better-sqlite3` fails to load, run `npm run rebuild` to recompile the native bindings.
 
 ### Configuration
-
-Au premier lancement, configurer dans les paramètres :
-
-1. **Chemin de la base** — dossier où seront stockés les fichiers Markdown (défaut : `~/Documents/CortX-Base/`)
-2. **Fournisseur LLM** — Anthropic (clé API requise) ou OpenAI-compatible (Ollama, llama.cpp — pas de clé nécessaire)
-3. **Modèle** — le modèle à utiliser pour l'agent
-
+On first launch, configure in the settings:
+1. **Base path** — folder where Markdown files will be stored (default: `~/Documents/CortX-Base/`)
+2. **LLM Provider** — Anthropic (API key required) or OpenAI-compatible (Ollama, llama.cpp — no key needed)
+3. **Model** — the model to use for the agent
 ---
-
 ## Architecture
+### Tech Stack
+| Component          | Technology                          |
+|--------------------|-------------------------------------|
+| Desktop App        | Electron 41                         |
+| Frontend           | React 19 + Tailwind CSS             |
+| State              | Zustand                             |
+| Database           | SQLite (better-sqlite3) + FTS5 + embeddings |
+| Versioning         | isomorphic-git                      |
+| Graph              | Cytoscape.js (fcose + cose-bilkent) |
+| LLM                | Anthropic SDK + OpenAI-compatible (fetch) |
+| Documents          | Python sidecar (docling, openpyxl, python-pptx) |
 
-### Stack technique
-
-| Composant | Techno |
-|---|---|
-| App desktop | Electron 41 |
-| Frontend | React 19 + Tailwind CSS |
-| État | Zustand |
-| Base de données | SQLite (better-sqlite3) + FTS5 + embeddings |
-| Versioning | isomorphic-git |
-| Graphe | Cytoscape.js (fcose + cose-bilkent) |
-| LLM | Anthropic SDK + OpenAI-compatible (fetch) |
-| Documents | Python sidecar (docling, openpyxl, python-pptx) |
-
-### Le pipeline agent — propose-then-execute
-
-Architecture **proposer-puis-exécuter** : l'agent ne modifie jamais de fichiers sans validation explicite.
+### Agent Pipeline — Propose-then-Execute
+**Propose-then-execute** architecture: the agent never modifies files without explicit user validation.
 
 ```
-INPUT UTILISATEUR
+USER INPUT
       │
       ▼
 ┌─────────────────┐
-│  RECHERCHE DE   │  ← FTS5 + embeddings + multi-hop
-│  CONTEXTE (RAG) │
+│ CONTEXT SEARCH  │ ← FTS5 + embeddings + multi-hop
+│      (RAG)      │
 └────────┬────────┘
          ▼
 ┌─────────────────┐
-│  APPEL LLM      │  ← Prompt système + contexte + input
-│  (streaming)    │
+│   LLM CALL      │ ← System prompt + context + input
+│   (streaming)   │
 └────────┬────────┘
          ▼
 ┌─────────────────┐
-│  PARSING JSON   │  ← Multi-fallback (strict → code block → regex)
-│  + NORMALISATION│
+│ JSON PARSING    │ ← Multi-fallback (strict → code block → regex)
+│ + NORMALIZATION │
 └────────┬────────┘
          ▼
 ┌─────────────────┐
-│  PROPOSITION    │  ← Actions avec status: 'proposed'
-│  (preview diff) │    Aucun fichier écrit
+│  PROPOSAL       │ ← Actions with status: 'proposed'
+│ (preview diff)  │ No files written yet
 └────────┬────────┘
          ▼
-    Utilisateur
-   valide / refuse
+     User
+   approves / rejects
          │
          ▼
 ┌─────────────────┐
-│  EXÉCUTION      │  ← Écriture fichiers + git commit
-│  + RÉINDEXATION │    + mise à jour SQLite
+│  EXECUTION      │ ← File writing + git commit
+│ + REINDEXING    │ + SQLite update
 └─────────────────┘
 ```
 
-### Structure des données utilisateur
-
+### User Data Structure
 ```
 CortX-Base/
-├── Reseau/              ← Fiches de personnes
-├── Entreprises/         ← Fiches d'organisations
-├── Domaines/            ← Domaines de connaissance
-├── Projets/             ← Projets en cours ou passés
-├── Journal/             ← Entrées quotidiennes
-├── Fiches/              ← Briefs et synthèses générés
-├── Bibliotheque/        ← Documents importés (PDF, DOCX…)
+├── Network/          ← People profiles
+├── Companies/        ← Organization profiles
+├── Domains/          ← Knowledge domains
+├── Projects/         ← Current or past projects
+├── Journal/          ← Daily entries
+├── Notes/            ← Generated briefs and syntheses
+├── Library/          ← Imported documents (PDF, DOCX…)
 ├── _System/
-│   └── cortx.db         ← SQLite (index, embeddings, relations, logs)
-└── .git/                ← Versioning automatique
+│   └── cortx.db       ← SQLite (index, embeddings, relations, logs)
+└── .git/             ← Automatic versioning
 ```
 
-Chaque fichier Markdown suit un format standardisé avec frontmatter YAML (type, tags, dates, relations) et wikilinks `[[Entité]]` pour les liens croisés.
+Each Markdown file follows a standardized format with YAML frontmatter (type, tags, dates, relations) and wikilinks `[[Entity]]` for cross-references.
 
-### Trois modes LLM
-
-| Mode | Description |
-|---|---|
-| **100% local** | Ollama / llama.cpp / LM Studio — confidentialité totale, aucune donnée ne quitte la machine |
-| **API** | Claude (Anthropic) ou OpenAI — meilleure qualité, requiert une clé API |
-| **Hybride** | Local pour les tâches simples, API pour les tâches complexes *(prévu)* |
-
----
-
-## État du projet
-
-### Ce qui fonctionne (avril 2026)
-
-| Fonctionnalité | État |
-|---|---|
-| Pipeline agent (capture / question / réflexion) | ✅ Complet |
-| Intégration LLM (Anthropic + OpenAI-compatible) | ✅ Complet |
-| Graphe de connaissances interactif | ✅ Complet |
-| Recherche hybride FTS5 + embeddings | ✅ Complet |
-| Versioning Git automatique + undo | ✅ Complet |
-| Interface 3 panneaux redimensionnables | ✅ Complet |
-| Import de documents (PDF, DOCX, XLSX, PPTX) | ✅ Complet |
-| Mode Idle (insights passifs) | ✅ Complet |
-| Internationalisation FR / EN | ✅ Complet |
-| Paramètres (LLM, chemin, validation, langue) | ✅ Complet |
-| Routeur LLM hybride (local/API auto) | 🔜 Prévu |
-| Capture rapide globale (raccourci système) | 🔜 Prévu |
-| Export PDF / Markdown | 🔜 Prévu |
-| Import vocal | 🔜 Prévu |
-| Packaging macOS / Linux | 🔜 Prévu |
-
-### Modèles locaux recommandés
-
-**Pour l'agent (classification + planification) :**
-- Gemma 3 4B ou Qwen 3 4B — tourne sur 8 GB RAM
-- Gemma 3 12B ou Qwen 3 14B — meilleure qualité, 16 GB RAM
-- Mistral Small 24B — excellent, 32 GB RAM ou GPU
-
-**Pour les embeddings (recherche sémantique) :**
-- nomic-embed-text (137M params) — tourne partout
-- snowflake-arctic-embed-m — alternative solide
+### Three LLM Modes
+| Mode       | Description |
+|------------|-------------|
+| **100% Local** | Ollama / llama.cpp / LM Studio — total privacy, no data leaves the machine |
+| **API**        | Claude (Anthropic) or OpenAI — best quality, requires API key |
+| **Hybrid**     | Local for simple tasks, API for complex ones *(planned)* |
 
 ---
+## Project Status
+### What works (April 2026)
+| Feature                                 | Status |
+|-----------------------------------------|--------|
+| Agent pipeline (capture / question / reflection) | ✅ Complete |
+| LLM integration (Anthropic + OpenAI-compatible) | ✅ Complete |
+| Interactive knowledge graph             | ✅ Complete |
+| Hybrid search (FTS5 + embeddings)       | ✅ Complete |
+| Automatic Git versioning + undo         | ✅ Complete |
+| 3-panel resizable interface             | ✅ Complete |
+| Document import (PDF, DOCX, XLSX, PPTX) | ✅ Complete |
+| Idle Mode (passive insights)            | ✅ Complete |
+| Internationalization (FR / EN)          | ✅ Complete |
+| Settings (LLM, path, validation, language) | ✅ Complete |
+| Hybrid LLM router (local/API auto)      | 🔜 Planned |
+| Global quick capture (system shortcut)  | 🔜 Planned |
+| PDF / Markdown export                   | 🔜 Planned |
+| Voice input                             | 🔜 Planned |
+| macOS / Linux packaging                 | 🔜 Planned |
 
-## Positionnement
+### Recommended Local Models
+**For the agent (classification + planning):**
+- Gemma 3 4B or Qwen 3 4B — runs on 8 GB RAM
+- Gemma 3 12B or Qwen 3 14B — better quality, 16 GB RAM
+- Mistral Small 24B — excellent, 32 GB RAM or GPU
 
-### Pourquoi CortX ?
+**For embeddings (semantic search):**
+- nomic-embed-text (137M params) — runs everywhere
+- snowflake-arctic-embed-m — solid alternative
+---
+## Positioning
+### Why CortX?
+Note-taking tools (Obsidian, Notion, Logseq) assume the user will structure their own thinking. The #1 barrier to a true “second brain” is not the lack of tools — it’s the **cognitive load of maintenance**.
 
-Les outils de prise de notes (Obsidian, Notion, Logseq) partent du principe que l'utilisateur structure lui-même sa pensée. Le frein n° 1 au "second cerveau" n'est pas le manque d'outils — c'est la **charge cognitive de maintenance**.
+CortX reduces the entry cost to **zero**. The user types raw text. The agent does the rest.
 
-CortX réduit le coût d'entrée à **zéro**. L'utilisateur tape du texte brut. L'agent fait le reste.
-
-### Ce qui nous différencie
-
-| | Mem.ai | Khoj | Obsidian + IA | CortX |
-|---|---|---|---|---|
-| L'agent **écrit** les fichiers | ❌ | ❌ | ❌ | ✅ |
-| Fichiers **Markdown local** | ❌ | ❌ | ✅ | ✅ |
-| LLM **100% local** possible | ❌ | ✅ | ❌ | ✅ |
-| Graphe de connaissances | ❌ | ❌ | ✅ (plugin) | ✅ |
-| Propose-then-execute | ❌ | ❌ | ❌ | ✅ |
+### What sets us apart
+|                          | Mem.ai | Khoj | Obsidian + AI | CortX |
+|--------------------------|--------|------|---------------|-------|
+| Agent **writes** the files | ❌     | ❌   | ❌            | ✅    |
+| **Local** Markdown files | ❌     | ❌   | ✅            | ✅    |
+| **100% local** LLM possible | ❌  | ✅   | ❌            | ✅    |
+| Knowledge Graph          | ❌     | ❌   | ✅ (plugin)   | ✅    |
+| Propose-then-execute     | ❌     | ❌   | ❌            | ✅    |
 
 ---
+## Contributing
+The project is under active development. Contributions are welcome:
+- **Bug reports** — open an issue with reproduction steps
+- **Testing with different LLMs** — feedback on agent quality with various local models
+- **UX suggestions** — ideas to improve the interface
+- **Technical architecture** — suggestions on RAG, embeddings management, performance
 
-## Contribuer
-
-Le projet est en développement actif. Contributions bienvenues :
-
-- **Bug reports** — ouvrir une issue avec les étapes de reproduction
-- **Test avec différents LLMs** — retours sur la qualité de l'agent avec différents modèles locaux
-- **Suggestions UX** — propositions d'amélioration de l'interface
-- **Architecture technique** — suggestions sur le RAG, la gestion des embeddings, les performances
-
-### Développement
-
+### Development
 ```bash
-npm run dev       # Electron en mode dev avec HMR
-npm run build     # Compile main/preload/renderer
-npm run dist      # Build + installeur Windows (NSIS)
-npm run rebuild   # Recompile better-sqlite3
+npm run dev      # Electron dev mode with HMR
+npm run build    # Compile main/preload/renderer
+npm run dist     # Build + Windows installer (NSIS)
+npm run rebuild  # Recompile better-sqlite3
 ```
 
-Pas de test runner configuré pour l'instant.
-
+No test runner configured yet.
 ---
-
-## Licence
-
+## License
 ISC
-
 ---
+*CortX — From vibe coding to vibe learning.*
+```
 
-*CortX — Du vibe coding au vibe learning.*
+**Ready to use!** Just copy and paste this into your `README.md` file.
