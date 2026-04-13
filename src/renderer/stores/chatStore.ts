@@ -1,5 +1,51 @@
 import { create } from 'zustand'
-import type { ChatMessage, AgentResponse } from '../../shared/types'
+import type { ChatMessage, AgentResponse, AgentAction } from '../../shared/types'
+
+/** User-supplied overrides for a create action before execution. */
+export interface ActionEdit {
+  title?: string
+  type?: string
+}
+
+const DIR_MAP: Record<string, string> = {
+  personne: 'Reseau',
+  entreprise: 'Entreprises',
+  domaine: 'Domaines',
+  projet: 'Projets',
+  journal: 'Journal',
+  note: 'Reseau',
+  fiche: 'Fiches'
+}
+
+function applyEditToAction(action: AgentAction, edit: ActionEdit): AgentAction {
+  let content = action.content
+  let file = action.file
+
+  if (edit.title) {
+    // Update frontmatter title: field
+    if (/^title:\s*.+$/m.test(content)) {
+      content = content.replace(/^title:\s*.+$/m, `title: ${edit.title}`)
+    }
+    // Update H1 heading
+    if (/^# .+$/m.test(content)) {
+      content = content.replace(/^# .+$/m, `# ${edit.title}`)
+    }
+  }
+
+  if (edit.type) {
+    // Update frontmatter type: field
+    if (/^type:\s*.+$/m.test(content)) {
+      content = content.replace(/^type:\s*.+$/m, `type: ${edit.type}`)
+    }
+    // Reroute directory
+    const newDir = DIR_MAP[edit.type]
+    if (newDir) {
+      file = file.replace(/^[^/]+\//, `${newDir}/`)
+    }
+  }
+
+  return { ...action, content, file }
+}
 import { useAgentStore } from './agentStore'
 import { useUIStore } from './uiStore'
 import { useGraphStore } from './graphStore'
@@ -17,8 +63,8 @@ interface ChatState {
   sendMessage: (content: string) => Promise<void>
   /** Analyze a dropped/imported .md file and ask the agent how to integrate it. */
   importMarkdown: (filename: string, content: string) => Promise<void>
-  acceptActions: (messageId: string) => Promise<void>
-  rejectActions: (messageId: string) => void
+  acceptActions: (messageId: string, opts?: { actionIds?: string[]; edits?: Record<string, ActionEdit> }) => Promise<void>
+  rejectActions: (messageId: string, actionIds?: string[]) => void
   undoActions: (commitHash: string, messageId: string) => Promise<void>
   answerClarification: (messageId: string, optionIndex: number) => Promise<void>
   dismissSuggestion: (text: string) => void
@@ -421,14 +467,23 @@ input_type="information"`
     }
   },
 
-  acceptActions: async (messageId: string) => {
+  acceptActions: async (messageId: string, opts) => {
+    const { actionIds, edits = {} } = opts ?? {}
     const msg = get().messages.find((m) => m.id === messageId)
     if (!msg?.agentResponse?.actions?.length) return
 
-    const actions = msg.agentResponse.actions
-    const summary = msg.agentResponse.summary || 'CortX: actions validees'
+    const allActions = msg.agentResponse.actions
+    const acceptSet = new Set(actionIds ?? allActions.map((a) => a.id))
+    // Only accept actions that are still proposed
+    const toAccept = allActions.filter((a) => acceptSet.has(a.id) && a.status === 'proposed')
+    const toReject = allActions.filter((a) => !acceptSet.has(a.id) && a.status === 'proposed')
 
-    // Mark as pending (executing)
+    if (toAccept.length === 0) return
+
+    const summary = msg.agentResponse.summary || 'CortX: actions validées'
+    const actionsToExecute = toAccept.map((a) => (edits[a.id] ? applyEditToAction(a, edits[a.id]) : a))
+
+    // Mark accepted as pending, non-accepted proposed as rejected
     set((s) => ({
       messages: s.messages.map((m) => {
         if (m.id !== messageId || !m.agentResponse) return m
@@ -436,16 +491,24 @@ input_type="information"`
           ...m,
           agentResponse: {
             ...m.agentResponse,
-            actions: m.agentResponse.actions.map((a) => ({ ...a, status: 'pending' as const }))
+            actions: m.agentResponse.actions.map((a) => {
+              if (acceptSet.has(a.id) && a.status === 'proposed') return { ...a, status: 'pending' as const }
+              if (!acceptSet.has(a.id) && a.status === 'proposed') return { ...a, status: 'rejected' as const }
+              return a
+            })
           }
         }
       })
     }))
 
-    try {
-      const commitHash = await window.cortx.agent.execute(actions, summary)
+    // Immediately sync rejected to agent store
+    if (toReject.length > 0) {
+      useAgentStore.getState().updateStatuses(toReject.map((a) => ({ id: a.id, status: 'rejected' as const })))
+    }
 
-      // Mark as validated
+    try {
+      const commitHash = await window.cortx.agent.execute(actionsToExecute, summary)
+
       set((s) => ({
         messages: s.messages.map((m) => {
           if (m.id !== messageId || !m.agentResponse) return m
@@ -454,18 +517,23 @@ input_type="information"`
             agentResponse: {
               ...m.agentResponse,
               commitHash,
-              actions: m.agentResponse.actions.map((a) => ({ ...a, status: 'validated' as const }))
+              actions: m.agentResponse.actions.map((a) =>
+                acceptSet.has(a.id) && a.status === 'pending' ? { ...a, status: 'validated' as const } : a
+              )
             }
           }
         })
       }))
 
-      useAgentStore.getState().validateActions(commitHash)
-      useUIStore.getState().addToast(`${actions.length} action(s) appliquee(s)`, 'success')
+      useAgentStore.getState().updateStatuses(
+        toAccept.map((a) => ({ id: a.id, status: 'validated' as const })),
+        commitHash
+      )
+      useUIStore.getState().addToast(`${toAccept.length} action(s) appliquée(s)`, 'success')
       useGraphStore.getState().loadGraph()
       useFileStore.getState().loadFiles()
     } catch (error) {
-      // Revert to proposed on failure
+      // Revert accepted-pending back to proposed
       set((s) => ({
         messages: s.messages.map((m) => {
           if (m.id !== messageId || !m.agentResponse) return m
@@ -473,16 +541,24 @@ input_type="information"`
             ...m,
             agentResponse: {
               ...m.agentResponse,
-              actions: m.agentResponse.actions.map((a) => ({ ...a, status: 'proposed' as const }))
+              actions: m.agentResponse.actions.map((a) =>
+                acceptSet.has(a.id) && a.status === 'pending' ? { ...a, status: 'proposed' as const } : a
+              )
             }
           }
         })
       }))
-      useUIStore.getState().addToast('Erreur lors de l\'execution', 'error')
+      useAgentStore.getState().updateStatuses(toAccept.map((a) => ({ id: a.id, status: 'proposed' as const })))
+      useUIStore.getState().addToast("Erreur lors de l'exécution", 'error')
     }
   },
 
-  rejectActions: (messageId: string) => {
+  rejectActions: (messageId: string, actionIds?: string[]) => {
+    const msg = get().messages.find((m) => m.id === messageId)
+    if (!msg?.agentResponse) return
+
+    const rejectSet = new Set(actionIds ?? msg.agentResponse.actions.map((a) => a.id))
+
     set((s) => ({
       messages: s.messages.map((m) => {
         if (m.id !== messageId || !m.agentResponse) return m
@@ -490,12 +566,18 @@ input_type="information"`
           ...m,
           agentResponse: {
             ...m.agentResponse,
-            actions: m.agentResponse.actions.map((a) => ({ ...a, status: 'rejected' as const }))
+            actions: m.agentResponse.actions.map((a) =>
+              rejectSet.has(a.id) && a.status === 'proposed' ? { ...a, status: 'rejected' as const } : a
+            )
           }
         }
       })
     }))
-    useUIStore.getState().addToast('Actions refusees', 'info')
+
+    useAgentStore.getState().updateStatuses(
+      [...rejectSet].map((id) => ({ id, status: 'rejected' as const }))
+    )
+    useUIStore.getState().addToast('Actions refusées', 'info')
   },
 
   answerClarification: async (messageId: string, optionIndex: number) => {

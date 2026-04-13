@@ -99,7 +99,13 @@ export interface T {
     reject: string
     applying: string
     cancel: string
+    acceptAll: string
+    rejectAll: string
+    acceptSelected: (n: number, total: number) => string
+    editTitle: string
+    editType: string
   }
+
   actionPreview: {
     loading: string
     newFile: string
@@ -115,6 +121,9 @@ export interface T {
     applied: string
     rejected: string
     cancelled: string
+    accept: string
+    reject: string
+    preview: string
   }
   activityFeed: {
     empty: string
@@ -387,7 +396,12 @@ const fr: T = {
     accept: 'Accepter',
     reject: 'Refuser',
     applying: 'Application en cours...',
-    cancel: 'Annuler'
+    cancel: 'Annuler',
+    acceptAll: 'Tout valider',
+    rejectAll: 'Tout refuser',
+    acceptSelected: (n, total) => `Valider ${n < total ? `(${n}/${total})` : 'tout'}`,
+    editTitle: 'Modifier le titre',
+    editType: 'Type'
   },
   actionPreview: {
     loading: "Chargement de l'aperçu...",
@@ -403,7 +417,10 @@ const fr: T = {
     inProgress: 'en cours',
     applied: 'appliqué',
     rejected: 'refusé',
-    cancelled: 'annulé'
+    cancelled: 'annulé',
+    accept: 'Valider',
+    reject: 'Refuser',
+    preview: 'Aperçu'
   },
   activityFeed: {
     empty: "Les actions de l'agent apparaîtront ici.",
@@ -676,7 +693,12 @@ const en: T = {
     accept: 'Accept',
     reject: 'Reject',
     applying: 'Applying...',
-    cancel: 'Cancel'
+    cancel: 'Cancel',
+    acceptAll: 'Accept all',
+    rejectAll: 'Reject all',
+    acceptSelected: (n, total) => `Accept ${n < total ? `(${n}/${total})` : 'all'}`,
+    editTitle: 'Edit title',
+    editType: 'Type'
   },
   actionPreview: {
     loading: 'Loading preview...',
@@ -692,7 +714,10 @@ const en: T = {
     inProgress: 'processing',
     applied: 'applied',
     rejected: 'rejected',
-    cancelled: 'cancelled'
+    cancelled: 'cancelled',
+    accept: 'Accept',
+    reject: 'Reject',
+    preview: 'Preview'
   },
   activityFeed: {
     empty: 'Agent actions will appear here.',
