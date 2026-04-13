@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { Network } from 'lucide-react'
 import { useUIStore } from '../../stores/uiStore'
 import { useFileStore } from '../../stores/fileStore'
 import { resolveWikilink, wikilinkLabel } from '../../utils/wikilink'
@@ -8,9 +9,10 @@ import { useT } from '../../i18n'
 
 interface MarkdownRendererProps {
   content: string
+  graphTitleSource?: 'frontmatter' | 'h1' | 'filename'
 }
 
-export function MarkdownRenderer({ content }: MarkdownRendererProps): React.JSX.Element {
+export function MarkdownRenderer({ content, graphTitleSource }: MarkdownRendererProps): React.JSX.Element {
   const openFilePreview = useUIStore((s) => s.openFilePreview)
   const addToast = useUIStore((s) => s.addToast)
   const files = useFileStore((s) => s.files)
@@ -23,14 +25,29 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps): React.JSX.
     (_, name: string) => `[${wikilinkLabel(name)}](cortx://link/${encodeURIComponent(name)})`
   )
 
+  // Track whether we've already labeled the first H1 (only the first one is the graph title)
+  let firstH1Done = false
+
   return (
     <div className="max-w-none text-sm text-cortx-text-primary/90">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          h1: ({ children }) => (
-            <h1 className="text-lg font-bold text-cortx-text-primary mb-3 mt-0">{children}</h1>
-          ),
+          h1: ({ children }) => {
+            const isGraphH1 = graphTitleSource === 'h1' && !firstH1Done
+            if (!firstH1Done) firstH1Done = true
+            return (
+              <h1 className="text-lg font-bold text-cortx-text-primary mb-3 mt-0 flex items-center gap-2">
+                <span>{children}</span>
+                {isGraphH1 && (
+                  <span className="inline-flex items-center gap-1 text-2xs font-normal px-1.5 py-0.5 rounded bg-cortx-accent/10 border border-cortx-accent/25 text-cortx-accent/80 align-middle">
+                    <Network size={9} />
+                    graphe
+                  </span>
+                )}
+              </h1>
+            )
+          },
           h2: ({ children }) => (
             <h2 className="text-base font-semibold text-cortx-text-primary mb-3 mt-4 pb-2 border-b border-cortx-border/60">{children}</h2>
           ),

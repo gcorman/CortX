@@ -1,11 +1,37 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { X, Pencil, Save, RotateCcw, Trash2, RefreshCw, Lock } from 'lucide-react'
+import { X, Pencil, Save, RotateCcw, Trash2, RefreshCw, Lock, Network } from 'lucide-react'
 import { MarkdownRenderer } from './MarkdownRenderer'
 import { useUIStore } from '../../stores/uiStore'
 import { useGraphStore } from '../../stores/graphStore'
 import { useFileStore } from '../../stores/fileStore'
 import { useT } from '../../i18n'
 import type { FileContent, CortxFile } from '../../../shared/types'
+
+type TitleSource = 'frontmatter' | 'h1' | 'filename'
+
+function computeEffectiveTitle(
+  frontmatter: Record<string, unknown>,
+  body: string,
+  filePath: string
+): { title: string; source: TitleSource } {
+  if (frontmatter.title) return { title: String(frontmatter.title), source: 'frontmatter' }
+  const h1 = body.match(/^#\s+(.+)$/m)
+  if (h1) return { title: h1[1].trim(), source: 'h1' }
+  return { title: filePath.split('/').pop()?.replace('.md', '') || filePath, source: 'filename' }
+}
+
+/** Parse frontmatter title + body from a raw markdown string (draft). */
+function parseDraftForTitle(raw: string): { fmTitle?: string; body: string } {
+  const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/)
+  if (match) {
+    const titleMatch = match[1].match(/^title:\s*(.+)$/m)
+    return {
+      fmTitle: titleMatch ? titleMatch[1].trim().replace(/^['"]|['"]$/g, '') : undefined,
+      body: match[2]
+    }
+  }
+  return { body: raw }
+}
 
 interface FilePreviewProps {
   path: string
@@ -189,8 +215,8 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
 
     setIsSavingTitle(true)
     try {
-      await window.cortx.files.updateTitle(path, editedTitle)
-      addToast(t.filePreview.titleUpdated, 'success')
+      const result = await window.cortx.files.updateTitle(path, editedTitle)
+      addToast(t.filePreview.titleUpdatedWithLinks(result.updatedLinks), 'success')
       await loadFile()
       setIsTitleEditing(false)
       reloadGraph()
@@ -384,6 +410,25 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
           ) : content ? (
             isEditing ? (
               <div className="relative flex flex-col h-full min-h-[60vh]">
+                {/* Graph title info bar */}
+                {(() => {
+                  const { fmTitle, body } = parseDraftForTitle(draft)
+                  const fm = fmTitle ? { title: fmTitle } : {}
+                  const { title: gTitle, source: gSource } = computeEffectiveTitle(fm, body, path)
+                  const sourceLabel = gSource === 'frontmatter'
+                    ? t.filePreview.graphTitleFromFrontmatter
+                    : gSource === 'h1'
+                      ? t.filePreview.graphTitleFromH1
+                      : t.filePreview.graphTitleFromFilename
+                  return (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-cortx-border bg-cortx-elevated/50 flex-shrink-0">
+                      <Network size={11} className="text-cortx-accent flex-shrink-0" />
+                      <span className="text-2xs text-cortx-text-secondary">{t.filePreview.graphTitleLabel} :</span>
+                      <span className="text-2xs font-medium text-cortx-text-primary truncate">{gTitle}</span>
+                      <span className="text-2xs text-cortx-text-secondary/50 flex-shrink-0">({sourceLabel})</span>
+                    </div>
+                  )
+                })()}
                 {/* [[ wikilink autocomplete dropdown */}
                 {wikilinkQuery !== null && wikilinkResults.length > 0 && (
                   <ul
@@ -464,9 +509,33 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
                           #{tag}
                         </span>
                       ))}
+                    {/* Graph title indicator */}
+                    {!isLibraryFile && (() => {
+                      const { title: gTitle, source: gSource } = computeEffectiveTitle(content.frontmatter, content.body, path)
+                      const sourceLabel = gSource === 'frontmatter'
+                        ? t.filePreview.graphTitleFromFrontmatter
+                        : gSource === 'h1'
+                          ? t.filePreview.graphTitleFromH1
+                          : t.filePreview.graphTitleFromFilename
+                      return (
+                        <span
+                          className="flex items-center gap-1 text-2xs px-2 py-0.5 rounded-full bg-cortx-accent/5 border border-cortx-accent/20 text-cortx-accent/80"
+                          title={`${t.filePreview.graphTitleLabel} (${sourceLabel})`}
+                        >
+                          <Network size={9} />
+                          {gTitle}
+                        </span>
+                      )
+                    })()}
                   </div>
                 )}
-                <MarkdownRenderer content={content.body} />
+                <MarkdownRenderer
+                  content={content.body}
+                  graphTitleSource={(() => {
+                    const { source } = computeEffectiveTitle(content.frontmatter, content.body, path)
+                    return source
+                  })()}
+                />
               </div>
             )
           ) : (

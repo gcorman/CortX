@@ -165,6 +165,49 @@ export class FileService {
     await this.writeFile(filePath, content)
   }
 
+  /**
+   * Returns the effective title used as the graph node label, using the same
+   * priority chain as DatabaseService: frontmatter.title → first H1 → filename.
+   */
+  getEffectiveTitle(filePath: string): string {
+    const fullPath = this.resolvePath(filePath)
+    if (!fs.existsSync(fullPath)) {
+      return filePath.split('/').pop()?.replace('.md', '') || filePath
+    }
+    const raw = fs.readFileSync(fullPath, 'utf-8')
+    const parsed = matter(raw)
+    if (parsed.data.title) return String(parsed.data.title)
+    const h1 = parsed.content.match(/^#\s+(.+)$/m)
+    if (h1) return h1[1].trim()
+    return filePath.split('/').pop()?.replace('.md', '') || filePath
+  }
+
+  /**
+   * Scans all KB markdown files and replaces [[oldTitle]] with [[newTitle]].
+   * Case-insensitive match. Returns paths of modified files (relative to basePath).
+   */
+  async updateWikilinksForRename(oldTitle: string, newTitle: string): Promise<string[]> {
+    if (!oldTitle || oldTitle === newTitle) return []
+    const allFiles: string[] = []
+    this.walkDir(this.basePath, allFiles)
+    const modified: string[] = []
+    const escaped = oldTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const pattern = new RegExp(`\\[\\[${escaped}\\]\\]`, 'gi')
+    for (const relPath of allFiles) {
+      const fullPath = this.resolvePath(relPath)
+      const content = fs.readFileSync(fullPath, 'utf-8')
+      if (!pattern.test(content)) {
+        pattern.lastIndex = 0
+        continue
+      }
+      pattern.lastIndex = 0
+      const updated = content.replace(pattern, `[[${newTitle}]]`)
+      fs.writeFileSync(fullPath, updated, 'utf-8')
+      modified.push(relPath)
+    }
+    return modified
+  }
+
   private buildTree(dir: string, prefix: string, lines: string[], depth: number): void {
     if (depth > 3) return
     const entries = fs.readdirSync(dir, { withFileTypes: true })

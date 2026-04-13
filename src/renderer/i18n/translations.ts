@@ -197,6 +197,11 @@ export interface T {
     placeholder: string
     loadError: string
     wikilinkNotFound: (name: string) => string
+    graphTitleLabel: string
+    graphTitleFromFrontmatter: string
+    graphTitleFromH1: string
+    graphTitleFromFilename: string
+    titleUpdatedWithLinks: (n: number) => string
   }
   graph: {
     zoomIn: string
@@ -480,7 +485,12 @@ const fr: T = {
     loading: 'Chargement...',
     placeholder: 'Contenu Markdown...',
     loadError: 'Impossible de charger le fichier.',
-    wikilinkNotFound: (name) => `Fichier "${name}" introuvable`
+    wikilinkNotFound: (name) => `Fichier "${name}" introuvable`,
+    graphTitleLabel: 'Titre graphe',
+    graphTitleFromFrontmatter: 'frontmatter',
+    graphTitleFromH1: 'titre H1',
+    graphTitleFromFilename: 'nom du fichier',
+    titleUpdatedWithLinks: (n) => n > 0 ? `Titre mis à jour · ${n} lien${n > 1 ? 's' : ''} mis à jour` : 'Titre mis à jour'
   },
   graph: {
     zoomIn: 'Zoom +',
@@ -764,7 +774,12 @@ const en: T = {
     loading: 'Loading...',
     placeholder: 'Markdown content...',
     loadError: 'Cannot load file.',
-    wikilinkNotFound: (name) => `File "${name}" not found`
+    wikilinkNotFound: (name) => `File "${name}" not found`,
+    graphTitleLabel: 'Graph title',
+    graphTitleFromFrontmatter: 'frontmatter',
+    graphTitleFromH1: 'H1 heading',
+    graphTitleFromFilename: 'filename',
+    titleUpdatedWithLinks: (n) => n > 0 ? `Title updated · ${n} link${n > 1 ? 's' : ''} updated` : 'Title updated'
   },
   graph: {
     zoomIn: 'Zoom in',

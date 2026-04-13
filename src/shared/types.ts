@@ -246,7 +246,7 @@ export interface CortxAPI {
     openMarkdownDialog(): Promise<{ path: string; filename: string; content: string } | null>
     readExternal(absolutePath: string): Promise<{ path: string; filename: string; content: string } | null>
     create(type: EntityType, title: string): Promise<{ path: string }>
-    updateTitle(filePath: string, newTitle: string): Promise<void>
+    updateTitle(filePath: string, newTitle: string): Promise<{ updatedLinks: number }>
   }
   llm: {
     send(messages: Array<{ role: string; content: string }>, systemPrompt?: string): Promise<string>

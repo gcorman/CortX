@@ -51,13 +51,22 @@ export function registerFileHandlers(getFiles: () => FileService, getDatabase?: 
   })
 
   /**
-   * Updates the title of a Markdown file (in frontmatter and H1 heading).
+   * Updates the title of a Markdown file (in frontmatter and H1 heading),
+   * then rewrites [[OldTitle]] wikilinks in all other KB files.
+   * Returns { updatedLinks: number } — count of files where wikilinks were rewritten.
    */
   ipcMain.handle('files:updateTitle', async (_event, { path: filePath, newTitle }: { path: string; newTitle: string }) => {
-    await getFiles().updateFileTitle(filePath, newTitle)
-    // Reindex the modified file if database service is available
+    const fileService = getFiles()
+    const oldTitle = fileService.getEffectiveTitle(filePath)
+    await fileService.updateFileTitle(filePath, newTitle)
+    const modifiedFiles = await fileService.updateWikilinksForRename(oldTitle, newTitle)
     if (getDatabase) {
-      await getDatabase().indexFile(filePath)
+      const db = getDatabase()
+      await db.indexFile(filePath)
+      for (const mp of modifiedFiles) {
+        await db.indexFile(mp)
+      }
     }
+    return { updatedLinks: modifiedFiles.length }
   })
 }
