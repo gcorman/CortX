@@ -201,7 +201,10 @@ ${wikilinkLines}
 
     try {
       const context = await this.gatherContext(target, entities, relations)
+      if (this.phase === 'stopped' || this.paused) return
+
       const result = await this.evaluateInsight(context)
+      if (this.phase === 'stopped' || this.paused) return
 
       if (result) {
         const conf = result.confidence
@@ -245,6 +248,7 @@ ${wikilinkLines}
       // ── Synthesis pass every N cycles ─────────────────────────────────
       this.cycleCount++
       if (this.cycleCount % SYNTHESIS_EVERY === 0 && this.draftInsights.length >= 2) {
+        if (this.phase === 'stopped') return
         await this.runSynthesis(nodeIds)
       }
 
@@ -300,6 +304,8 @@ Sinon : {"promoted": [{"category": "opportunity|development|pattern|contradictio
         [{ role: 'user', content: userMsg }],
         systemPrompt
       )
+
+      if (this.phase === 'stopped') { this.draftInsights = []; return }
 
       const jsonMatch = raw.match(/\{[\s\S]*\}/)
       if (!jsonMatch) { this.draftInsights = []; return }

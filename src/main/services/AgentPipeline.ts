@@ -421,7 +421,16 @@ export class AgentPipeline {
    * tag browser and entity index pick up the changes immediately.
    */
   async saveManualEdit(filePath: string, content: string): Promise<string> {
+    // Capture old effective title before overwriting so we can propagate renames
+    const oldTitle = this.fileService.getEffectiveTitle(filePath)
+
     await this.fileService.writeFile(filePath, content)
+
+    // If the title changed (H1 or frontmatter), rewrite [[wikilinks]] in all other KB files
+    const newTitle = this.fileService.getEffectiveTitle(filePath)
+    if (oldTitle !== newTitle) {
+      await this.fileService.updateWikilinksForRename(oldTitle, newTitle)
+    }
 
     let commitHash = ''
     try {

@@ -29,8 +29,9 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
       // Compare nodes AND edges — a manual edit can add/remove wikilinks
       // without changing node count, so we must compare edges too.
-      const nodesKey = data.nodes.map((n) => n.id).join(',')
-      const prevNodesKey = current.nodes.map((n) => n.id).join(',')
+      // Include label in the key so that renames (same ID, new label) also trigger a re-render.
+      const nodesKey = data.nodes.map((n) => `${n.id}:${n.label}`).join(',')
+      const prevNodesKey = current.nodes.map((n) => `${n.id}:${n.label}`).join(',')
       const edgesKey = data.edges.map((e) => `${e.source}->${e.target}`).sort().join(',')
       const prevEdgesKey = current.edges.map((e) => `${e.source}->${e.target}`).sort().join(',')
 
