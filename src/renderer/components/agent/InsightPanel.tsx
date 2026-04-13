@@ -61,7 +61,7 @@ export function InsightPanel(): React.JSX.Element | null {
                   </p>
                   {draftCount > 0 && (
                     <p className="text-2xs text-cortx-accent/60 font-medium">
-                      {draftCount} {draftCount > 1 ? t.insightPanel.drafts : t.insightPanel.draft} en cours de synthèse
+                      {draftCount} {draftCount > 1 ? t.insightPanel.drafts : t.insightPanel.draft} {t.insightPanel.synthesizing}
                     </p>
                   )}
                 </div>

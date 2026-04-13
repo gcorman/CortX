@@ -8,6 +8,7 @@ import { useFileStore } from '../../stores/fileStore'
 import { useLibraryStore } from '../../stores/libraryStore'
 import { useIdleStore } from '../../stores/idleStore'
 import { Network, LayoutGrid, Trash2, RefreshCw, FileText, ExternalLink, Plus } from 'lucide-react'
+import { useT } from '../../i18n'
 
 // Register extensions — fcose takes priority over cose-bilkent for all layouts
 try { cytoscape.use(fcose as unknown as cytoscape.Ext) } catch { /* already registered */ }
@@ -513,6 +514,7 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
   const [isRewriting, setIsRewriting] = useState(false)
   const [rewriteUndo, setRewriteUndo] = useState<{ commitHash: string } | null>(null)
 
+  const t = useT()
   const { nodes, edges, isLoading, loadGraph, filterTypes, toggleFilterType } = useGraphStore()
   const openFilePreview = useUIStore((s) => s.openFilePreview)
   const setActiveCenterView = useUIStore((s) => s.setActiveCenterView)
@@ -577,7 +579,7 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       setTimeout(() => setRewriteUndo(null), 8000)
     } catch (err) {
       console.error(err)
-      addToast('Erreur lors de la rédaction', 'error')
+      addToast(t.filePreview.rewriteError, 'error')
     } finally {
       setIsRewriting(false)
     }
@@ -589,11 +591,11 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       if (contextMenu.isLibDoc) {
         const docId = contextMenu.nodeId.replace('lib:', '')
         await deleteDocument(docId)
-        addToast('Document supprimé de la bibliothèque', 'info')
+        addToast(t.graph.libDocDeleted, 'info')
       } else {
         await window.cortx.agent.deleteFile(contextMenu.filePath)
         await loadFiles()
-        addToast('Fichier supprimé', 'info')
+        addToast(t.filePreview.deleted, 'info')
       }
       setContextMenu(null)
       setConfirmDelete(false)
@@ -1070,7 +1072,7 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
             {/* Draft count badge */}
             {idleDraftCount > 0 && !isInsightPhase && (
               <div className="mt-1.5 text-2xs text-cortx-text-secondary/50">
-                {idleDraftCount} brouillon{idleDraftCount > 1 ? 's' : ''} en mémoire
+                {t.graph.draftsInMemory(idleDraftCount)}
               </div>
             )}
             {/* Arrow pointing down */}
@@ -1086,7 +1088,7 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       {/* Loading overlay */}
       {isLoading && nodes.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="text-sm text-cortx-text-secondary">Chargement du graphe...</span>
+          <span className="text-sm text-cortx-text-secondary">{t.graph.loading}</span>
         </div>
       )}
 
@@ -1096,9 +1098,9 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
           <div className="w-14 h-14 rounded-full bg-cortx-surface flex items-center justify-center mb-4">
             <Network size={28} className="text-cortx-text-secondary/40" />
           </div>
-          <h3 className="text-sm font-medium text-cortx-text-secondary mb-1">Graphe vide</h3>
+          <h3 className="text-sm font-medium text-cortx-text-secondary mb-1">{t.graph.empty}</h3>
           <p className="text-xs text-cortx-text-secondary/60 max-w-[280px]">
-            Commence par capturer des informations via la conversation.
+            {t.graph.emptyHint}
           </p>
         </div>
       )}
@@ -1109,7 +1111,7 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       {nodes.length > 0 && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none select-none">
           <p className="text-2xs text-cortx-text-secondary/40 bg-cortx-surface/70 backdrop-blur-sm px-2.5 py-1 rounded-full border border-cortx-border/30">
-            Clic = sélectionner · Double-clic = ouvrir · Clic droit = menu · Glisser = déplacer
+            {t.graph.hint}
           </p>
         </div>
       )}
@@ -1117,21 +1119,21 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       {/* Undo bar after rewrite */}
       {rewriteUndo && (
         <div className="absolute top-3 right-3 z-30 flex items-center gap-2 bg-cortx-surface border border-cortx-border rounded-card px-3 py-2 shadow-lg">
-          <span className="text-xs text-cortx-text-primary">Rédaction réorganisée</span>
+          <span className="text-xs text-cortx-text-primary">{t.filePreview.rewritten}</span>
           <button
             onClick={async () => {
               try {
                 await window.cortx.agent.undo(rewriteUndo.commitHash)
                 setRewriteUndo(null)
                 await loadGraph()
-                addToast('Annulé', 'info')
+                addToast(t.filePreview.undone, 'info')
               } catch {
-                addToast("Erreur lors de l'annulation", 'error')
+                addToast(t.filePreview.undoError, 'error')
               }
             }}
             className="text-xs text-cortx-accent hover:text-cortx-accent-light cursor-pointer transition-colors"
           >
-            Annuler
+            {t.filePreview.cancel}
           </button>
           <button
             onClick={() => setRewriteUndo(null)}
@@ -1161,7 +1163,7 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-cortx-text-primary hover:bg-cortx-elevated transition-colors cursor-pointer"
             >
               <Plus size={13} className="text-cortx-accent" />
-              Créer un nouveau fichier
+              {t.graph.createFile}
             </button>
           </div>
         </>
@@ -1191,14 +1193,14 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-cortx-text-primary hover:bg-cortx-elevated transition-colors cursor-pointer"
                 >
                   <ExternalLink size={13} />
-                  Ouvrir le fichier original
+                  {t.graph.openOriginal}
                 </button>
                 <button
                   onClick={handleOpenTranscription}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-cortx-text-primary hover:bg-cortx-elevated transition-colors cursor-pointer"
                 >
                   <FileText size={13} />
-                  Voir la transcription Markdown
+                  {t.graph.viewTranscription}
                 </button>
                 <div className="border-t border-cortx-border mt-1" />
                 {!confirmDelete ? (
@@ -1207,17 +1209,17 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
                   >
                     <Trash2 size={13} />
-                    Supprimer de la bibliothèque
+                    {t.graph.deleteFromLibrary}
                   </button>
                 ) : (
                   <div className="px-3 py-2 space-y-1.5">
-                    <p className="text-xs text-red-400">Supprimer définitivement ?</p>
+                    <p className="text-xs text-red-400">{t.graph.deleteForever}</p>
                     <div className="flex gap-1.5">
                       <button onClick={handleDelete} className="flex-1 text-xs bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded px-2 py-1 transition-colors cursor-pointer">
-                        Supprimer
+                        {t.graph.delete}
                       </button>
                       <button onClick={() => setConfirmDelete(false)} className="flex-1 text-xs bg-cortx-elevated hover:bg-cortx-border text-cortx-text-secondary rounded px-2 py-1 transition-colors cursor-pointer">
-                        Annuler
+                        {t.filePreview.cancel}
                       </button>
                     </div>
                   </div>
@@ -1232,7 +1234,7 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-cortx-text-primary hover:bg-cortx-elevated transition-colors cursor-pointer disabled:opacity-50"
                 >
                   <RefreshCw size={13} className={isRewriting ? 'animate-spin' : ''} />
-                  {isRewriting ? 'Réorganisation...' : 'Reprendre la rédaction'}
+                  {isRewriting ? t.graph.rewriting : t.graph.rewrite}
                 </button>
                 {!confirmDelete ? (
                   <button
@@ -1240,17 +1242,17 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
                   >
                     <Trash2 size={13} />
-                    Supprimer
+                    {t.graph.delete}
                   </button>
                 ) : (
                   <div className="px-3 py-2 space-y-1.5">
-                    <p className="text-xs text-red-400">Supprimer définitivement ?</p>
+                    <p className="text-xs text-red-400">{t.graph.deleteForever}</p>
                     <div className="flex gap-1.5">
                       <button onClick={handleDelete} className="flex-1 text-xs bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded px-2 py-1 transition-colors cursor-pointer">
-                        Supprimer
+                        {t.graph.delete}
                       </button>
                       <button onClick={() => setConfirmDelete(false)} className="flex-1 text-xs bg-cortx-elevated hover:bg-cortx-border text-cortx-text-secondary rounded px-2 py-1 transition-colors cursor-pointer">
-                        Annuler
+                        {t.filePreview.cancel}
                       </button>
                     </div>
                   </div>

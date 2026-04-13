@@ -59,8 +59,8 @@ export function InsightCard({ insight }: InsightCardProps): React.JSX.Element {
   }
 
   function handleExplore(): void {
-    const entityList = insight.entityNames.join(' et ')
-    const message = `Peux-tu développer cet insight concernant ${entityList} : "${insight.content}"`
+    const entityList = insight.entityNames.join(t.insightCard.entityJoin)
+    const message = t.insightCard.exploreMessage(entityList, insight.content)
     void sendMessage(message)
     void dismissInsight(insight.id)
   }

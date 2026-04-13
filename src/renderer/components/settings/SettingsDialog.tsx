@@ -183,7 +183,7 @@ export function SettingsDialog(): React.JSX.Element {
       clearActions()
       clearGraph()
       await Promise.all([loadFiles(), loadGraph()])
-      addToast('Base de connaissances réinitialisée', 'success')
+      addToast(t.settings.resetDone, 'success')
       setResetConfirm(false)
       toggleSettings()
     } catch (err) {

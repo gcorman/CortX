@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm'
 import { useUIStore } from '../../stores/uiStore'
 import { useFileStore } from '../../stores/fileStore'
 import { resolveWikilink, wikilinkLabel } from '../../utils/wikilink'
+import { useT } from '../../i18n'
 
 interface MarkdownRendererProps {
   content: string
@@ -13,6 +14,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps): React.JSX.
   const openFilePreview = useUIStore((s) => s.openFilePreview)
   const addToast = useUIStore((s) => s.addToast)
   const files = useFileStore((s) => s.files)
+  const t = useT()
 
   // Transform wikilinks [[Name]] → [Label](cortx://link/Name). The label strips
   // underscores and `.md`, so the brackets are never shown to the user.
@@ -79,7 +81,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps): React.JSX.
                     if (resolved) {
                       openFilePreview(resolved)
                     } else {
-                      addToast(`Fichier "${wikilinkLabel(name)}" introuvable`, 'info')
+                      addToast(t.filePreview.wikilinkNotFound(wikilinkLabel(name)), 'info')
                     }
                   }}
                   className="text-cortx-accent hover:text-cortx-accent-light underline decoration-cortx-accent/30 hover:decoration-cortx-accent cursor-pointer transition-colors"

@@ -27,7 +27,7 @@ export function FichePanel(): React.JSX.Element {
     }
     setConfirming(null)
     await deleteFiche(path)
-    addToast(`Fiche "${subject}" supprimée`, 'info')
+    addToast(t.fichePanel.ficheDeleted(subject), 'info')
   }
 
   return (
@@ -54,7 +54,7 @@ export function FichePanel(): React.JSX.Element {
             <Sparkles size={18} className="mx-auto mb-2 text-cortx-text-secondary/40" />
             <p className="text-2xs text-cortx-text-secondary/60 leading-relaxed">
               {t.fichePanel.empty}<br />
-              Tape <span className="font-mono text-cortx-accent">{t.fichePanel.briefHint}</span> pour en générer une.
+              {t.fichePanel.ficheHintBefore}<span className="font-mono text-cortx-accent">{t.fichePanel.briefHint}</span>{t.fichePanel.ficheHintAfter}
             </p>
           </div>
         ) : (

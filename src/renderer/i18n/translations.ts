@@ -41,6 +41,7 @@ export interface T {
     configSaved: string
     saveError: string
     folderError: string
+    resetDone: string
   }
   statusBar: {
     noCommit: string
@@ -125,6 +126,9 @@ export interface T {
     title: string
     empty: string
     briefHint: string
+    ficheHintBefore: string
+    ficheHintAfter: string
+    ficheDeleted: (subject: string) => string
     openPreview: string
     clickAgain: string
     delete: string
@@ -134,6 +138,7 @@ export interface T {
     accumulating: string
     draft: string
     drafts: string
+    synthesizing: string
     activateIdle: string
     selecting: string
     examining: string
@@ -160,6 +165,8 @@ export interface T {
     minutesAgo: (n: number) => string
     hoursAgo: (n: number) => string
     daysAgo: (n: number) => string
+    exploreMessage: (entities: string, content: string) => string
+    entityJoin: string
   }
   filePreview: {
     libraryReadOnly: string
@@ -195,6 +202,20 @@ export interface T {
     zoomIn: string
     zoomOut: string
     fitAll: string
+    rewrite: string
+    rewriting: string
+    delete: string
+    deleteForever: string
+    libDocDeleted: string
+    draftsInMemory: (n: number) => string
+    loading: string
+    empty: string
+    emptyHint: string
+    hint: string
+    createFile: string
+    openOriginal: string
+    viewTranscription: string
+    deleteFromLibrary: string
   }
   tags: {
     noTags: string
@@ -240,6 +261,8 @@ export interface T {
     done: string
     error: string
     selectDocument: string
+    open: string
+    openWith: string
   }
   libraryItem: {
     error: string
@@ -301,7 +324,8 @@ const fr: T = {
     saving: 'Sauvegarde...',
     configSaved: 'Configuration sauvegardée',
     saveError: 'Erreur lors de la sauvegarde',
-    folderError: 'Erreur lors de la sélection du dossier'
+    folderError: 'Erreur lors de la sélection du dossier',
+    resetDone: 'Base de connaissances réinitialisée'
   },
   statusBar: {
     noCommit: 'Aucun commit',
@@ -386,6 +410,9 @@ const fr: T = {
     title: 'Fiches générées',
     empty: 'Aucune fiche pour le moment.',
     briefHint: '/brief sujet',
+    ficheHintBefore: 'Tape ',
+    ficheHintAfter: ' pour en générer une.',
+    ficheDeleted: (subject) => `Fiche "${subject}" supprimée`,
     openPreview: "Ouvrir dans l'aperçu",
     clickAgain: 'Cliquer à nouveau pour confirmer',
     delete: 'Supprimer'
@@ -395,6 +422,7 @@ const fr: T = {
     accumulating: "L'agent accumule des intuitions en silence…",
     draft: 'brouillon',
     drafts: 'brouillons',
+    synthesizing: 'en cours de synthèse',
     activateIdle: "Activez le mode Idle pour lancer l'exploration du graphe.",
     selecting: 'Sélection...',
     examining: 'Examen...',
@@ -420,7 +448,9 @@ const fr: T = {
     justNow: 'à l\'instant',
     minutesAgo: (n) => `il y a ${n}min`,
     hoursAgo: (n) => `il y a ${n}h`,
-    daysAgo: (n) => `il y a ${n}j`
+    daysAgo: (n) => `il y a ${n}j`,
+    exploreMessage: (entities, content) => `Peux-tu développer cet insight concernant ${entities} : "${content}"`,
+    entityJoin: ' et '
   },
   filePreview: {
     libraryReadOnly: 'Fichier de la bibliothèque (lecture seule)',
@@ -455,7 +485,21 @@ const fr: T = {
   graph: {
     zoomIn: 'Zoom +',
     zoomOut: 'Zoom -',
-    fitAll: 'Tout afficher'
+    fitAll: 'Tout afficher',
+    rewrite: 'Reprendre la rédaction',
+    rewriting: 'Réorganisation...',
+    delete: 'Supprimer',
+    deleteForever: 'Supprimer définitivement ?',
+    libDocDeleted: 'Document supprimé de la bibliothèque',
+    draftsInMemory: (n) => `${n} brouillon${n > 1 ? 's' : ''} en mémoire`,
+    loading: 'Chargement du graphe...',
+    empty: 'Graphe vide',
+    emptyHint: 'Commence par capturer des informations via la conversation.',
+    hint: 'Clic = sélectionner · Double-clic = ouvrir · Clic droit = menu · Glisser = déplacer',
+    createFile: 'Créer un nouveau fichier',
+    openOriginal: 'Ouvrir le fichier original',
+    viewTranscription: 'Voir la transcription Markdown',
+    deleteFromLibrary: 'Supprimer de la bibliothèque'
   },
   tags: {
     noTags: 'Aucun tag',
@@ -499,7 +543,10 @@ const fr: T = {
     embedding: 'embeddings…',
     linking: 'liens…',
     done: 'terminé',
-    error: 'erreur'
+    error: 'erreur',
+    selectDocument: 'Sélectionnez un document',
+    open: 'Ouvrir',
+    openWith: 'Ouvrir avec le logiciel système'
   },
   libraryItem: {
     error: 'erreur',
@@ -561,7 +608,8 @@ const en: T = {
     saving: 'Saving...',
     configSaved: 'Configuration saved',
     saveError: 'Error saving configuration',
-    folderError: 'Error selecting folder'
+    folderError: 'Error selecting folder',
+    resetDone: 'Knowledge base reset'
   },
   statusBar: {
     noCommit: 'No commit',
@@ -646,6 +694,9 @@ const en: T = {
     title: 'Generated cards',
     empty: 'No cards yet.',
     briefHint: '/brief subject',
+    ficheHintBefore: 'Type ',
+    ficheHintAfter: ' to generate one.',
+    ficheDeleted: (subject) => `Card "${subject}" deleted`,
     openPreview: 'Open in preview',
     clickAgain: 'Click again to confirm',
     delete: 'Delete'
@@ -655,6 +706,7 @@ const en: T = {
     accumulating: 'Agent quietly accumulating insights…',
     draft: 'draft',
     drafts: 'drafts',
+    synthesizing: 'being synthesized',
     activateIdle: 'Enable Idle mode to start graph exploration.',
     selecting: 'Selecting...',
     examining: 'Examining...',
@@ -680,7 +732,9 @@ const en: T = {
     justNow: 'just now',
     minutesAgo: (n) => `${n}min ago`,
     hoursAgo: (n) => `${n}h ago`,
-    daysAgo: (n) => `${n}d ago`
+    daysAgo: (n) => `${n}d ago`,
+    exploreMessage: (entities, content) => `Can you expand on this insight about ${entities}: "${content}"`,
+    entityJoin: ' and '
   },
   filePreview: {
     libraryReadOnly: 'Library file (read only)',
@@ -715,7 +769,21 @@ const en: T = {
   graph: {
     zoomIn: 'Zoom in',
     zoomOut: 'Zoom out',
-    fitAll: 'Fit all'
+    fitAll: 'Fit all',
+    rewrite: 'Rewrite',
+    rewriting: 'Reorganizing...',
+    delete: 'Delete',
+    deleteForever: 'Delete permanently?',
+    libDocDeleted: 'Document removed from library',
+    draftsInMemory: (n) => `${n} draft${n > 1 ? 's' : ''} in memory`,
+    loading: 'Loading graph...',
+    empty: 'Empty graph',
+    emptyHint: 'Start by capturing information through the conversation.',
+    hint: 'Click = select · Double-click = open · Right-click = menu · Drag = move',
+    createFile: 'Create new file',
+    openOriginal: 'Open original file',
+    viewTranscription: 'View Markdown transcription',
+    deleteFromLibrary: 'Remove from library'
   },
   tags: {
     noTags: 'No tags',
@@ -759,7 +827,10 @@ const en: T = {
     embedding: 'embedding…',
     linking: 'linking…',
     done: 'done',
-    error: 'error'
+    error: 'error',
+    selectDocument: 'Select a document',
+    open: 'Open',
+    openWith: 'Open with system application'
   },
   libraryItem: {
     error: 'error',
