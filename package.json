@@ -10,6 +10,7 @@
     "dist": "electron-vite build && electron-builder --win",
     "postinstall": "electron-builder install-app-deps",
     "rebuild": "electron-rebuild -f -w better-sqlite3",
+    "setup-sidecar": "node scripts/setup-sidecar.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

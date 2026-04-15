@@ -1,0 +1,136 @@
+name: Build Python Sidecar
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to attach the asset to (e.g. v1.2.0)'
+        required: true
+
+jobs:
+  build-windows:
+    name: Build sidecar (Windows x64)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Cache pip wheels — heavy deps (torch, docling) are slow to download
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\pip\Cache
+          key: ${{ runner.os }}-pip-${{ hashFiles('python-sidecar/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      # Cache the sentence-transformers model so re-runs don't re-download it
+      - name: Cache embedding model
+        uses: actions/cache@v4
+        with:
+          path: python-sidecar/model-cache
+          key: e5-small-multilingual-v1
+
+      - name: Create venv and install dependencies
+        working-directory: python-sidecar
+        run: |
+          python -m venv .venv
+          .\.venv\Scripts\Activate.ps1
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build with PyInstaller
+        working-directory: python-sidecar
+        run: |
+          .\.venv\Scripts\Activate.ps1
+          pyinstaller `
+            --onedir `
+            --name cortx-extractor `
+            --distpath dist `
+            --workpath build `
+            --specpath . `
+            --noconfirm `
+            --clean `
+            --collect-all docling `
+            --collect-all docling_core `
+            --collect-all docling_parse `
+            --collect-all docling_ibm_models `
+            --collect-all sentence_transformers `
+            --collect-all transformers `
+            --collect-all tokenizers `
+            --collect-all huggingface_hub `
+            --collect-all safetensors `
+            --collect-all torch `
+            --collect-all rapidocr `
+            --collect-all onnxruntime `
+            --collect-all omegaconf `
+            --hidden-import docling.models.plugins `
+            --hidden-import docling.backend `
+            --hidden-import docling.pipeline `
+            --hidden-import PIL `
+            --hidden-import cv2 `
+            --hidden-import easyocr `
+            --hidden-import rtree `
+            cortx_extractor.py
+
+      - name: Pre-download embedding model into dist
+        working-directory: python-sidecar
+        env:
+          MODEL_CACHE_DIR: ${{ github.workspace }}\python-sidecar\model-cache
+        run: |
+          .\.venv\Scripts\Activate.ps1
+          $modelDest = "dist\cortx-extractor\_internal\sentence_transformers_cache"
+          New-Item -ItemType Directory -Force -Path $modelDest | Out-Null
+
+          # Use the actions cache dir if populated, otherwise download fresh
+          if (Test-Path "$env:MODEL_CACHE_DIR\intfloat_multilingual-e5-small") {
+            Copy-Item "$env:MODEL_CACHE_DIR\intfloat_multilingual-e5-small" -Destination $modelDest -Recurse -Force
+            Write-Host "Model restored from cache."
+          } else {
+            python -c @"
+          import os
+          os.environ['SENTENCE_TRANSFORMERS_HOME'] = r'$modelDest'
+          from sentence_transformers import SentenceTransformer
+          SentenceTransformer('intfloat/multilingual-e5-small')
+          "@
+            # Save to cache for next run
+            New-Item -ItemType Directory -Force -Path "$env:MODEL_CACHE_DIR" | Out-Null
+            Copy-Item "$modelDest\intfloat_multilingual-e5-small" -Destination $env:MODEL_CACHE_DIR -Recurse -Force
+          }
+
+      - name: Create zip archive
+        working-directory: python-sidecar
+        run: |
+          Compress-Archive `
+            -Path "dist\cortx-extractor\*" `
+            -DestinationPath "cortx-extractor-win32-x64.zip" `
+            -Force
+          $size = (Get-Item "cortx-extractor-win32-x64.zip").Length / 1MB
+          Write-Host "Archive size: $([math]::Round($size, 1)) MB"
+
+      - name: Determine release tag
+        id: tag
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            echo "name=${{ github.event.inputs.tag }}" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "name=${{ github.ref_name }}" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          files: python-sidecar/cortx-extractor-win32-x64.zip
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

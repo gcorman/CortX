@@ -120,15 +120,25 @@ The two critical modules that already have full coverage are:
 
 ## Python sidecar (optional)
 
-The sidecar handles PDF/DOCX/XLSX extraction and embedding generation. It is not required for core agent/KB work.
+The sidecar handles PDF/DOCX/XLSX extraction and embedding generation. It is **not required** for core agent / KB work — the app runs normally without it, library ingestion just won't work.
+
+**Fastest setup (Windows, pre-built binary from GitHub Releases):**
 
 ```bash
-cd resources/python-sidecar
-pip install -r requirements.txt   # installs docling and e5-small dependencies
-python build.py                   # packages sidecar binary
+npm run setup-sidecar
 ```
 
-Until built, `LibraryService.ingest()` fails gracefully — the rest of the app works normally.
+**Build from source** (all platforms, requires Python 3.10+):
+
+```powershell
+cd python-sidecar
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+.\build.ps1
+```
+
+See [`python-sidecar/README.md`](python-sidecar/README.md) for full details including macOS/Linux notes.
 
 ---
 
