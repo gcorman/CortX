@@ -31,7 +31,7 @@ CortX is an Electron desktop app: an AI agent that reads natural-language input 
 
 Core of the product. **Propose-then-execute** architecture — do not collapse into single auto-execute.
 
-1. **`process(input)`** — retrieves KB context via `DatabaseService.search()` + library context via `retrieveLibraryContext()`, builds a system prompt with `promptBuilder`, calls LLM, parses JSON response (strict → code block → regex fallbacks), normalizes actions, returns them with `status: 'proposed'`. **No files written.**
+1. **`process(input)`** — retrieves KB context via `DatabaseService.search()` + library context via `retrieveLibraryContext()`, fetches optional web context via `fetchWebContext()` (detects `/wiki` and `/internet` directives), builds a system prompt with `promptBuilder`, calls LLM, parses JSON response (strict → code block → regex fallbacks), normalizes actions, returns them with `status: 'proposed'`. **No files written.**
 2. **`preview(action)`** — returns `{ before, after }` for proposal modal. Computes modified content via `computeModifiedContent` without touching disk.
 3. **`execute(actions, summary)`** — only called after user clicks Accept. Writes files, runs `gitService.commitAll()`, re-indexes everything, logs to `agent_log` table.
 4. **`undo(commitHash)`** — `git revert` + reindex.
@@ -41,6 +41,7 @@ Core of the product. **Propose-then-execute** architecture — do not collapse i
 8. **`saveBrief(subject, body, kind?)`** — archives a brief/insight to `Fiches/YYYY-MM-DD_HH-MM_slug.md` with frontmatter. Sanitizes LLM output (strips leading frontmatter, duplicate H1, code fences).
 9. **`listFiches()`** — returns sorted list of `Fiches/` files with metadata (subject, kind, created, excerpt).
 10. **`deleteFiche(filePath)`** — deletes from `Fiches/` only.
+11. **`wikiToMd(topic, lang?)`** — fetches a Wikipedia article (lang = app language, fallback English), passes full content to LLM, returns `AgentResponse` with proposed `create` action. User validates before any file is written. IPC: `agent:wikiToMd`.
 
 ### Multi-hop context expansion
 
@@ -83,6 +84,20 @@ CortX-Base/
 ```
 
 Config (base path, LLM provider, API key, model, validation mode) persists to `app.getPath('userData')/cortx-config.json`. The `app:setConfig` IPC handler preserves masked API keys (`'***'`) so the renderer can hide secrets without losing them on save.
+
+### Web service (`src/main/services/WebService.ts`)
+
+Fetches external content to enrich the agent's context window. No API key needed for Wikipedia.
+
+- **`fetchWikipedia(topic, lang)`** — Wikipedia REST API (`/api/rest_v1/page/summary` + `/mobile-sections`). Fetches in the requested language, auto-fallbacks to English if not found. Returns title, plain-text extract, and up to 12 sections (capped at 2 000 chars each).
+- **`fetchUrl(url)`** — Generic HTTP fetch + HTML strip (removes scripts/styles, decodes entities). Max 8 000 chars to keep prompt size sane.
+- **`formatWikipediaAsContext` / `formatUrlAsContext`** — render results as Markdown blocks for prompt injection.
+
+**Web directives in chat input** (parsed by `AgentPipeline.fetchWebContext()`):
+- `/wiki <topic>` — fetch Wikipedia in app language (fallback English)
+- `/internet <url>` — fetch any URL directly
+
+Fetched content is appended to the system prompt under `SOURCES WEB RÉCUPÉRÉES` before the LLM call. The propose-then-execute flow is unchanged — user still validates before any file is written.
 
 ### LLM provider abstraction (`LLMService`)
 

@@ -19,6 +19,7 @@ The agent doesn’t just answer — it **writes and modifies** the files in your
 - **Questions on the base** — ask your knowledge base without modifying it; the agent cites sources
 - **Reflection** — think out loud, the agent suggests actions without executing them
 - **Commands** — `/ask`, `/brief [topic]`, `/synthese`, `/digest`
+- **Web enrichment** — use `/wiki <topic>` or `/internet <url>` in any message to inject live web content into the agent’s context before it proposes actions
 
 Every action proposed by the agent is previewable (diff before/after) and requires your explicit approval. Nothing is written without your consent.
 
@@ -30,6 +31,12 @@ Search combining full-text indexing (FTS5) and semantic search via embeddings. T
 
 ### Document Library
 Import and indexing of PDF, DOCX, PPTX, and XLSX files. Documents are chunked, vectorized, and integrated into the agent’s context.
+
+### Web Search & Wikipedia Import
+Fetch live web content directly from the chat:
+- `/wiki Notion` — imports a Wikipedia article and generates a structured `.md` file (proposed, requires validation)
+- `/internet https://...` — fetches any URL and injects its content as context for the current action
+- Language-aware: searches Wikipedia in the app’s selected language (FR/EN) with automatic English fallback
 
 ### Automatic Versioning
 Every accepted action = a Git commit. Full history, one-click undo (`git revert`), and built-in audit log.
@@ -105,7 +112,8 @@ On first launch, configure in the settings:
 | Database           | SQLite (better-sqlite3) + FTS5 + embeddings |
 | Versioning         | isomorphic-git                      |
 | Graph              | Cytoscape.js (fcose + cose-bilkent) |
-| LLM                | Anthropic SDK + OpenAI-compatible (fetch) |
+| LLM                | Anthropic SDK + OpenAI-compatible (fetch) + Google AI |
+| Web fetch          | Node.js built-in fetch + Wikipedia REST API |
 | Documents          | Python sidecar (docling, openpyxl, python-pptx) |
 
 ### Agent Pipeline — Propose-then-Execute
@@ -184,6 +192,7 @@ Each Markdown file follows a standardized format with YAML frontmatter (type, ta
 | Idle Mode (passive insights)            | ✅ Complete |
 | Internationalization (FR / EN)          | ✅ Complete |
 | Settings (LLM, path, validation, language) | ✅ Complete |
+| Web enrichment (/wiki + /internet)      | ✅ Complete |
 | Hybrid LLM router (local/API auto)      | 🔜 Planned |
 | Global quick capture (system shortcut)  | 🔜 Planned |
 | PDF / Markdown export                   | 🔜 Planned |
