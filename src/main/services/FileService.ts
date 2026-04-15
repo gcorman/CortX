@@ -2,17 +2,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import matter from 'gray-matter'
 import type { FileContent, EntityType } from '../../shared/types'
-
-const BASE_DIRS = [
-  'Reseau',
-  'Entreprises',
-  'Domaines',
-  'Projets',
-  'Journal',
-  'Fiches',
-  '_Templates',
-  '_System'
-]
+import { BASE_DIRS, TYPE_TO_DIR } from '../../shared/constants'
 
 export class FileService {
   constructor(private basePath: string) {}
@@ -94,15 +84,7 @@ export class FileService {
   }
 
   private getDirectoryForType(type: EntityType): string {
-    const dirMap: Record<EntityType, string> = {
-      personne: 'Reseau',
-      entreprise: 'Entreprises',
-      domaine: 'Domaines',
-      projet: 'Projets',
-      journal: 'Journal',
-      note: 'Reseau'
-    }
-    return dirMap[type]
+    return TYPE_TO_DIR[type] ?? 'Journal'
   }
 
   private slugify(text: string): string {

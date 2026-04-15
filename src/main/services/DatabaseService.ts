@@ -272,7 +272,23 @@ export class DatabaseService {
 
   // --- Files ---
 
+  /**
+   * Full single-file index: entities + relations in one call.
+   * Use this for incremental updates (single file save, manual edit, etc.).
+   * For bulk reindex use indexFileEntities() + indexFileRelations() as two
+   * separate passes so all entities exist before any wikilinks are resolved.
+   */
   indexFile(fileContent: FileContent): void {
+    this.indexFileEntities(fileContent)
+    this.indexFileRelations(fileContent)
+  }
+
+  /**
+   * Pass 1 — upsert the file row, FTS entry, and entity node.
+   * Does NOT touch relations or library links.
+   * Safe to call for every file before any pass-2 work begins.
+   */
+  indexFileEntities(fileContent: FileContent): void {
     const fm = fileContent.frontmatter
     const title = this.extractTitle(fileContent.body) || fileContent.path.split('/').pop()?.replace('.md', '') || ''
     const tags = JSON.stringify(fm.tags || [])
@@ -300,32 +316,33 @@ export class DatabaseService {
       fileContent.body
     )
 
-    // Index entities from file
-    this.indexEntitiesFromFile(fileContent)
-  }
-
-  private indexEntitiesFromFile(fileContent: FileContent): void {
-    const fm = fileContent.frontmatter
+    // Upsert entity node (graph vertex)
     // Type comes from frontmatter, but if missing we infer it from the
     // directory the file lives in. Without this, every file with a missing
     // `type:` ends up as a generic "note" and the relation classifier falls
     // back to "mentionne" for everything.
     const type = (fm.type as string) || inferTypeFromPath(fileContent.path)
-    const title = (fm.title as string) || this.extractTitle(fileContent.body) || fileContent.path.split('/').pop()?.replace('.md', '') || ''
+    const entityTitle = (fm.title as string) || title
 
-    // Index all known entity types as graph nodes
     const entityTypes = ['personne', 'entreprise', 'domaine', 'projet', 'note', 'journal']
     if (entityTypes.includes(type)) {
       const existing = this.db.prepare('SELECT id FROM entities WHERE file_path = ?').get(fileContent.path) as { id: number } | undefined
       if (!existing) {
         this.db.prepare('INSERT INTO entities (name, type, file_path, aliases) VALUES (?, ?, ?, ?)')
-          .run(title, type, fileContent.path, '[]')
+          .run(entityTitle, type, fileContent.path, '[]')
       } else {
         this.db.prepare('UPDATE entities SET name = ?, type = ? WHERE file_path = ?')
-          .run(title, type, fileContent.path)
+          .run(entityTitle, type, fileContent.path)
       }
     }
+  }
 
+  /**
+   * Pass 2 — resolve wikilinks into relation rows and library links.
+   * Must run AFTER indexFileEntities() has been called for ALL files,
+   * otherwise links to not-yet-indexed entities are silently dropped.
+   */
+  indexFileRelations(fileContent: FileContent): void {
     // Clear previous relations coming from this file — they may be stale
     // (a line was edited, a link removed, or the inferred type changed).
     this.db.prepare('DELETE FROM relations WHERE source_file = ?').run(fileContent.path)

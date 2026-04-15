@@ -6,6 +6,7 @@ import { LLMService } from './LLMService'
 import { libraryService } from './LibraryService'
 import { buildSystemPrompt } from '../utils/promptBuilder'
 import type { AgentResponse, AgentAction, LibraryChunkResult, AppLanguage } from '../../shared/types'
+import { TYPE_TO_DIR, KNOWN_DIRS, DIR_ALIASES } from '../../shared/constants'
 
 interface RawAction {
   action?: string
@@ -634,8 +635,10 @@ export class AgentPipeline {
         console.error('[AgentPipeline] Failed to read', filePath, err)
       }
     }
-    for (const content of contents) this.dbService.indexFile(content)
-    for (const content of contents) this.dbService.indexFile(content)
+    // Pass 1: register all file rows, FTS entries, and entity nodes.
+    for (const content of contents) this.dbService.indexFileEntities(content)
+    // Pass 2: resolve [[wikilinks]] into relations now that all entity rows exist.
+    for (const content of contents) this.dbService.indexFileRelations(content)
 
     // Remove DB entries for files that no longer exist on disk (e.g. after deletion).
     this.dbService.purgeStaleFiles(new Set(files))
@@ -686,29 +689,7 @@ export class AgentPipeline {
   private normalizeActions(rawActions: RawAction[]): Array<{
     action: string; file: string; content: string; section?: string; operation?: string; old_content?: string
   }> {
-    // Canonical directory names — must match FileService.BASE_DIRS exactly.
-    // The prompt sometimes shows "Réseau/" with an accent; the filesystem uses
-    // "Reseau/" without one. We MUST normalize, otherwise files end up in a
-    // ghost directory disconnected from the rest of the base.
-    const TYPE_TO_DIR: Record<string, string> = {
-      personne: 'Reseau',
-      entreprise: 'Entreprises',
-      domaine: 'Domaines',
-      projet: 'Projets',
-      journal: 'Journal',
-      note: 'Journal'
-    }
-    const KNOWN_DIRS = ['Reseau', 'Entreprises', 'Domaines', 'Projets', 'Journal', 'Fiches']
-    // Map every accent / casing variant the LLM might emit back to the canonical name.
-    const DIR_ALIASES: Record<string, string> = {
-      'reseau': 'Reseau', 'réseau': 'Reseau', 'network': 'Reseau', 'people': 'Reseau', 'contacts': 'Reseau',
-      'entreprises': 'Entreprises', 'entreprise': 'Entreprises', 'companies': 'Entreprises', 'organisations': 'Entreprises',
-      'domaines': 'Domaines', 'domaine': 'Domaines', 'topics': 'Domaines',
-      'projets': 'Projets', 'projet': 'Projets', 'projects': 'Projets',
-      'journal': 'Journal', 'daily': 'Journal', 'logs': 'Journal',
-      'fiches': 'Fiches', 'briefs': 'Fiches'
-    }
-
+    // TYPE_TO_DIR, KNOWN_DIRS, DIR_ALIASES imported from shared/constants.
     return rawActions
       .map((a) => ({
         action: this.normalizeActionType(a.action || a.type || 'create'),
@@ -778,8 +759,14 @@ export class AgentPipeline {
 
   private normalizeActionType(action: string): string {
     const lower = action.toLowerCase().trim()
-    if (['create', 'créer', 'creer', 'new', 'add', 'create_file'].includes(lower)) return 'create'
-    if (['modify', 'modifier', 'update', 'edit', 'append', 'modify_file', 'change'].includes(lower)) return 'modify'
+    if ([
+      'create', 'créer', 'creer', 'new', 'add', 'create_file',
+      'insert', 'write', 'generate', 'make',
+    ].includes(lower)) return 'create'
+    if ([
+      'modify', 'modifier', 'update', 'edit', 'append', 'modify_file', 'change',
+      'patch', 'amend', 'revise', 'upsert',
+    ].includes(lower)) return 'modify'
     return lower
   }
 
