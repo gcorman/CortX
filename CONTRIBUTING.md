@@ -80,6 +80,26 @@ Add migrations inside `DatabaseService.ts` using `CREATE TABLE IF NOT EXISTS` / 
 
 ---
 
+## Running tests
+
+```bash
+npm test          # run once (CI mode)
+npm run test:watch  # re-run on file change (dev mode)
+```
+
+Tests live next to the code they cover in `__tests__/` subdirectories.
+The two critical modules that already have full coverage are:
+
+| Test file | What it covers |
+|-----------|----------------|
+| `src/main/utils/__tests__/contentMerge.test.ts` | `computeModifiedContent`, `safeAppend`, `modifySection`, `normalizeHeading` — the entire merge pipeline including accent/case-insensitive section matching |
+| `src/main/utils/__tests__/actionNormalize.test.ts` | `normalizeActions`, `normalizeActionType` — verb normalisation, type-based routing, directory alias resolution, path sanitisation, Fiches/ guard |
+
+**When adding new logic to these utils**, add a test for it in the same PR.  
+**When adding new services**, extract any pure (no-IO) logic into a `utils/` function so it can be tested without mocking Electron or SQLite.
+
+---
+
 ## Coding conventions
 
 - TypeScript strict mode. No `any` except at SQLite row boundaries (cast explicitly).

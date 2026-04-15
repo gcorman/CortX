@@ -1,4 +1,3 @@
-import matter from 'gray-matter'
 import { FileService } from './FileService'
 import { DatabaseService } from './DatabaseService'
 import { GitService } from './GitService'
@@ -6,20 +5,9 @@ import { LLMService } from './LLMService'
 import { libraryService } from './LibraryService'
 import { buildSystemPrompt } from '../utils/promptBuilder'
 import type { AgentResponse, AgentAction, LibraryChunkResult, AppLanguage } from '../../shared/types'
-import { TYPE_TO_DIR, KNOWN_DIRS, DIR_ALIASES } from '../../shared/constants'
-
-interface RawAction {
-  action?: string
-  type?: string
-  file?: string
-  path?: string
-  filename?: string
-  filepath?: string
-  content?: string
-  section?: string
-  operation?: string
-  old_content?: string
-}
+import { computeModifiedContent } from '../utils/contentMerge'
+import { normalizeActions } from '../utils/actionNormalize'
+import type { RawAction } from '../utils/actionNormalize'
 
 interface RawAgentResponse {
   input_type?: string
@@ -453,169 +441,12 @@ export class AgentPipeline {
   }
 
   // --- Compute modified content without writing to disk ---
+  // Pure logic lives in src/main/utils/contentMerge.ts (tested independently).
 
   private computeModifiedContent(existingRaw: string, action: {
-    content: string
-    section?: string
-    operation?: string
-    oldContent?: string
-    old_content?: string
+    content: string; section?: string; operation?: string; oldContent?: string; old_content?: string
   }): string {
-    if (!existingRaw) return action.content
-
-    const hasFrontmatter = existingRaw.trimStart().startsWith('---')
-    const oldContent = action.oldContent || action.old_content
-    const operation = action.operation?.toLowerCase()
-
-    const parsed = matter(existingRaw)
-    let body = parsed.content
-    const data = parsed.data as Record<string, unknown>
-
-    // --- Frontmatter modifications ---
-    if (action.section?.startsWith('frontmatter.')) {
-      const field = action.section.replace('frontmatter.', '')
-      if (operation === 'add_item') {
-        const current = (data[field] as string[]) || []
-        const newItem = action.content.replace(/^"|"$/g, '')
-        if (!current.includes(newItem)) current.push(newItem)
-        data[field] = current
-      } else {
-        data[field] = action.content
-      }
-      data.modified = new Date().toISOString().split('T')[0]
-      return hasFrontmatter ? matter.stringify(body, data) : body
-    }
-
-    // --- Body modifications ---
-
-    // Explicit replace_line with old_content
-    if (operation === 'replace_line' && oldContent) {
-      body = body.replace(oldContent, action.content)
-    }
-    // Explicit full replace (only when explicitly requested)
-    else if (operation === 'replace') {
-      if (action.section && action.section !== 'root') {
-        body = this.modifySection(body, action.section, action.content, 'replace')
-      } else {
-        body = action.content
-      }
-    }
-    // Explicit prepend
-    else if (operation === 'prepend') {
-      if (action.section && action.section !== 'root') {
-        body = this.modifySection(body, action.section, action.content, 'prepend')
-      } else {
-        body = action.content + '\n' + body
-      }
-    }
-    // Section-targeted (append by default)
-    else if (action.section && action.section !== 'root') {
-      body = this.modifySection(body, action.section, action.content, operation || 'append')
-    }
-    // No section, no operation — SAFE APPEND only:
-    // Strip frontmatter from incoming content, dedupe lines that already exist,
-    // and append the rest. NEVER overwrites existing content.
-    else {
-      body = this.safeAppend(body, action.content)
-    }
-
-    if (hasFrontmatter) {
-      data.modified = new Date().toISOString().split('T')[0]
-      return matter.stringify(body, data)
-    }
-    return body.trimStart()
-  }
-
-  /**
-   * Safe append: never overwrites. Strips frontmatter from incoming content,
-   * dedupes any line that already exists in the body, and merges the remainder.
-   *
-   * If the new content contains headings matching existing ones, the lines under
-   * each heading are appended under the corresponding existing section.
-   * Otherwise the deduped remainder is appended at the end.
-   */
-  private safeAppend(existingBody: string, newContent: string): string {
-    // Strip frontmatter from incoming content if present
-    let clean = newContent
-    if (clean.trimStart().startsWith('---')) {
-      try {
-        clean = matter(clean).content
-      } catch { /* keep as-is */ }
-    }
-    clean = clean.trim()
-    if (!clean) return existingBody
-
-    // Build a set of trimmed non-empty lines already present in the body
-    const existingLineSet = new Set(
-      existingBody.split('\n').map((l) => l.trim()).filter(Boolean)
-    )
-
-    // Parse incoming content into sections by heading (preserve level for H1 detection)
-    const lines = clean.split('\n')
-    const sections: Array<{ heading: string | null; level: number; lines: string[] }> = []
-    let current: { heading: string | null; level: number; lines: string[] } = { heading: null, level: 0, lines: [] }
-    for (const line of lines) {
-      const headingMatch = line.match(/^(#{1,6})\s+(.+?)\s*$/)
-      if (headingMatch) {
-        if (current.lines.length || current.heading) sections.push(current)
-        current = { heading: headingMatch[2].trim(), level: headingMatch[1].length, lines: [] }
-      } else {
-        current.lines.push(line)
-      }
-    }
-    if (current.lines.length || current.heading) sections.push(current)
-
-    let result = existingBody
-
-    for (const sec of sections) {
-      // Drop top-level H1 that just repeats an existing H1 (LLMs often re-emit it)
-      if (sec.heading && sec.level === 1) {
-        const existingH1 = result.split('\n').some(line => {
-          const m = line.match(/^#\s+(.+)$/)
-          return m && this.normalizeHeading(m[1]) === this.normalizeHeading(sec.heading!)
-        })
-        if (existingH1 && sec.lines.every((l) => !l.trim() || existingLineSet.has(l.trim()))) {
-          continue
-        }
-      }
-
-      // Dedupe: keep only lines that don't already exist in the body
-      const dedupedLines: string[] = []
-      for (const ln of sec.lines) {
-        const t = ln.trim()
-        if (!t) {
-          dedupedLines.push(ln)
-        } else if (!existingLineSet.has(t)) {
-          dedupedLines.push(ln)
-          existingLineSet.add(t)
-        }
-      }
-      const addition = dedupedLines.join('\n').trim()
-      if (!addition && !sec.heading) continue
-
-      if (sec.heading) {
-        // Look for an existing section with the same heading (accent- and case-insensitive)
-        const normalizedTarget = this.normalizeHeading(sec.heading)
-        const hasSection = result.split('\n').some(line => {
-          const m = line.match(/^(#{1,6})\s+(.+)$/)
-          return m && this.normalizeHeading(m[2]) === normalizedTarget
-        })
-        if (hasSection) {
-          if (addition) {
-            result = this.modifySection(result, sec.heading, addition, 'append')
-          }
-        } else {
-          // New section — append at the end
-          result = result.trimEnd() + `\n\n## ${sec.heading}\n${addition}`.trimEnd()
-          existingLineSet.add(`## ${sec.heading}`.trim())
-        }
-      } else if (addition) {
-        // Loose lines with no heading — append to the end of the body
-        result = result.trimEnd() + '\n\n' + addition
-      }
-    }
-
-    return result
+    return computeModifiedContent(existingRaw, action)
   }
 
   // --- Private methods ---
@@ -686,88 +517,9 @@ export class AgentPipeline {
     console.log('[AgentPipeline] KB embeddings updated.')
   }
 
-  private normalizeActions(rawActions: RawAction[]): Array<{
-    action: string; file: string; content: string; section?: string; operation?: string; old_content?: string
-  }> {
-    // TYPE_TO_DIR, KNOWN_DIRS, DIR_ALIASES imported from shared/constants.
-    return rawActions
-      .map((a) => ({
-        action: this.normalizeActionType(a.action || a.type || 'create'),
-        file: a.file || a.path || a.filename || a.filepath || '',
-        content: a.content || '',
-        section: a.section,
-        operation: a.operation,
-        old_content: a.old_content
-      }))
-      .filter((a) => {
-        if (!a.file) {
-          console.warn('[AgentPipeline] Skipping action with missing file path:', a)
-          return false
-        }
-        return true
-      })
-      .map((a) => {
-        // Strip Windows-illegal characters from the path, but keep separators.
-        a.file = a.file.replace(/\\/g, '/').replace(/[<>:"|?*]/g, '').trim()
-        if (!a.file.endsWith('.md')) {
-          a.file = `${a.file.replace(/\s+/g, '_')}.md`
-        }
-
-        // Detect the type from the frontmatter the LLM emitted.
-        const typeMatch = a.content.match(/^\s*type:\s*['"]?(personne|entreprise|domaine|projet|journal|note|fiche)['"]?/im)
-        const detectedType = typeMatch?.[1].toLowerCase()
-
-        // Split file into directory + filename.
-        const segments = a.file.split('/').filter(Boolean)
-        const filename = segments.pop() || a.file
-        const rawDir = segments.join('/')
-        const firstSegment = segments[0]?.toLowerCase()
-        const aliasedDir = firstSegment ? DIR_ALIASES[firstSegment] : undefined
-
-        // Authoritative routing rules (in priority order):
-        //  1. Known type → forced canonical directory. Type wins over what the LLM
-        //     said about the path. Fixes "personne in Fiches/" and accent ghost dirs.
-        //  2. No known type, but the directory is a known alias → normalize the alias.
-        //  3. No directory at all → fall back to Journal/ (a sensible default for
-        //     freeform notes the LLM didn't classify).
-        //  4. Otherwise keep what the LLM produced (safe for arbitrary subpaths).
-        if (detectedType && detectedType !== 'fiche' && TYPE_TO_DIR[detectedType]) {
-          a.file = `${TYPE_TO_DIR[detectedType]}/${filename}`
-        } else if (aliasedDir) {
-          // Replace the first segment with its canonical form, keep any deeper subpath.
-          const rest = segments.slice(1).join('/')
-          a.file = rest ? `${aliasedDir}/${rest}/${filename}` : `${aliasedDir}/${filename}`
-        } else if (!rawDir) {
-          a.file = `Journal/${filename}`
-        } else if (!KNOWN_DIRS.includes(segments[0])) {
-          // Unknown top-level dir — re-route to Journal to keep the base tidy.
-          a.file = `Journal/${filename}`
-        }
-
-        // Final guard: NEVER let the LLM write to Fiches/ from a normal action.
-        // Fiches/ is reserved for the saveBrief pipeline (the /brief command).
-        if (a.file.startsWith('Fiches/')) {
-          // Re-route based on detected type, or default to Journal.
-          const fallback = detectedType && TYPE_TO_DIR[detectedType] ? TYPE_TO_DIR[detectedType] : 'Journal'
-          a.file = `${fallback}/${filename}`
-          console.warn(`[AgentPipeline] Re-routed Fiches/ write to ${a.file}`)
-        }
-
-        return a
-      })
-  }
-
-  private normalizeActionType(action: string): string {
-    const lower = action.toLowerCase().trim()
-    if ([
-      'create', 'créer', 'creer', 'new', 'add', 'create_file',
-      'insert', 'write', 'generate', 'make',
-    ].includes(lower)) return 'create'
-    if ([
-      'modify', 'modifier', 'update', 'edit', 'append', 'modify_file', 'change',
-      'patch', 'amend', 'revise', 'upsert',
-    ].includes(lower)) return 'modify'
-    return lower
+  // normalizeActions / normalizeActionType live in src/main/utils/actionNormalize.ts.
+  private normalizeActions(rawActions: RawAction[]): ReturnType<typeof normalizeActions> {
+    return normalizeActions(rawActions)
   }
 
   private async retrieveLibraryContext(input: string): Promise<LibraryChunkResult[]> {
@@ -1110,36 +862,4 @@ export class AgentPipeline {
     await this.fileService.writeFile(action.file, result)
   }
 
-  /** Strip diacritics and lowercase for heading comparison. */
-  private normalizeHeading(h: string): string {
-    return h
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/^#+\s*/, '')
-      .toLowerCase()
-      .trim()
-  }
-
-  private modifySection(body: string, sectionName: string, content: string, operation: string): string {
-    const lines = body.split('\n')
-    const normalizedTarget = this.normalizeHeading(sectionName)
-    let sectionStart = -1, sectionLevel = 0
-    for (let i = 0; i < lines.length; i++) {
-      const match = lines[i].match(/^(#{1,6})\s+(.+)$/)
-      if (match && this.normalizeHeading(match[2]) === normalizedTarget) {
-        sectionStart = i; sectionLevel = match[1].length; break
-      }
-    }
-    const sectionClean = sectionName.replace(/^#+\s*/, '')
-    if (sectionStart === -1) return body + `\n\n## ${sectionClean}\n${content}`
-    let sectionEnd = lines.length
-    for (let i = sectionStart + 1; i < lines.length; i++) {
-      const match = lines[i].match(/^(#{1,6})\s+/)
-      if (match && match[1].length <= sectionLevel) { sectionEnd = i; break }
-    }
-    if (operation === 'prepend') lines.splice(sectionStart + 1, 0, content)
-    else if (operation === 'replace') lines.splice(sectionStart + 1, sectionEnd - sectionStart - 1, content)
-    else lines.splice(sectionEnd, 0, content)
-    return lines.join('\n')
-  }
 }

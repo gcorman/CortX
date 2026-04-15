@@ -9,7 +9,9 @@
     "preview": "electron-vite preview",
     "dist": "electron-vite build && electron-builder --win",
     "postinstall": "electron-builder install-app-deps",
-    "rebuild": "electron-rebuild -f -w better-sqlite3"
+    "rebuild": "electron-rebuild -f -w better-sqlite3",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "build": {
     "appId": "com.cortx.app",
@@ -25,7 +27,9 @@
       {
         "from": "resources/python-sidecar",
         "to": "python-sidecar",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
@@ -68,7 +72,8 @@
     "postcss": "^8.5.8",
     "tailwindcss": "^3.4.19",
     "typescript": "^6.0.2",
-    "vite": "^7.3.2"
+    "vite": "^7.3.2",
+    "vitest": "^4.1.4"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",

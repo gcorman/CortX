@@ -40,7 +40,8 @@
       "Bash(\"C:/Users/gauti/Documents/GitHub/CortX/resources/python-sidecar/cortx-extractor.exe\")",
       "Bash(pip show:*)",
       "Bash(python -c \"import onnxruntime; print\\(onnxruntime.__file__\\)\")",
-      "Bash(python -c \"import omegaconf; print\\(omegaconf.__file__\\)\")"
+      "Bash(python -c \"import omegaconf; print\\(omegaconf.__file__\\)\")",
+      "Bash(npm test:*)"
     ]
   }
 }
