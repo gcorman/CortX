@@ -31,9 +31,14 @@ export class LLMService {
     if (this.config.provider === 'anthropic' && !this.config.apiKey) {
       throw new Error('Cle API non configuree. Va dans Settings pour ajouter ta cle.')
     }
+    if (this.config.provider === 'google-ai' && !this.config.apiKey) {
+      throw new Error('Cle API Google AI non configuree. Va dans Settings pour ajouter ta cle.')
+    }
 
     if (this.config.provider === 'anthropic') {
       return this.sendAnthropic(messages, systemPrompt, onDelta)
+    } else if (this.config.provider === 'google-ai') {
+      return this.sendGoogleAI(messages, systemPrompt, onDelta)
     } else {
       return this.sendOpenAICompatible(messages, systemPrompt, onDelta)
     }
@@ -217,6 +222,104 @@ export class LLMService {
     }
 
     return full
+  }
+
+  private async sendGoogleAI(
+    messages: Array<{ role: string; content: string }>,
+    systemPrompt?: string,
+    onDelta?: (delta: string) => void
+  ): Promise<string> {
+    const model = this.config.model || 'gemini-2.0-flash-lite'
+    const apiKey = this.config.apiKey
+
+    // Separate system messages; Google AI uses a dedicated systemInstruction field
+    const userMessages = messages.filter((m) => m.role !== 'system')
+
+    const contents = userMessages.map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }]
+    }))
+
+    const body: Record<string, unknown> = {
+      contents,
+      generationConfig: {
+        maxOutputTokens: 8192,
+        temperature: 0.3
+      }
+    }
+
+    if (systemPrompt) {
+      body.systemInstruction = { parts: [{ text: systemPrompt }] }
+    }
+
+    if (onDelta) {
+      // Streaming via SSE
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+
+      if (!response.ok) {
+        const text = await response.text()
+        throw new Error(`Google AI API error ${response.status}: ${text}`)
+      }
+
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('Google AI: no response body')
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let full = ''
+
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+
+        const lines = buffer.split(/\r?\n/)
+        buffer = lines.pop() ?? ''
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed.startsWith('data:')) continue
+          const data = trimmed.slice(5).trim()
+          if (!data || data === '[DONE]') continue
+          try {
+            const parsed = JSON.parse(data) as {
+              candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+            }
+            const delta = parsed.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+            if (delta) {
+              full += delta
+              onDelta(delta)
+            }
+          } catch {
+            // ignore partial JSON
+          }
+        }
+      }
+
+      return full
+    }
+
+    // Non-streaming
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+      throw new Error(`Google AI API error ${response.status}: ${text}`)
+    }
+
+    const data = (await response.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+    }
+    return data.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
   }
 
   private extractOpenAIContent(raw: string): string {

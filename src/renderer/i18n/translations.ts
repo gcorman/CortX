@@ -17,7 +17,9 @@ export interface T {
     active: string
     anthropicDesc: string
     localDesc: string
+    googleAiDesc: string
     anthropicApiKey: string
+    googleAiApiKey: string
     serverUrl: string
     quickPresets: string
     apiKeyOptional: string
@@ -25,6 +27,11 @@ export interface T {
     model: string
     anthropicModelsHint: string
     localModelHint: string
+    googleAiModelsHint: string
+    privacyLocal: string
+    privacyRemote: string
+    privacyLocalDesc: string
+    privacyRemoteDesc: string
     dangerZone: string
     resetTitle: string
     resetDesc: string
@@ -56,6 +63,8 @@ export interface T {
     idleResting: string
     idle: string
     settings: string
+    privacyLocal: string
+    privacyRemote: string
   }
   centerPanel: {
     graph: string
@@ -315,7 +324,9 @@ const fr: T = {
     active: 'actif',
     anthropicDesc: 'API Anthropic — modèles Claude Sonnet, Opus, Haiku',
     localDesc: 'llama.cpp, Ollama, LM Studio, ou toute API compatible OpenAI',
+    googleAiDesc: 'Google AI Studio — Gemini, Gemma (forfait gratuit disponible)',
     anthropicApiKey: 'Clé API Anthropic',
+    googleAiApiKey: 'Clé API Google AI',
     serverUrl: 'URL du serveur',
     quickPresets: 'Presets rapides :',
     apiKeyOptional: 'Clé API',
@@ -323,6 +334,11 @@ const fr: T = {
     model: 'Modèle',
     anthropicModelsHint: 'claude-sonnet-4-20250514, claude-opus-4-20250514, claude-haiku-4-5-20251001',
     localModelHint: 'Nom du modèle chargé sur le serveur (ex: mistral, llama3, gemma3, qwen3)',
+    googleAiModelsHint: 'gemini-2.0-flash, gemini-2.5-pro, gemma-3-27b-it — voir ai.google.dev',
+    privacyLocal: 'Local',
+    privacyRemote: 'Internet',
+    privacyLocalDesc: 'Traitement local — vos données ne quittent pas votre machine',
+    privacyRemoteDesc: 'API distante — vos données sont envoyées à un serveur externe',
     dangerZone: 'Zone dangereuse',
     resetTitle: 'Réinitialiser la base de connaissances',
     resetDesc: 'Supprime tous les fichiers Markdown, l\'index SQLite et l\'historique Git. Cette action est irréversible.',
@@ -353,7 +369,9 @@ const fr: T = {
     idleInsight: 'Idle · Insight !',
     idleResting: 'Idle · Pause',
     idle: 'Idle',
-    settings: 'Settings'
+    settings: 'Settings',
+    privacyLocal: 'Local',
+    privacyRemote: 'Internet'
   },
   centerPanel: {
     graph: 'Graphe',
@@ -612,7 +630,9 @@ const en: T = {
     active: 'active',
     anthropicDesc: 'Anthropic API — Claude Sonnet, Opus, Haiku models',
     localDesc: 'llama.cpp, Ollama, LM Studio, or any OpenAI-compatible API',
+    googleAiDesc: 'Google AI Studio — Gemini, Gemma (free tier available)',
     anthropicApiKey: 'Anthropic API Key',
+    googleAiApiKey: 'Google AI API Key',
     serverUrl: 'Server URL',
     quickPresets: 'Quick presets:',
     apiKeyOptional: 'API Key',
@@ -620,6 +640,11 @@ const en: T = {
     model: 'Model',
     anthropicModelsHint: 'claude-sonnet-4-20250514, claude-opus-4-20250514, claude-haiku-4-5-20251001',
     localModelHint: 'Name of the model loaded on the server (e.g. mistral, llama3, gemma3, qwen3)',
+    googleAiModelsHint: 'gemini-2.0-flash, gemini-2.5-pro, gemma-3-27b-it — see ai.google.dev',
+    privacyLocal: 'Local',
+    privacyRemote: 'Internet',
+    privacyLocalDesc: 'Local processing — your data never leaves your machine',
+    privacyRemoteDesc: 'Remote API — your data is sent to an external server',
     dangerZone: 'Danger zone',
     resetTitle: 'Reset knowledge base',
     resetDesc: 'Deletes all Markdown files, the SQLite index and Git history. This action is irreversible.',
@@ -650,7 +675,9 @@ const en: T = {
     idleInsight: 'Idle · Insight!',
     idleResting: 'Idle · Resting',
     idle: 'Idle',
-    settings: 'Settings'
+    settings: 'Settings',
+    privacyLocal: 'Local',
+    privacyRemote: 'Internet'
   },
   centerPanel: {
     graph: 'Graph',

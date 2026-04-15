@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Wifi, WifiOff, FileText, GitCommit, Settings, Brain } from 'lucide-react'
+import { Wifi, WifiOff, FileText, GitCommit, Settings, Brain, Lock } from 'lucide-react'
 import { useUIStore } from '../../stores/uiStore'
 import { useChatStore } from '../../stores/chatStore'
 import { useIdleStore } from '../../stores/idleStore'
@@ -13,6 +13,7 @@ export function StatusBar(): React.JSX.Element {
   const [fileCount, setFileCount] = useState(0)
   const [lastCommit, setLastCommit] = useState('')
   const [llmStatus, setLlmStatus] = useState<'configured' | 'unconfigured'>('unconfigured')
+  const [privacyMode, setPrivacyMode] = useState<'local' | 'remote'>('remote')
 
   const refresh = useCallback(async () => {
     try {
@@ -38,12 +39,23 @@ export function StatusBar(): React.JSX.Element {
 
     try {
       const config = await window.cortx.app.getConfig()
-      if (config.llm.provider === 'anthropic' && config.llm.apiKey === '***') {
+      const { provider, apiKey, baseUrl } = config.llm
+      if (provider === 'anthropic' && apiKey === '***') {
         setLlmStatus('configured')
-      } else if (config.llm.provider === 'openai-compatible' && config.llm.baseUrl) {
+      } else if (provider === 'google-ai' && apiKey === '***') {
+        setLlmStatus('configured')
+      } else if (provider === 'openai-compatible' && baseUrl) {
         setLlmStatus('configured')
       } else {
         setLlmStatus('unconfigured')
+      }
+
+      // Privacy mode: local only when openai-compatible with localhost URL
+      if (provider === 'openai-compatible') {
+        const url = baseUrl || 'http://localhost:11434/v1'
+        setPrivacyMode(/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(url) ? 'local' : 'remote')
+      } else {
+        setPrivacyMode('remote')
       }
     } catch {
       setLlmStatus('unconfigured')
@@ -88,6 +100,22 @@ export function StatusBar(): React.JSX.Element {
               <span>{t.statusBar.llmNotConfigured}</span>
             </>
           )}
+        </div>
+
+        {/* Separator */}
+        <div className="w-px h-3 bg-cortx-border" />
+
+        {/* Privacy mode */}
+        <div
+          className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs font-medium ${
+            privacyMode === 'local'
+              ? 'text-cortx-success'
+              : 'text-amber-400'
+          }`}
+          title={privacyMode === 'local' ? t.statusBar.privacyLocal : t.statusBar.privacyRemote}
+        >
+          {privacyMode === 'local' ? <Lock size={10} /> : <Wifi size={10} />}
+          <span>{privacyMode === 'local' ? t.statusBar.privacyLocal : t.statusBar.privacyRemote}</span>
         </div>
 
         {/* Separator */}

@@ -549,15 +549,15 @@ export class AgentPipeline {
       existingBody.split('\n').map((l) => l.trim()).filter(Boolean)
     )
 
-    // Parse incoming content into sections by heading
+    // Parse incoming content into sections by heading (preserve level for H1 detection)
     const lines = clean.split('\n')
-    const sections: Array<{ heading: string | null; lines: string[] }> = []
-    let current: { heading: string | null; lines: string[] } = { heading: null, lines: [] }
+    const sections: Array<{ heading: string | null; level: number; lines: string[] }> = []
+    let current: { heading: string | null; level: number; lines: string[] } = { heading: null, level: 0, lines: [] }
     for (const line of lines) {
       const headingMatch = line.match(/^(#{1,6})\s+(.+?)\s*$/)
       if (headingMatch) {
         if (current.lines.length || current.heading) sections.push(current)
-        current = { heading: headingMatch[2].trim(), lines: [] }
+        current = { heading: headingMatch[2].trim(), level: headingMatch[1].length, lines: [] }
       } else {
         current.lines.push(line)
       }
@@ -568,9 +568,12 @@ export class AgentPipeline {
 
     for (const sec of sections) {
       // Drop top-level H1 that just repeats an existing H1 (LLMs often re-emit it)
-      if (sec.heading && /^#\s+/.test(`# ${sec.heading}`)) {
-        const h1Existing = new RegExp(`^#\\s+${sec.heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'mi')
-        if (h1Existing.test(result) && sec.lines.every((l) => !l.trim() || existingLineSet.has(l.trim()))) {
+      if (sec.heading && sec.level === 1) {
+        const existingH1 = result.split('\n').some(line => {
+          const m = line.match(/^#\s+(.+)$/)
+          return m && this.normalizeHeading(m[1]) === this.normalizeHeading(sec.heading!)
+        })
+        if (existingH1 && sec.lines.every((l) => !l.trim() || existingLineSet.has(l.trim()))) {
           continue
         }
       }
@@ -590,12 +593,13 @@ export class AgentPipeline {
       if (!addition && !sec.heading) continue
 
       if (sec.heading) {
-        // Look for an existing section with the same heading
-        const sectionRegex = new RegExp(
-          `^(#{1,6})\\s+${sec.heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`,
-          'mi'
-        )
-        if (sectionRegex.test(result)) {
+        // Look for an existing section with the same heading (accent- and case-insensitive)
+        const normalizedTarget = this.normalizeHeading(sec.heading)
+        const hasSection = result.split('\n').some(line => {
+          const m = line.match(/^(#{1,6})\s+(.+)$/)
+          return m && this.normalizeHeading(m[2]) === normalizedTarget
+        })
+        if (hasSection) {
           if (addition) {
             result = this.modifySection(result, sec.heading, addition, 'append')
           }
@@ -1119,16 +1123,27 @@ export class AgentPipeline {
     await this.fileService.writeFile(action.file, result)
   }
 
+  /** Strip diacritics and lowercase for heading comparison. */
+  private normalizeHeading(h: string): string {
+    return h
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/^#+\s*/, '')
+      .toLowerCase()
+      .trim()
+  }
+
   private modifySection(body: string, sectionName: string, content: string, operation: string): string {
     const lines = body.split('\n')
-    const sectionClean = sectionName.replace(/^#+\s*/, '')
+    const normalizedTarget = this.normalizeHeading(sectionName)
     let sectionStart = -1, sectionLevel = 0
     for (let i = 0; i < lines.length; i++) {
       const match = lines[i].match(/^(#{1,6})\s+(.+)$/)
-      if (match && match[2].trim().toLowerCase() === sectionClean.toLowerCase()) {
+      if (match && this.normalizeHeading(match[2]) === normalizedTarget) {
         sectionStart = i; sectionLevel = match[1].length; break
       }
     }
+    const sectionClean = sectionName.replace(/^#+\s*/, '')
     if (sectionStart === -1) return body + `\n\n## ${sectionClean}\n${content}`
     let sectionEnd = lines.length
     for (let i = sectionStart + 1; i < lines.length; i++) {

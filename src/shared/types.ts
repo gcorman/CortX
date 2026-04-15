@@ -133,7 +133,7 @@ export interface ChatMessage {
 // --- LLM Config ---
 
 export interface LLMConfig {
-  provider: 'anthropic' | 'openai-compatible'
+  provider: 'anthropic' | 'openai-compatible' | 'google-ai'
   apiKey: string
   model: string
   baseUrl?: string

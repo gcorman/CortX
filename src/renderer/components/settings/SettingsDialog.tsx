@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Server, Cloud, Cpu, Check, AlertCircle, FolderOpen, Sun, Moon, Trash2, Globe } from 'lucide-react'
+import { X, Server, Cloud, Cpu, Check, AlertCircle, FolderOpen, Sun, Moon, Trash2, Globe, Lock, Wifi } from 'lucide-react'
 import { useUIStore } from '../../stores/uiStore'
 import { useGraphStore } from '../../stores/graphStore'
 import { useFileStore } from '../../stores/fileStore'
@@ -7,7 +7,7 @@ import { useAgentStore } from '../../stores/agentStore'
 import { useT } from '../../i18n'
 import type { LLMConfig, AppLanguage } from '../../../shared/types'
 
-type Provider = 'anthropic' | 'openai-compatible'
+type Provider = 'anthropic' | 'openai-compatible' | 'google-ai'
 
 interface ProviderPreset {
   id: Provider
@@ -50,6 +50,14 @@ export function SettingsDialog(): React.JSX.Element {
       description: t.settings.anthropicDesc,
       icon: <Cloud size={18} />,
       defaultModel: 'claude-sonnet-4-20250514',
+      needsApiKey: true
+    },
+    {
+      id: 'google-ai',
+      label: 'Google AI',
+      description: t.settings.googleAiDesc,
+      icon: <Globe size={18} />,
+      defaultModel: 'gemini-2.0-flash-lite',
       needsApiKey: true
     },
     {
@@ -96,7 +104,6 @@ export function SettingsDialog(): React.JSX.Element {
       }
       await window.cortx.app.setConfig({ llm: llmConfig, language })
 
-      // Update base path if changed
       const currentBasePath = await window.cortx.app.getBasePath()
       if (basePath && basePath !== currentBasePath) {
         await window.cortx.app.setBasePath(basePath)
@@ -170,6 +177,12 @@ export function SettingsDialog(): React.JSX.Element {
 
   function handleSelectLanguage(lang: AppLanguage): void {
     setLanguage(lang)
+  }
+
+  function isLocalProvider(): boolean {
+    if (provider !== 'openai-compatible') return false
+    const url = baseUrl || 'http://localhost:11434/v1'
+    return /localhost|127\.0\.0\.1|0\.0\.0\.0/.test(url)
   }
 
   async function handleReset(): Promise<void> {
@@ -329,6 +342,20 @@ export function SettingsDialog(): React.JSX.Element {
             </div>
           </div>
 
+          {/* Privacy badge */}
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-card border text-xs ${
+            isLocalProvider()
+              ? 'border-cortx-success/30 bg-cortx-success/5 text-cortx-success'
+              : 'border-amber-500/30 bg-amber-500/5 text-amber-400'
+          }`}>
+            {isLocalProvider() ? <Lock size={12} /> : <Wifi size={12} />}
+            <span className="font-medium">{isLocalProvider() ? t.settings.privacyLocal : t.settings.privacyRemote}</span>
+            <span className="text-cortx-text-secondary">—</span>
+            <span className="text-cortx-text-secondary">
+              {isLocalProvider() ? t.settings.privacyLocalDesc : t.settings.privacyRemoteDesc}
+            </span>
+          </div>
+
           {/* API Key (Anthropic) */}
           {provider === 'anthropic' && (
             <div className="space-y-1.5">
@@ -340,6 +367,22 @@ export function SettingsDialog(): React.JSX.Element {
                 value={apiKey}
                 onChange={(e) => { setApiKey(e.target.value); setConnectionStatus('idle') }}
                 placeholder="sk-ant-..."
+                className="w-full bg-cortx-bg border border-cortx-border rounded-input px-3 py-2 text-sm text-cortx-text-primary placeholder:text-cortx-text-secondary/40 focus:outline-none focus:border-cortx-accent transition-colors font-mono"
+              />
+            </div>
+          )}
+
+          {/* API Key (Google AI) */}
+          {provider === 'google-ai' && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-cortx-text-secondary uppercase tracking-wider">
+                {t.settings.googleAiApiKey}
+              </label>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => { setApiKey(e.target.value); setConnectionStatus('idle') }}
+                placeholder="AIza..."
                 className="w-full bg-cortx-bg border border-cortx-border rounded-input px-3 py-2 text-sm text-cortx-text-primary placeholder:text-cortx-text-secondary/40 focus:outline-none focus:border-cortx-accent transition-colors font-mono"
               />
             </div>
@@ -406,12 +449,21 @@ export function SettingsDialog(): React.JSX.Element {
               type="text"
               value={model}
               onChange={(e) => { setModel(e.target.value); setConnectionStatus('idle') }}
-              placeholder={provider === 'anthropic' ? 'claude-sonnet-4-20250514' : 'mistral'}
+              placeholder={
+                provider === 'anthropic' ? 'claude-sonnet-4-20250514'
+                : provider === 'google-ai' ? 'gemini-2.0-flash-lite'
+                : 'mistral'
+              }
               className="w-full bg-cortx-bg border border-cortx-border rounded-input px-3 py-2 text-sm text-cortx-text-primary placeholder:text-cortx-text-secondary/40 focus:outline-none focus:border-cortx-accent transition-colors font-mono"
             />
             {provider === 'anthropic' && (
               <p className="text-2xs text-cortx-text-secondary/50">
                 {t.settings.anthropicModelsHint}
+              </p>
+            )}
+            {provider === 'google-ai' && (
+              <p className="text-2xs text-cortx-text-secondary/50">
+                {t.settings.googleAiModelsHint}
               </p>
             )}
             {provider === 'openai-compatible' && (
@@ -477,7 +529,7 @@ export function SettingsDialog(): React.JSX.Element {
           <div className="flex items-center gap-3">
             <button
               onClick={handleTestConnection}
-              disabled={isTestingConnection || (!apiKey && provider === 'anthropic')}
+              disabled={isTestingConnection || (!apiKey && (provider === 'anthropic' || provider === 'google-ai'))}
               className="flex items-center gap-2 px-4 py-2 rounded-card text-sm font-medium bg-cortx-elevated text-cortx-text-primary hover:bg-cortx-border disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
               {isTestingConnection ? (
