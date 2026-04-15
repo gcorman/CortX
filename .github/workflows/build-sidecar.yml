@@ -91,13 +91,7 @@ jobs:
           SENTENCE_TRANSFORMERS_HOME: ${{ github.workspace }}\python-sidecar\model-cache
         run: |
           .\.venv\Scripts\Activate.ps1
-          python -c "
-import os
-from sentence_transformers import SentenceTransformer
-print('Model home:', os.environ['SENTENCE_TRANSFORMERS_HOME'])
-SentenceTransformer('intfloat/multilingual-e5-small')
-print('Model ready.')
-"
+          python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('intfloat/multilingual-e5-small'); print('Model ready.')"
 
       - name: Copy model into dist
         working-directory: python-sidecar
