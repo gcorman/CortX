@@ -82,29 +82,33 @@ jobs:
             --hidden-import rtree `
             cortx_extractor.py
 
-      - name: Pre-download embedding model into dist
+      # Download the embedding model into model-cache/ (persisted by actions/cache).
+      # On cache hit the directory is already populated — sentence-transformers
+      # will skip the download automatically when SENTENCE_TRANSFORMERS_HOME points there.
+      - name: Download embedding model
         working-directory: python-sidecar
         env:
-          MODEL_CACHE_DIR: ${{ github.workspace }}\python-sidecar\model-cache
+          SENTENCE_TRANSFORMERS_HOME: ${{ github.workspace }}\python-sidecar\model-cache
         run: |
           .\.venv\Scripts\Activate.ps1
+          python -c "
+import os
+from sentence_transformers import SentenceTransformer
+print('Model home:', os.environ['SENTENCE_TRANSFORMERS_HOME'])
+SentenceTransformer('intfloat/multilingual-e5-small')
+print('Model ready.')
+"
+
+      - name: Copy model into dist
+        working-directory: python-sidecar
+        run: |
           $modelDest = "dist\cortx-extractor\_internal\sentence_transformers_cache"
           New-Item -ItemType Directory -Force -Path $modelDest | Out-Null
-
-          # Use the actions cache dir if populated, otherwise download fresh
-          if (Test-Path "$env:MODEL_CACHE_DIR\intfloat_multilingual-e5-small") {
-            Copy-Item "$env:MODEL_CACHE_DIR\intfloat_multilingual-e5-small" -Destination $modelDest -Recurse -Force
-            Write-Host "Model restored from cache."
+          if (Test-Path "model-cache") {
+            Copy-Item "model-cache\*" -Destination $modelDest -Recurse -Force
+            Write-Host "Model copied to dist."
           } else {
-            python -c @"
-          import os
-          os.environ['SENTENCE_TRANSFORMERS_HOME'] = r'$modelDest'
-          from sentence_transformers import SentenceTransformer
-          SentenceTransformer('intfloat/multilingual-e5-small')
-          "@
-            # Save to cache for next run
-            New-Item -ItemType Directory -Force -Path "$env:MODEL_CACHE_DIR" | Out-Null
-            Copy-Item "$modelDest\intfloat_multilingual-e5-small" -Destination $env:MODEL_CACHE_DIR -Recurse -Force
+            Write-Warning "model-cache not found — users will download the model on first extraction."
           }
 
       - name: Create zip archive
