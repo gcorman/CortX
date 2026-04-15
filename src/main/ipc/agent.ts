@@ -61,4 +61,8 @@ export function registerAgentHandlers(getAgent: () => AgentPipeline): void {
   ipcMain.handle('agent:rewriteFile', (_event, filePath: string) => getAgent().rewriteFile(filePath))
 
   ipcMain.handle('agent:deleteFile', (_event, filePath: string) => getAgent().deleteFile(filePath))
+
+  ipcMain.handle('agent:wikiToMd', (_event, topic: string, lang?: string) =>
+    getAgent().wikiToMd(topic, lang)
+  )
 }

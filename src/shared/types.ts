@@ -271,6 +271,7 @@ export interface CortxAPI {
     deleteFiche(filePath: string): Promise<void>
     rewriteFile(filePath: string): Promise<string>
     deleteFile(filePath: string): Promise<void>
+    wikiToMd(topic: string, lang?: string): Promise<AgentResponse>
   }
   app: {
     getBasePath(): Promise<string>

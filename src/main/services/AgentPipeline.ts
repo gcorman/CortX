@@ -3,6 +3,7 @@ import { DatabaseService } from './DatabaseService'
 import { GitService } from './GitService'
 import { LLMService } from './LLMService'
 import { libraryService } from './LibraryService'
+import { webService } from './WebService'
 import { buildSystemPrompt } from '../utils/promptBuilder'
 import type { AgentResponse, AgentAction, LibraryChunkResult, AppLanguage } from '../../shared/types'
 import { computeModifiedContent } from '../utils/contentMerge'
@@ -66,7 +67,13 @@ export class AgentPipeline {
       ? contextFiles + '\n\n' + extraKbText
       : contextFiles
 
-    const systemPrompt = buildSystemPrompt(
+    // ── Web context injection ───────────────────────────────────────────────
+    // Detect /wiki <topic> and /internet <url> directives in user input.
+    // Fetched content is appended to the system prompt so the LLM can reference
+    // it when proposing actions — nothing is written yet (propose-then-execute).
+    const webContext = await this.fetchWebContext(input)
+
+    let systemPrompt = buildSystemPrompt(
       this.dbService,
       this.fileService,
       mergedContextFiles,
@@ -74,6 +81,10 @@ export class AgentPipeline {
       mergedLibraryChunks,
       this.language
     )
+
+    if (webContext) {
+      systemPrompt += `\n\n==================================================\nSOURCES WEB RÉCUPÉRÉES\n==================================================\n${webContext}`
+    }
 
     const rawResponse = await this.llmService.sendMessage(
       [{ role: 'user', content: input }],
@@ -860,6 +871,101 @@ export class AgentPipeline {
     }
     const result = this.computeModifiedContent(existing.raw, action)
     await this.fileService.writeFile(action.file, result)
+  }
+
+  // ── Web context ─────────────────────────────────────────────────────────────
+
+  /**
+   * Detect /wiki <topic> and /internet <url> directives in user input.
+   * Fetches content and returns a formatted string to inject into the system prompt.
+   * Returns empty string if no directives found or all fetches fail.
+   */
+  private async fetchWebContext(input: string): Promise<string> {
+    const parts: string[] = []
+
+    // /wiki <topic> — fetch Wikipedia
+    const wikiMatches = [...input.matchAll(/\/wiki\s+([^\n/]+)/gi)]
+    for (const m of wikiMatches) {
+      const topic = m[1].trim()
+      try {
+        const result = await webService.fetchWikipedia(topic, this.language === 'en' ? 'en' : 'fr')
+        parts.push(webService.formatWikipediaAsContext(result))
+        console.log(`[AgentPipeline] Fetched Wikipedia: ${result.title} (${result.lang})`)
+      } catch (err) {
+        console.warn(`[AgentPipeline] Wikipedia fetch failed for "${topic}":`, err)
+        parts.push(`## Source web — Wikipedia\nErreur : impossible de récupérer "${topic}"`)
+      }
+    }
+
+    // /internet <url> — fetch a specific URL
+    const urlMatches = [...input.matchAll(/\/internet\s+(https?:\/\/\S+)/gi)]
+    for (const m of urlMatches) {
+      const url = m[1].trim()
+      try {
+        const text = await webService.fetchUrl(url)
+        parts.push(webService.formatUrlAsContext(url, text))
+        console.log(`[AgentPipeline] Fetched URL: ${url}`)
+      } catch (err) {
+        console.warn(`[AgentPipeline] URL fetch failed for "${url}":`, err)
+        parts.push(`## Source web — ${url}\nErreur : impossible de récupérer cette URL`)
+      }
+    }
+
+    return parts.join('\n\n')
+  }
+
+  /**
+   * Fetch a Wikipedia article and return a proposed AgentAction to create a .md file.
+   * The LLM converts the raw Wikipedia content into a structured knowledge base entry.
+   * Result is a full AgentResponse (status: 'proposed') — user must accept before any file is written.
+   */
+  async wikiToMd(topic: string, lang?: string): Promise<AgentResponse> {
+    const effectiveLang = lang ?? (this.language === 'en' ? 'en' : 'fr')
+    const wikiResult = await webService.fetchWikipedia(topic, effectiveLang)
+    const wikiContext = webService.formatWikipediaAsContext(wikiResult)
+
+    const systemPrompt = buildSystemPrompt(
+      this.dbService,
+      this.fileService,
+      'Aucun fichier pertinent trouvé.',
+      this.basePath,
+      [],
+      this.language
+    ) + `\n\n==================================================\nSOURCES WEB RÉCUPÉRÉES\n==================================================\n${wikiContext}`
+
+    const userMessage = this.language === 'en'
+      ? `Create a structured knowledge base note about "${wikiResult.title}" using the Wikipedia content provided above. Use "create" action, choose the appropriate folder (Domaines/ for topics, Projets/ for projects, etc.), write complete frontmatter, and structure the content with clear headings. Include the Wikipedia URL as a source.`
+      : `Crée une fiche structurée sur "${wikiResult.title}" en te basant sur le contenu Wikipedia fourni ci-dessus. Utilise l'action "create", choisis le dossier approprié (Domaines/ pour les sujets, Projets/ pour les projets, etc.), écris un frontmatter complet, et structure le contenu avec des titres clairs. Inclus l'URL Wikipedia comme source.`
+
+    const rawResponse = await this.llmService.sendMessage(
+      [{ role: 'user', content: userMessage }],
+      systemPrompt
+    )
+
+    const parsed = this.parseResponse(rawResponse)
+    const normalizedActions = this.normalizeActions(parsed.actions || [])
+
+    const actions: AgentAction[] = normalizedActions.map((a, i) => ({
+      id: `wiki-${Date.now().toString(36)}-${i}`,
+      action: a.action as 'create' | 'modify',
+      file: a.file,
+      content: a.content || '',
+      section: a.section,
+      operation: a.operation as AgentAction['operation'],
+      oldContent: a.old_content,
+      status: 'proposed' as const
+    }))
+
+    return {
+      inputType: 'commande',
+      actions,
+      summary: parsed.summary || `Fiche Wikipedia : ${wikiResult.title}`,
+      response: parsed.response,
+      sources: [wikiResult.url],
+      conflicts: parsed.conflicts || [],
+      ambiguities: parsed.ambiguities || [],
+      suggestions: parsed.suggestions || []
+    }
   }
 
 }
