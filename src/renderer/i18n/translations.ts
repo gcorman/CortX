@@ -100,6 +100,7 @@ export interface T {
     dropMdHint: string
     writingResponse: string
     agentAnalyzing: string
+    webFetching: string
     welcome: string
     welcomeHint: string
   }
@@ -407,6 +408,7 @@ const fr: T = {
     dropMdHint: "L'agent va l'analyser et proposer son intégration",
     writingResponse: 'Rédaction de la réponse',
     agentAnalyzing: "L'agent analyse...",
+    webFetching: 'Recherche web en cours...',
     welcome: 'Bienvenue dans CortX',
     welcomeHint: 'Tape une info, pose une question, ou utilise une commande pour commencer.'
   },
@@ -713,6 +715,7 @@ const en: T = {
     dropMdHint: 'The agent will analyze it and propose its integration',
     writingResponse: 'Writing response',
     agentAnalyzing: 'Agent analyzing...',
+    webFetching: 'Fetching web results...',
     welcome: 'Welcome to CortX',
     welcomeHint: 'Type info, ask a question, or use a command to get started.'
   },

@@ -627,7 +627,7 @@ export class DatabaseService {
    * Return KB file paths that contain a [[wikilink]] to a specific library document.
    * Used for reverse lookup: "which project uses this .xlsx file?".
    */
-  getKbFilesLinkingTo(docId: string): string[] {
+  getKbFilesLinkingToLibDoc(docId: string): string[] {
     const rows = this.db.prepare(
       'SELECT file_path FROM file_library_links WHERE document_id = ?'
     ).all(docId) as Array<{ file_path: string }>

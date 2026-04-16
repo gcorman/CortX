@@ -5,9 +5,17 @@ import { useChatStore } from '../../stores/chatStore'
 import { useUIStore } from '../../stores/uiStore'
 import { Brain, Sparkles, FileText } from 'lucide-react'
 import { useT } from '../../i18n'
+import type { ChatMessage as ChatMessageType } from '../../shared/types'
+
+function lastUserMessageHasWeb(messages: ChatMessageType[]): boolean {
+  const last = [...messages].reverse().find(m => m.role === 'user')
+  if (!last) return false
+  return /\/(internet|wiki)\b/i.test(last.content)
+}
 
 export function ChatView(): React.JSX.Element {
   const { messages, isProcessing, sendMessage, importMarkdown, streamProgress } = useChatStore()
+  const { addToast } = useUIStore()
   const scrollRef = useRef<HTMLDivElement>(null)
   const [globalDragOver, setGlobalDragOver] = useState(false)
   const dragCounterRef = useRef(0)
@@ -53,6 +61,7 @@ export function ChatView(): React.JSX.Element {
         await importMarkdown(file.name, content)
       } catch (err) {
         console.error('[ChatView] drop error:', err)
+        addToast(err instanceof Error ? err.message : String(err), 'error')
       }
     }
   }, [importMarkdown])
@@ -98,7 +107,9 @@ export function ChatView(): React.JSX.Element {
                 <span className="w-1.5 h-1.5 rounded-full bg-cortx-accent animate-bounce" style={{ animationDelay: '150ms' }} />
                 <span className="w-1.5 h-1.5 rounded-full bg-cortx-accent animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
-              <span className="text-xs text-cortx-text-secondary">{t.chat.agentAnalyzing}</span>
+              <span className="text-xs text-cortx-text-secondary">
+                {lastUserMessageHasWeb(messages) ? t.chat.webFetching : t.chat.agentAnalyzing}
+              </span>
             </div>
           )
         )}

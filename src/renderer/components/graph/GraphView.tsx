@@ -1088,7 +1088,10 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       {/* Loading overlay */}
       {isLoading && nodes.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="text-sm text-cortx-text-secondary">{t.graph.loading}</span>
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-5 h-5 rounded-full border-2 border-cortx-accent/30 border-t-cortx-accent animate-spin" />
+            <span className="text-xs text-cortx-text-secondary">{t.graph.loading}</span>
+          </div>
         </div>
       )}
 

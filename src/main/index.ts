@@ -215,6 +215,10 @@ function registerAppHandlers(): void {
     return result.canceled ? null : result.filePaths[0]
   })
 
+  // API key masking: the real key lives only in config (in-memory) and in
+  // cortx-config.json on disk (plain-text — keep that file out of version control).
+  // The renderer receives '***' so it can't read the key; on save it sends '***'
+  // back and setConfig below preserves the real key unchanged.
   ipcMain.handle('app:getConfig', () => ({
     ...config,
     llm: { ...config.llm, apiKey: config.llm.apiKey ? '***' : '' }
@@ -259,7 +263,7 @@ function registerAppHandlers(): void {
 
   ipcMain.handle('app:setConfig', (_event, partial: Partial<AppConfig>) => {
     if (partial.llm) {
-      // If apiKey is '***' (masked), keep the existing one
+      // '***' = masked placeholder from renderer; '' = field left blank — both preserve existing key
       if (partial.llm.apiKey === '***' || partial.llm.apiKey === '') {
         partial.llm.apiKey = config.llm.apiKey
       }

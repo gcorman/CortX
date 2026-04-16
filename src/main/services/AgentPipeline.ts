@@ -650,7 +650,7 @@ export class AgentPipeline {
     const kbPathsToFetch = new Set<string>()
 
     for (const docId of allLibDocIds) {
-      const kbPaths = this.dbService.getKbFilesLinkingTo(docId)
+      const kbPaths = this.dbService.getKbFilesLinkingToLibDoc(docId)
       for (const kbPath of kbPaths) {
         if (!kbPathsInContext.has(kbPath)) kbPathsToFetch.add(kbPath)
       }
