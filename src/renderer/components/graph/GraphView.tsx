@@ -199,7 +199,7 @@ function buildCyStyle(): cytoscape.StylesheetStyle[] {
         'border-width': 3,
         'background-opacity': 1,
         'transition-property': 'opacity, width, height, border-width, border-color, border-opacity',
-        'transition-duration': 800
+        'transition-duration': 600
       } as unknown as cytoscape.Css.Node
     },
     // Neighbors of examined nodes (softer teal)
@@ -211,7 +211,7 @@ function buildCyStyle(): cytoscape.StylesheetStyle[] {
         'border-opacity': 0.35,
         'border-width': 2,
         'transition-property': 'opacity, border-width, border-color, border-opacity',
-        'transition-duration': 600
+        'transition-duration': 500
       } as unknown as cytoscape.Css.Node
     },
     // Insight found! Nodes glow orange
@@ -219,23 +219,35 @@ function buildCyStyle(): cytoscape.StylesheetStyle[] {
       selector: 'node.idle-insight',
       style: {
         opacity: 1,
-        width: 30,
-        height: 30,
+        width: 32,
+        height: 32,
         'border-color': '#F97316',
         'border-opacity': 1,
-        'border-width': 3,
+        'border-width': 3.5,
         'background-opacity': 1,
         'transition-property': 'opacity, width, height, border-width, border-color, border-opacity',
-        'transition-duration': 400
+        'transition-duration': 300
       } as unknown as cytoscape.Css.Node
     },
     // Background nodes (dimmed subtly during idle)
     {
       selector: 'node.idle-bg',
       style: {
-        opacity: 0.35,
+        opacity: 0.28,
         'transition-property': 'opacity',
-        'transition-duration': 1200
+        'transition-duration': 900
+      } as unknown as cytoscape.Css.Node
+    },
+    // Recently explored trail — fades over 5s via JS timeout
+    {
+      selector: 'node.idle-recent',
+      style: {
+        opacity: 0.55,
+        'border-color': '#14B8A6',
+        'border-opacity': 0.25,
+        'border-width': 1.5,
+        'transition-property': 'opacity, border-color, border-opacity, border-width',
+        'transition-duration': 1500
       } as unknown as cytoscape.Css.Node
     },
     // Edges being examined
@@ -247,7 +259,7 @@ function buildCyStyle(): cytoscape.StylesheetStyle[] {
         'target-arrow-color': '#14B8A6',
         width: 2,
         'transition-property': 'opacity, line-color, width',
-        'transition-duration': 600
+        'transition-duration': 500
       } as unknown as cytoscape.Css.Edge
     },
     // Insight edges
@@ -259,16 +271,16 @@ function buildCyStyle(): cytoscape.StylesheetStyle[] {
         'target-arrow-color': '#F97316',
         width: 2.5,
         'transition-property': 'opacity, line-color, width',
-        'transition-duration': 400
+        'transition-duration': 300
       } as unknown as cytoscape.Css.Edge
     },
     // Background edges
     {
       selector: 'edge.idle-bg',
       style: {
-        opacity: 0.08,
+        opacity: 0.06,
         'transition-property': 'opacity',
-        'transition-duration': 1200
+        'transition-duration': 900
       } as unknown as cytoscape.Css.Edge
     }
   ]
@@ -340,7 +352,27 @@ function drawIdleOverlay(
   const dpr = window.devicePixelRatio || 1
   ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-  if (positions.length < 1 || phase === 'stopped' || phase === 'resting' || phase === 'selecting') return
+  if (positions.length < 1 || phase === 'stopped' || phase === 'resting') return
+
+  // ── Selecting phase: expanding ripple rings from each active node ──────────
+  if (phase === 'selecting') {
+    for (const pos of positions) {
+      for (let ring = 0; ring < 3; ring++) {
+        const ringOffset = ring * 700
+        const progress = ((t + ringOffset) % 2100) / 2100
+        const radius = (12 + progress * 30) * dpr
+        const alpha = (1 - progress) * 0.6
+        ctx.beginPath()
+        ctx.arc(pos.x * dpr, pos.y * dpr, radius, 0, Math.PI * 2)
+        ctx.strokeStyle = '#14B8A6'
+        ctx.globalAlpha = alpha
+        ctx.lineWidth = 1.5 * dpr
+        ctx.stroke()
+        ctx.globalAlpha = 1
+      }
+    }
+    return
+  }
 
   const isInsight = phase === 'insight'
   const isThinking = phase === 'thinking'
@@ -545,6 +577,9 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
   const idlePhaseRef = useRef(idlePhase)
   const idleNodeIdsRef = useRef(idleNodeIds)
   const idleActiveRef = useIdleStore((s) => s.isActive)
+  // Trail: track previous active node IDs for lingering highlight
+  const trailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const prevActiveNodeIdsRef = useRef<string[]>([])
 
   const [thoughtBubblePos, setThoughtBubblePos] = useState<Pt | null>(null)
 
@@ -888,11 +923,33 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
     const cy = cyRef.current
     if (!cy) return
 
-    // Clear all idle classes first
+    // ── Trail: move previous active nodes to idle-recent before clearing ──────
+    if (prevActiveNodeIdsRef.current.length > 0 && idleNodeIds.length > 0) {
+      const newActiveSet = new Set(idleNodeIds)
+      for (const prevId of prevActiveNodeIdsRef.current) {
+        if (!newActiveSet.has(prevId)) {
+          const node = cy.getElementById(prevId)
+          if (node.length > 0) {
+            node.removeClass('idle-examining idle-insight idle-bg').addClass('idle-recent')
+          }
+        }
+      }
+      // Auto-remove trail after 5s
+      if (trailTimerRef.current) clearTimeout(trailTimerRef.current)
+      trailTimerRef.current = setTimeout(() => {
+        if (cyRef.current) cyRef.current.nodes().removeClass('idle-recent')
+      }, 5000)
+    }
+
+    // Clear all idle classes
     cy.elements().removeClass('idle-examining idle-attended idle-bg idle-insight')
 
-    if (idlePhase === 'stopped' || idlePhase === 'resting' || idleNodeIds.length === 0) return
+    if (idlePhase === 'stopped' || idlePhase === 'resting' || idleNodeIds.length === 0) {
+      prevActiveNodeIdsRef.current = []
+      return
+    }
 
+    prevActiveNodeIdsRef.current = [...idleNodeIds]
     const activeSet = new Set(idleNodeIds)
     const isInsight = idlePhase === 'insight'
     const nodeClass = isInsight ? 'idle-insight' : 'idle-examining'
@@ -906,8 +963,7 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
     for (const nodeId of idleNodeIds) {
       const node = cy.getElementById(nodeId)
       if (node.length > 0) {
-        node.removeClass('idle-bg').addClass(nodeClass)
-        // Attended: direct neighbors of examined nodes
+        node.removeClass('idle-bg idle-recent').addClass(nodeClass)
         if (!isInsight) {
           node.neighborhood().nodes().forEach((nb) => {
             if (!activeSet.has(nb.id() as string)) {
@@ -929,6 +985,28 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
           edge.removeClass('idle-bg').addClass(edgeClass)
         }
       })
+    }
+
+    // ── Camera: pan + zoom toward active nodes ────────────────────────────────
+    if (idleNodeIds.length > 0 && (idlePhase === 'examining' || idlePhase === 'thinking' || idlePhase === 'insight')) {
+      const activeNodes = cy.collection(idleNodeIds.map((id) => cy.getElementById(id)).filter((n) => n.length > 0))
+      if (activeNodes.length > 0) {
+        const zoomTarget = isInsight ? 1.5 : 1.2
+        cy.animate({
+          fit: { eles: activeNodes, padding: isInsight ? 100 : 140 },
+          zoom: Math.min(zoomTarget, cy.maxZoom()),
+          duration: isInsight ? 500 : 700,
+          easing: 'ease-out'
+        } as Parameters<typeof cy.animate>[0])
+      }
+    }
+
+    // ── Insight flash ─────────────────────────────────────────────────────────
+    if (isInsight) {
+      const flash = document.createElement('div')
+      flash.className = 'idle-insight-flash'
+      document.body.appendChild(flash)
+      setTimeout(() => flash.remove(), 1400)
     }
   }, [idlePhase, idleNodeIds, idleEdgeKeys])
 
@@ -982,7 +1060,8 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
 
       drawIdleOverlay(cv, positions, phase, t)
 
-      if (phase !== 'stopped' && phase !== 'resting') {
+      const needsAnimation = phase !== 'stopped' && phase !== 'resting'
+      if (needsAnimation) {
         animFrameRef.current = requestAnimationFrame(frame)
       } else {
         const ctx = cv.getContext('2d')
@@ -990,7 +1069,8 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       }
     }
 
-    if (idlePhase !== 'stopped' && idlePhase !== 'resting') {
+    const needsAnimation = idlePhase !== 'stopped' && idlePhase !== 'resting'
+    if (needsAnimation) {
       animFrameRef.current = requestAnimationFrame(frame)
     } else {
       const ctx = canvas.getContext('2d')

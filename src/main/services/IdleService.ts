@@ -13,7 +13,7 @@ interface ExplorationTarget {
   entityIds: number[]
   entityNames: string[]
   edgeKeys: string[]
-  strategy: 'peripheral' | 'bridge' | 'cluster' | 'random'
+  strategy: 'peripheral' | 'bridge' | 'cluster' | 'recent' | 'random'
 }
 
 interface DraftInsight {
@@ -25,9 +25,13 @@ interface DraftInsight {
   edgeKeys: string[]
 }
 
-const SYNTHESIS_EVERY = 4    // run synthesis pass every N completed cycles
-const DRAFT_MIN_CONF = 0.42  // min confidence to add to draft pool
-const FINAL_MIN_CONF = 0.82  // min confidence to promote immediately (rare)
+const SYNTHESIS_EVERY = 3
+const DRAFT_MIN_CONF = 0.55
+const FINAL_MIN_CONF = 0.88
+const DRAFT_POOL_MAX = 6
+const CONTENT_MIN_WORDS = 80
+const AUTO_DISMISS_HOURS = 24
+const DEDUP_ENTITY_OVERLAP_THRESHOLD = 0.7
 
 export class IdleService {
   private phase: Phase = 'stopped'
@@ -39,9 +43,12 @@ export class IdleService {
   private cycleCount = 0
   private mainWindow: BrowserWindow | null = null
   private config: IdleConfig = {
-    intervalSeconds: 45,
-    confidenceThreshold: 0.82
+    intervalSeconds: 12,
+    confidenceThreshold: FINAL_MIN_CONF
   }
+  // Prefetch cache: context gathered during LLM call, consumed next cycle
+  private prefetchedTarget: ExplorationTarget | null = null
+  private prefetchedContext: string | null = null
 
   constructor(
     private dbService: DatabaseService,
@@ -65,6 +72,8 @@ export class IdleService {
   stop(): void {
     if (this.timer) { clearTimeout(this.timer); this.timer = null }
     this.phase = 'stopped'
+    this.prefetchedTarget = null
+    this.prefetchedContext = null
     this.emit({ phase: 'resting', activeNodeIds: [], activeEdgeKeys: [] })
   }
 
@@ -78,11 +87,6 @@ export class IdleService {
     if (insight) { insight.status = 'dismissed'; this.persistInsights() }
   }
 
-  /**
-   * Build the subject + body for an insight fiche.
-   * The actual write, git commit and reindex are delegated to AgentPipeline.saveBrief
-   * via the IPC handler so the fiche lands in Fiches/ and appears in FichePanel.
-   */
   buildInsightFicheContent(id: string): { subject: string; body: string } {
     const insight = this.insights.find((i) => i.id === id)
     if (!insight) throw new Error('Insight non trouvé')
@@ -102,7 +106,6 @@ export class IdleService {
     }
     const catLabel = CATEGORY_LABELS[insight.category] ?? insight.category
 
-    // Build wikilinks for all entity names (they exist in the KB)
     const wikilinkLines = insight.entityNames
       .map((name) => `- [[${name}]]`)
       .join('\n')
@@ -121,7 +124,6 @@ ${wikilinkLines}
     return { subject, body }
   }
 
-  /** Mark an insight as saved without touching the file system. */
   markInsightSaved(id: string): void {
     const insight = this.insights.find((i) => i.id === id)
     if (insight) {
@@ -156,11 +158,30 @@ ${wikilinkLines}
       return
     }
 
-    const target = this.pickTarget(entities, relations)
+    // Use prefetched target if available, otherwise pick fresh
+    let target: ExplorationTarget | null = null
+    let context: string | null = null
+
+    if (this.prefetchedTarget && this.prefetchedContext) {
+      target = this.prefetchedTarget
+      context = this.prefetchedContext
+      this.prefetchedTarget = null
+      this.prefetchedContext = null
+      // Validate prefetched target still has valid entities
+      const validIds = new Set(entities.map((e) => e.id))
+      if (!target.entityIds.every((id) => validIds.has(id))) {
+        target = null
+        context = null
+      }
+    }
+
     if (!target) {
-      this.exploredPairs.clear()
-      this.scheduleNext(this.config.intervalSeconds * 1000)
-      return
+      target = this.pickTarget(entities, relations)
+      if (!target) {
+        this.exploredPairs.clear()
+        this.scheduleNext(this.config.intervalSeconds * 1000)
+        return
+      }
     }
 
     const nodeIds = target.entityIds.map((id) => String(id))
@@ -174,7 +195,7 @@ ${wikilinkLines}
       currentThought: this.makeSelectingThought(target),
       draftCount: this.draftInsights.length
     })
-    await this.sleep(600)
+    await this.sleep(250)
     if (this.phase === 'stopped' || this.paused) return
 
     // ── Phase: examining ───────────────────────────────────────────────────
@@ -186,8 +207,26 @@ ${wikilinkLines}
       currentThought: this.makeExaminingThought(target),
       draftCount: this.draftInsights.length
     })
-    await this.sleep(2000)
+
+    // Gather context now if not prefetched
+    if (!context) {
+      context = await this.gatherContext(target, entities, relations)
+    }
+
+    await this.sleep(700)
     if (this.phase === 'stopped' || this.paused) return
+
+    // Skip cheap: not enough content to analyze
+    const wordCount = context.split(/\s+/).length
+    if (wordCount < CONTENT_MIN_WORDS) {
+      if (this.phase !== 'stopped') {
+        this.phase = 'resting'
+        this.emit({ phase: 'resting', activeNodeIds: [], activeEdgeKeys: [], draftCount: this.draftInsights.length })
+        await this.sleep(150)
+        if (this.phase !== 'stopped') this.scheduleNext(this.config.intervalSeconds * 1000)
+      }
+      return
+    }
 
     // ── Phase: thinking ────────────────────────────────────────────────────
     this.phase = 'thinking'
@@ -200,17 +239,28 @@ ${wikilinkLines}
     })
 
     try {
-      const context = await this.gatherContext(target, entities, relations)
-      if (this.phase === 'stopped' || this.paused) return
+      // Prefetch next target context in parallel with LLM call
+      const nextTarget = this.pickTarget(entities, relations)
+      const prefetchPromise = nextTarget
+        ? this.gatherContext(nextTarget, entities, relations).then((ctx) => {
+            if (this.phase !== 'stopped') {
+              this.prefetchedTarget = nextTarget
+              this.prefetchedContext = ctx
+            }
+          }).catch(() => { /* non-fatal */ })
+        : Promise.resolve()
 
-      const result = await this.evaluateInsight(context)
+      const [result] = await Promise.all([
+        this.evaluateInsight(context),
+        prefetchPromise
+      ])
+
       if (this.phase === 'stopped' || this.paused) return
 
       if (result) {
         const conf = result.confidence
 
-        if (conf >= FINAL_MIN_CONF) {
-          // Promote immediately — exceptionally strong insight
+        if (conf >= FINAL_MIN_CONF && !this.isInsightDuplicate(result.content, target.entityNames)) {
           const insight = this.buildInsight(result, target, nodeIds)
           this.insights.unshift(insight)
           if (this.insights.length > 50) this.insights = this.insights.slice(0, 50)
@@ -221,13 +271,12 @@ ${wikilinkLines}
             phase: 'insight',
             activeNodeIds: nodeIds,
             activeEdgeKeys: target.edgeKeys,
-            currentThought: result.content.slice(0, 80) + (result.content.length > 80 ? '…' : ''),
+            currentThought: result.content.slice(0, 100) + (result.content.length > 100 ? '…' : ''),
             draftCount: this.draftInsights.length,
             insight
           })
-          await this.sleep(6000)
-        } else if (conf >= DRAFT_MIN_CONF) {
-          // Add to draft pool — will be synthesized later
+          await this.sleep(5000)
+        } else if (conf >= DRAFT_MIN_CONF && !this.isInsightDuplicate(result.content, target.entityNames)) {
           this.draftInsights.push({
             content: result.content,
             confidence: result.confidence,
@@ -236,11 +285,9 @@ ${wikilinkLines}
             entityIds: nodeIds,
             edgeKeys: target.edgeKeys
           })
-          // Keep draft pool bounded
-          if (this.draftInsights.length > 12) {
-            // Remove lowest-confidence draft
+          if (this.draftInsights.length > DRAFT_POOL_MAX) {
             this.draftInsights.sort((a, b) => b.confidence - a.confidence)
-            this.draftInsights = this.draftInsights.slice(0, 10)
+            this.draftInsights = this.draftInsights.slice(0, DRAFT_POOL_MAX - 1)
           }
         }
       }
@@ -259,7 +306,7 @@ ${wikilinkLines}
     if (this.phase !== 'stopped') {
       this.phase = 'resting'
       this.emit({ phase: 'resting', activeNodeIds: [], activeEdgeKeys: [], draftCount: this.draftInsights.length })
-      await this.sleep(800)
+      await this.sleep(150)
       if (this.phase !== 'stopped') {
         this.scheduleNext(this.config.intervalSeconds * 1000)
       }
@@ -273,7 +320,7 @@ ${wikilinkLines}
 
     const systemPrompt = `Tu es un analyste expert en bases de connaissances personnelles.
 Tu reçois des intuitions provisoires collectées sur le graphe de connaissances d'un utilisateur.
-Tu dois identifier les 1-2 vraiment remarquables et les réécrire en insights affinés et précis.
+Tu dois identifier AU MAXIMUM 1 insight vraiment remarquable et le réécrire de façon précise et percutante.
 Sois EXTRÊMEMENT sélectif. Réponds en JSON strict, rien d'autre.`
 
     const draftList = this.draftInsights
@@ -286,18 +333,22 @@ Sois EXTRÊMEMENT sélectif. Réponds en JSON strict, rien d'autre.`
 ${draftList}
 
 ## MISSION DE SYNTHÈSE
-Sélectionne 0, 1 ou 2 insights qui méritent vraiment d'être mis en avant.
+Sélectionne 0 ou 1 insight (jamais plus) qui mérite vraiment d'être mis en avant.
 
 Priorité absolue aux insights qui :
 1. Révèlent une **opportunité concrète** non encore exploitée
-2. Pointent vers quelque chose d'**actionnable** (approfondissement, connexion à créer, risque à surveiller)
+2. Pointent vers quelque chose d'**actionnable** directement
 3. Sont **surprenants** — que l'utilisateur ne saurait pas sans cette analyse
 
-Écarte systématiquement les insights purement structurels ("il manque un lien") au profit des insights de fond.
-Réécris et affine les insights sélectionnés pour les rendre plus précis et percutants.
+Écarte systématiquement :
+- Les insights purement structurels ("il manque un lien", "connexion attendue")
+- Les insights génériques ou évidents
+- Tout ce qui a une confiance brute < 0.75
 
-Si aucun ne mérite vraiment : {"promoted": []}
-Sinon : {"promoted": [{"category": "opportunity|development|pattern|contradiction|hidden_connection|gap|cluster", "content": "...", "confidence": 0.0, "entityNames": ["..."], "entityIds": ["..."]}]}`
+Réécris et affine l'insight sélectionné pour le rendre plus précis et percutant.
+
+Si aucun ne mérite : {"promoted": []}
+Sinon (max 1) : {"promoted": [{"category": "opportunity|development|pattern|contradiction|hidden_connection|gap|cluster", "content": "...", "confidence": 0.0, "entityNames": ["..."], "entityIds": ["..."]}]}`
 
     try {
       const raw = await this.llmService.sendMessage(
@@ -320,9 +371,10 @@ Sinon : {"promoted": [{"category": "opportunity|development|pattern|contradictio
         }>
       }
 
-      const promoted = parsed.promoted ?? []
+      const promoted = (parsed.promoted ?? []).slice(0, 1) // max 1
       for (const p of promoted) {
-        if (!p.content || !p.confidence || p.confidence < 0.6) continue
+        if (!p.content || !p.confidence || p.confidence < 0.75) continue
+        if (this.isInsightDuplicate(p.content, p.entityNames ?? [])) continue
 
         const validCats: IdleInsight['category'][] = ['hidden_connection', 'pattern', 'contradiction', 'gap', 'cluster', 'opportunity', 'development']
         const category = validCats.includes(p.category as IdleInsight['category'])
@@ -343,7 +395,7 @@ Sinon : {"promoted": [{"category": "opportunity|development|pattern|contradictio
           phase: 'insight',
           activeNodeIds: entityIds,
           activeEdgeKeys: [],
-          currentThought: p.content.slice(0, 80) + (p.content.length > 80 ? '…' : ''),
+          currentThought: p.content.slice(0, 100) + (p.content.length > 100 ? '…' : ''),
           draftCount: 0,
           insight
         } satisfies IdleExplorationEvent)
@@ -358,12 +410,39 @@ Sinon : {"promoted": [{"category": "opportunity|development|pattern|contradictio
     this.draftInsights = []
   }
 
+  // ── Deduplication ─────────────────────────────────────────────────────────
+
+  private isInsightDuplicate(content: string, entityNames: string[]): boolean {
+    const newEntitySet = new Set(entityNames.map((n) => n.toLowerCase()))
+
+    for (const existing of this.insights) {
+      if (existing.status === 'dismissed') continue
+
+      // Entity overlap check
+      const existingSet = new Set(existing.entityNames.map((n) => n.toLowerCase()))
+      const intersection = [...newEntitySet].filter((n) => existingSet.has(n)).length
+      const union = new Set([...newEntitySet, ...existingSet]).size
+      const entityOverlap = union > 0 ? intersection / union : 0
+
+      if (entityOverlap >= DEDUP_ENTITY_OVERLAP_THRESHOLD) {
+        // Check rough text similarity (word overlap)
+        const newWords = new Set(content.toLowerCase().split(/\W+/).filter((w) => w.length > 4))
+        const existWords = new Set(existing.content.toLowerCase().split(/\W+/).filter((w) => w.length > 4))
+        const wordIntersection = [...newWords].filter((w) => existWords.has(w)).length
+        const wordUnion = new Set([...newWords, ...existWords]).size
+        if (wordUnion > 0 && wordIntersection / wordUnion > 0.5) return true
+      }
+    }
+    return false
+  }
+
   // ── Thought generation ────────────────────────────────────────────────────
 
   private makeSelectingThought(target: ExplorationTarget): string {
     if (target.strategy === 'bridge') return `Pont potentiel : ${target.entityNames.join(' ↔ ')}`
     if (target.strategy === 'cluster') return `Cluster : ${target.entityNames.slice(0, 2).join(' + ')}…`
     if (target.strategy === 'peripheral') return `Nœud isolé : ${target.entityNames[0]}`
+    if (target.strategy === 'recent') return `Récent : ${target.entityNames.slice(0, 2).join(' × ')}`
     return `Scan : ${target.entityNames.slice(0, 2).join(' × ')}`
   }
 
@@ -371,6 +450,7 @@ Sinon : {"promoted": [{"category": "opportunity|development|pattern|contradictio
     const names = target.entityNames.slice(0, 2).map((n) => `"${n}"`).join(' et ')
     if (target.strategy === 'bridge') return `Connexion non documentée entre ${names} ?`
     if (target.strategy === 'cluster') return `Pattern autour de ${names} ?`
+    if (target.strategy === 'recent') return `Analyse de ${names} (récemment modifié)`
     return `Examen de ${names}`
   }
 
@@ -379,6 +459,7 @@ Sinon : {"promoted": [{"category": "opportunity|development|pattern|contradictio
     if (target.strategy === 'bridge') return `Opportunité entre ${names} ?`
     if (target.strategy === 'cluster') return `Que révèle le contenu de ${names} ?`
     if (target.strategy === 'peripheral') return `Aspect sous-développé autour de "${target.entityNames[0]}" ?`
+    if (target.strategy === 'recent') return `Nouveauté exploitable dans ${names} ?`
     return `Analyse de fond en cours…`
   }
 
@@ -386,32 +467,30 @@ Sinon : {"promoted": [{"category": "opportunity|development|pattern|contradictio
 
   private pickTarget(entities: Entity[], relations: Relation[]): ExplorationTarget | null {
     const rand = Math.random()
-    if (rand < 0.35) return this.pickPeripheral(entities, relations)
+    if (rand < 0.25) return this.pickRecentActivity(entities, relations)
     if (rand < 0.65) return this.pickCrossDomainBridge(entities, relations)
-    if (rand < 0.85) return this.pickDenseCluster(entities, relations)
+    if (rand < 1.00) return this.pickDenseCluster(entities, relations)
     return this.pickRandomPair(entities, relations)
   }
 
-  private pickPeripheral(entities: Entity[], relations: Relation[]): ExplorationTarget | null {
-    const connectionCount = new Map<number, number>()
-    for (const e of entities) connectionCount.set(e.id, 0)
-    for (const r of relations) {
-      connectionCount.set(r.sourceEntityId, (connectionCount.get(r.sourceEntityId) ?? 0) + 1)
-      connectionCount.set(r.targetEntityId, (connectionCount.get(r.targetEntityId) ?? 0) + 1)
-    }
-    const peripheral = entities.filter((e) => (connectionCount.get(e.id) ?? 0) <= 2)
-    if (peripheral.length < 2) return this.pickRandomPair(entities, relations)
+  /** Pick pairs from recently modified files — fresh context = more relevant insights */
+  private pickRecentActivity(entities: Entity[], relations: Relation[]): ExplorationTarget | null {
+    const files = this.dbService.getFiles() // already sorted by modified_at DESC
+    const recentPaths = new Set(files.slice(0, 15).map((f) => f.path))
 
-    for (let i = 0; i < 10; i++) {
-      const a = peripheral[Math.floor(Math.random() * peripheral.length)]
-      const b = peripheral[Math.floor(Math.random() * peripheral.length)]
+    const recentEntities = entities.filter((e) => e.filePath && recentPaths.has(e.filePath))
+    if (recentEntities.length < 2) return this.pickCrossDomainBridge(entities, relations)
+
+    for (let i = 0; i < 15; i++) {
+      const a = recentEntities[Math.floor(Math.random() * recentEntities.length)]
+      const b = recentEntities[Math.floor(Math.random() * recentEntities.length)]
       if (a.id === b.id) continue
       const key = [a.id, b.id].sort().join('-')
       if (this.exploredPairs.has(key)) continue
       this.exploredPairs.add(key)
-      return { entityIds: [a.id, b.id], entityNames: [a.name, b.name], edgeKeys: this.getEdgeKeys(relations, [a.id, b.id]), strategy: 'peripheral' }
+      return { entityIds: [a.id, b.id], entityNames: [a.name, b.name], edgeKeys: this.getEdgeKeys(relations, [a.id, b.id]), strategy: 'recent' }
     }
-    return null
+    return this.pickCrossDomainBridge(entities, relations)
   }
 
   private pickCrossDomainBridge(entities: Entity[], relations: Relation[]): ExplorationTarget | null {
@@ -483,7 +562,6 @@ Sinon : {"promoted": [{"category": "opportunity|development|pattern|contradictio
   private async gatherContext(target: ExplorationTarget, entities: Entity[], relations: Relation[]): Promise<string> {
     const lines: string[] = ['## ENTITÉS EXAMINÉES (contenu intégral)']
 
-    // Read examined entities — up to 500 words each for richer content analysis
     const examIds = new Set(target.entityIds)
     for (let i = 0; i < target.entityIds.length; i++) {
       const entity = entities.find((e) => e.id === target.entityIds[i])
@@ -501,7 +579,6 @@ Sinon : {"promoted": [{"category": "opportunity|development|pattern|contradictio
       }
     }
 
-    // Add brief excerpts of direct neighbors for extra context
     const neighborIds = new Set<number>()
     for (const r of relations) {
       if (examIds.has(r.sourceEntityId) && !examIds.has(r.targetEntityId)) neighborIds.add(r.targetEntityId)
@@ -528,7 +605,6 @@ Sinon : {"promoted": [{"category": "opportunity|development|pattern|contradictio
       }
     }
 
-    // Relations between examined entities
     const relevant = relations.filter((r) => examIds.has(r.sourceEntityId) && examIds.has(r.targetEntityId))
     if (relevant.length > 0) {
       lines.push('\n## RELATIONS DOCUMENTÉES')
@@ -541,7 +617,6 @@ Sinon : {"promoted": [{"category": "opportunity|development|pattern|contradictio
       lines.push('\n## RELATIONS DOCUMENTÉES\n(Aucune relation directe entre ces entités)')
     }
 
-    // Global KB summary
     const typeCount = new Map<string, number>()
     for (const e of entities) typeCount.set(e.type, (typeCount.get(e.type) ?? 0) + 1)
     lines.push(`\n## BASE DE CONNAISSANCES\n${entities.length} entités (${[...typeCount.entries()].map(([t, c]) => `${c} ${t}`).join(', ')}), ${relations.length} relations.`)
@@ -585,10 +660,10 @@ Lis le contenu des notes et demande-toi :
 - Ne génère PAS de conseils génériques ("il faudrait mieux documenter…")
 
 ## GUIDE DE CONFIANCE
-- 0.85-1.0 : insight solide, supporté par le contenu, directement actionnable
-- 0.65-0.85 : inférence plausible, bien fondée
-- 0.45-0.65 : piste intéressante mais spéculative
-- < 0.45 : trop incertain, ne pas signaler
+- 0.88-1.0 : insight solide, supporté par le contenu, directement actionnable
+- 0.70-0.88 : inférence plausible, bien fondée
+- 0.55-0.70 : piste intéressante mais spéculative
+- < 0.55 : trop incertain, ne pas signaler
 
 ## CATÉGORIES
 - opportunity : opportunité business, stratégique ou intellectuelle détectée dans le contenu
@@ -653,7 +728,15 @@ OU
   private loadInsights(): void {
     try {
       if (fs.existsSync(this.insightsPath)) {
-        this.insights = JSON.parse(fs.readFileSync(this.insightsPath, 'utf-8')) as IdleInsight[]
+        const loaded = JSON.parse(fs.readFileSync(this.insightsPath, 'utf-8')) as IdleInsight[]
+        const cutoff = Date.now() - AUTO_DISMISS_HOURS * 60 * 60 * 1000
+        this.insights = loaded.map((i) => {
+          if (i.status === 'new' && new Date(i.timestamp).getTime() < cutoff) {
+            return { ...i, status: 'dismissed' as const }
+          }
+          return i
+        })
+        this.persistInsights()
       }
     } catch { this.insights = [] }
   }

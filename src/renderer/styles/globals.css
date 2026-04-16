@@ -119,3 +119,53 @@
 @layer utilities {
   .text-balance { text-wrap: balance; }
 }
+
+/* ─── Idle mode global tint ─────────────────────────────────────────────── */
+
+body.idle-active::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(13, 148, 136, 0.035);
+  pointer-events: none;
+  z-index: 9998;
+  transition: background 0.8s ease, opacity 0.8s ease;
+}
+
+body.idle-insight-active::after {
+  background: rgba(249, 115, 22, 0.06);
+}
+
+/* ─── Idle insight screen flash ──────────────────────────────────────────── */
+
+@keyframes idle-insight-flash {
+  0%   { opacity: 0; }
+  15%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.idle-insight-flash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9997;
+  background: radial-gradient(ellipse at center, rgba(249, 115, 22, 0.18) 0%, transparent 70%);
+  animation: idle-insight-flash 1.2s ease-out forwards;
+}
+
+/* ─── Idle selecting ripple ──────────────────────────────────────────────── */
+
+@keyframes idle-ripple {
+  0%   { transform: scale(0.6); opacity: 0.8; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* ─── Brain progress ring (SVG-based, applied via inline style) ──────────── */
+
+@keyframes idle-ring-spin {
+  from { stroke-dashoffset: 100; }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* ─── Idle recent trail ──────────────────────────────────────────────────── */
+/* Applied on Cytoscape nodes via JS — handled entirely in buildCyStyle() */
