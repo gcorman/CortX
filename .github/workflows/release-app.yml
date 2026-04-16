@@ -1,0 +1,88 @@
+name: Release Electron App
+
+on:
+  # Auto-trigger once the sidecar build succeeds on a version tag
+  workflow_run:
+    workflows: ["Build Python Sidecar"]
+    types: [completed]
+  # Manual override: supply the tag directly
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.2.0)'
+        required: true
+
+jobs:
+  release:
+    name: Build & release Windows installer
+    runs-on: windows-latest
+    # For workflow_run: only run when sidecar succeeded AND triggered by a vX.Y.Z tag
+    if: >
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       startsWith(github.event.workflow_run.head_branch, 'v')) ||
+      github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Determine release tag
+        id: tag
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            "name=${{ github.event.inputs.tag }}" >> $env:GITHUB_OUTPUT
+          } else {
+            "name=${{ github.event.workflow_run.head_branch }}" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.name }}
+
+      # Download the pre-built Python sidecar from the GitHub Release so it gets
+      # bundled inside the NSIS installer via electron-builder extraResources.
+      - name: Download Python sidecar from release
+        shell: pwsh
+        run: |
+          gh release download ${{ steps.tag.outputs.name }} `
+            --pattern cortx-extractor-win32-x64.zip `
+            --dir sidecar-dl
+          Expand-Archive `
+            -Path sidecar-dl\cortx-extractor-win32-x64.zip `
+            -DestinationPath resources\python-sidecar `
+            -Force
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # Cache electron + electron-builder downloads (speeds up re-runs significantly)
+      - name: Cache Electron builder
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
+          key: ${{ runner.os }}-electron-${{ hashFiles('package.json') }}
+          restore-keys: ${{ runner.os }}-electron-
+
+      # postinstall runs electron-builder install-app-deps automatically,
+      # which rebuilds better-sqlite3 native bindings for the bundled Electron version.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and package Windows installer
+        run: npm run dist
+
+      - name: Upload installer to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          files: dist/*.exe
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
