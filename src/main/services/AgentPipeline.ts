@@ -897,17 +897,63 @@ export class AgentPipeline {
       }
     }
 
-    // /internet <url> — fetch a specific URL
-    const urlMatches = [...input.matchAll(/\/internet\s+(https?:\/\/\S+)/gi)]
-    for (const m of urlMatches) {
-      const url = m[1].trim()
-      try {
-        const text = await webService.fetchUrl(url)
-        parts.push(webService.formatUrlAsContext(url, text))
-        console.log(`[AgentPipeline] Fetched URL: ${url}`)
-      } catch (err) {
-        console.warn(`[AgentPipeline] URL fetch failed for "${url}":`, err)
-        parts.push(`## Source web — ${url}\nErreur : impossible de récupérer cette URL`)
+    // /internet <url|query> — fetch a specific URL, or run a DuckDuckGo search
+    // and pull in the top pages. If the directive has no argument, the remaining
+    // user input (minus other directives) is used as the query.
+    const internetMatches = [...input.matchAll(/\/internet(?:\s+([^\n]*))?/gi)]
+    const seen = new Set<string>()
+    const lang: 'fr' | 'en' = this.language === 'en' ? 'en' : 'fr'
+
+    for (const m of internetMatches) {
+      const arg = (m[1] ?? '').trim()
+      let target: { type: 'url' | 'query'; value: string } | null = null
+
+      if (!arg) {
+        const auto = input
+          .replace(/\/internet(?:\s+[^\n]*)?/gi, ' ')
+          .replace(/\/wiki\s+[^\n/]+/gi, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+        if (auto) target = { type: 'query', value: auto.slice(0, 200) }
+      } else if (/^https?:\/\//i.test(arg)) {
+        target = { type: 'url', value: arg.split(/\s+/)[0] }
+      } else {
+        target = { type: 'query', value: arg }
+      }
+
+      if (!target) continue
+      const key = `${target.type}:${target.value}`
+      if (seen.has(key)) continue
+      seen.add(key)
+
+      if (target.type === 'url') {
+        try {
+          const text = await webService.fetchUrl(target.value)
+          parts.push(webService.formatUrlAsContext(target.value, text))
+          console.log(`[AgentPipeline] Fetched URL: ${target.value}`)
+        } catch (err) {
+          console.warn(`[AgentPipeline] URL fetch failed for "${target.value}":`, err)
+          parts.push(`## Source web — ${target.value}\nErreur : impossible de récupérer cette URL`)
+        }
+      } else {
+        try {
+          const batch = await webService.searchAndFetch(target.value, {
+            limit: 4,
+            perPageChars: 3500,
+            timeoutMs: 8000,
+            lang
+          })
+          if (batch.results.length === 0) {
+            parts.push(`## Recherche web — "${target.value}"\nAucun résultat DuckDuckGo.`)
+          } else {
+            parts.push(webService.formatSearchAsContext(batch))
+            const ok = batch.results.filter(r => !r.error).length
+            console.log(`[AgentPipeline] Web search "${target.value}" — ${ok}/${batch.results.length} pages récupérées`)
+          }
+        } catch (err) {
+          console.warn(`[AgentPipeline] Web search failed for "${target.value}":`, err)
+          parts.push(`## Recherche web — "${target.value}"\nErreur : ${err instanceof Error ? err.message : String(err)}`)
+        }
       }
     }
 

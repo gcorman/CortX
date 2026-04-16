@@ -19,7 +19,7 @@ The agent doesn’t just answer — it **writes and modifies** the files in your
 - **Questions on the base** — ask your knowledge base without modifying it; the agent cites sources
 - **Reflection** — think out loud, the agent suggests actions without executing them
 - **Commands** — `/ask`, `/brief [topic]`, `/synthese`, `/digest`
-- **Web enrichment** — use `/wiki <topic>` or `/internet <url>` in any message to inject live web content into the agent’s context before it proposes actions
+- **Web enrichment** — use `/wiki <topic>`, `/internet <url>`, or `/internet <query>` to inject live web content (Wikipedia article, specific page, or a full DuckDuckGo search whose top pages are fetched and read) into the agent’s context before it proposes actions
 
 Every action proposed by the agent is previewable (diff before/after) and requires your explicit approval. Nothing is written without your consent.
 
@@ -35,8 +35,9 @@ Import and indexing of PDF, DOCX, PPTX, and XLSX files. Documents are chunked, v
 ### Web Search & Wikipedia Import
 Fetch live web content directly from the chat:
 - `/wiki Notion` — imports a Wikipedia article and generates a structured `.md` file (proposed, requires validation)
-- `/internet https://...` — fetches any URL and injects its content as context for the current action
-- Language-aware: searches Wikipedia in the app’s selected language (FR/EN) with automatic English fallback
+- `/internet https://...` — fetches a specific URL and injects its readable main content as context
+- `/internet <query>` — runs a DuckDuckGo search (no API key, no account) and pulls in the top ~4 pages’ main content, so the agent can answer with fresh information (e.g. *« Met à jour le paragraphe "actualité" de @MonProjet avec les dernières infos accessibles sur /internet »*)
+- Language-aware: searches Wikipedia / DuckDuckGo in the app’s selected language (FR/EN) with automatic English fallback
 
 ### Automatic Versioning
 Every accepted action = a Git commit. Full history, one-click undo (`git revert`), and built-in audit log.

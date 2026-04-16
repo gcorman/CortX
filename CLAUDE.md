@@ -87,15 +87,19 @@ Config (base path, LLM provider, API key, model, validation mode) persists to `a
 
 ### Web service (`src/main/services/WebService.ts`)
 
-Fetches external content to enrich the agent's context window. No API key needed for Wikipedia.
+Fetches external content to enrich the agent's context window. No API key, no third-party account.
 
 - **`fetchWikipedia(topic, lang)`** — Wikipedia REST API (`/api/rest_v1/page/summary` + `/mobile-sections`). Fetches in the requested language, auto-fallbacks to English if not found. Returns title, plain-text extract, and up to 12 sections (capped at 2 000 chars each).
-- **`fetchUrl(url)`** — Generic HTTP fetch + HTML strip (removes scripts/styles, decodes entities). Max 8 000 chars to keep prompt size sane.
-- **`formatWikipediaAsContext` / `formatUrlAsContext`** — render results as Markdown blocks for prompt injection.
+- **`search(query, limit, lang)`** — DuckDuckGo HTML SERP scrape (`html.duckduckgo.com/html/`). Returns organic `{title, url, snippet}`, decoding DDG redirect URLs (`//duckduckgo.com/l/?uddg=...`) to real targets. Ads are filtered (`result--ad`). Browser-like UA, 12 s timeout.
+- **`searchAndFetch(query, opts)`** — runs `search()` then fetches the top N pages in parallel via `Promise.all` with per-page timeouts. Failed pages carry an `error` field but don't abort the batch.
+- **`fetchUrl(url, opts)`** — `AbortController`-backed HTTP fetch with browser-like UA, content-type filter (rejects binaries), main-content extraction (`<article>` → `<main>` → `<body>`, strips `<nav>/<header>/<footer>/<aside>/<script>/<style>`) and configurable char budget (default 8 000).
+- **`formatWikipediaAsContext` / `formatUrlAsContext` / `formatSearchAsContext`** — render results as Markdown blocks for prompt injection. Search blocks are numbered with URL + snippet + page content so the LLM can cite sources.
 
 **Web directives in chat input** (parsed by `AgentPipeline.fetchWebContext()`):
 - `/wiki <topic>` — fetch Wikipedia in app language (fallback English)
-- `/internet <url>` — fetch any URL directly
+- `/internet <url>` — fetch a specific URL (readable main content only)
+- `/internet <query>` — run a DuckDuckGo search and inject the top ~4 pages' content
+- `/internet` with no argument — uses the rest of the user input (minus directives) as the query, so natural phrasing like *« …avec les dernières infos accessibles sur /internet »* works directly
 
 Fetched content is appended to the system prompt under `SOURCES WEB RÉCUPÉRÉES` before the LLM call. The propose-then-execute flow is unchanged — user still validates before any file is written.
 
