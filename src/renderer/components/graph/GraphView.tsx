@@ -511,6 +511,7 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
   } | null>(null)
   const [canvasContextMenu, setCanvasContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmRewrite, setConfirmRewrite] = useState(false)
   const [isRewriting, setIsRewriting] = useState(false)
   const [rewriteUndo, setRewriteUndo] = useState<{ commitHash: string } | null>(null)
 
@@ -561,6 +562,7 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       if (e.key === 'Escape') {
         setContextMenu(null)
         setConfirmDelete(false)
+        setConfirmRewrite(false)
         setCanvasContextMenu(null)
       }
     }
@@ -570,13 +572,14 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
 
   async function handleRewrite(): Promise<void> {
     if (!contextMenu) return
+    setConfirmRewrite(false)
     setIsRewriting(true)
     try {
       const commitHash = await window.cortx.agent.rewriteFile(contextMenu.filePath)
       setContextMenu(null)
       setRewriteUndo({ commitHash })
       await loadGraph()
-      setTimeout(() => setRewriteUndo(null), 8000)
+      setTimeout(() => setRewriteUndo(null), 30000)
     } catch (err) {
       console.error(err)
       addToast(t.filePreview.rewriteError, 'error')
@@ -1177,7 +1180,7 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
         <>
           <div
             className="absolute inset-0 z-10"
-            onClick={() => { setContextMenu(null); setConfirmDelete(false) }}
+            onClick={() => { setContextMenu(null); setConfirmDelete(false); setConfirmRewrite(false) }}
           />
           <div
             className="absolute z-20 bg-cortx-surface border border-cortx-border rounded-card shadow-xl py-1 min-w-[210px]"
@@ -1231,14 +1234,34 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
             ) : (
               /* ── Knowledge-base entity actions ── */
               <>
-                <button
-                  onClick={handleRewrite}
-                  disabled={isRewriting}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-cortx-text-primary hover:bg-cortx-elevated transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  <RefreshCw size={13} className={isRewriting ? 'animate-spin' : ''} />
-                  {isRewriting ? t.graph.rewriting : t.graph.rewrite}
-                </button>
+                {!confirmRewrite ? (
+                  <button
+                    onClick={() => setConfirmRewrite(true)}
+                    disabled={isRewriting}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-cortx-text-primary hover:bg-cortx-elevated transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw size={13} className={isRewriting ? 'animate-spin' : ''} />
+                    {isRewriting ? t.graph.rewriting : t.graph.rewrite}
+                  </button>
+                ) : (
+                  <div className="px-3 py-2 space-y-1.5">
+                    <p className="text-xs text-cortx-text-secondary">{t.graph.rewrite}?</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => void handleRewrite()}
+                        className="flex-1 text-xs text-cortx-accent hover:text-cortx-accent-light font-medium cursor-pointer transition-colors"
+                      >
+                        {t.filePreview.yes}
+                      </button>
+                      <button
+                        onClick={() => setConfirmRewrite(false)}
+                        className="flex-1 text-xs text-cortx-text-secondary hover:text-cortx-text-primary cursor-pointer transition-colors"
+                      >
+                        {t.filePreview.no}
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {!confirmDelete ? (
                   <button
                     onClick={() => setConfirmDelete(true)}

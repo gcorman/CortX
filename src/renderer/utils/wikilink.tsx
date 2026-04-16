@@ -47,20 +47,39 @@ export function wikilinkLabel(name: string): string {
 }
 
 /**
+ * Coerce arbitrary LLM-produced values to a renderable string.
+ * The agent sometimes returns arrays or objects in fields typed as strings
+ * (e.g. `summary: ["line1", "line2"]`) — we join them instead of crashing.
+ */
+function toDisplayString(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (value == null) return ''
+  if (Array.isArray(value)) return value.map(toDisplayString).filter(Boolean).join('\n')
+  if (typeof value === 'object') {
+    try { return JSON.stringify(value, null, 2) } catch { return String(value) }
+  }
+  return String(value)
+}
+
+/**
  * Inline renderer: takes a plain text string, splits it on wikilink syntax,
  * and returns a React fragment where each `[[Name]]` becomes a clickable
  * button that opens the corresponding file in the preview pane.
  *
  * Brackets are never shown to the user.
+ *
+ * Accepts `unknown` at runtime — LLM outputs drift (arrays, objects) and we
+ * must not crash the whole chat over a typing mismatch.
  */
-export function WikiText({ text }: { text: string }): React.JSX.Element {
+export function WikiText({ text }: { text: unknown }): React.JSX.Element {
   const files = useFileStore((s) => s.files)
   const openFilePreview = useUIStore((s) => s.openFilePreview)
   const addToast = useUIStore((s) => s.addToast)
 
-  if (!text) return <></>
+  const safeText = toDisplayString(text)
+  if (!safeText) return <></>
 
-  const parts = text.split(/(\[\[[^\]]+\]\])/g)
+  const parts = safeText.split(/(\[\[[^\]]+\]\])/g)
   return (
     <>
       {parts.map((part, i) => {

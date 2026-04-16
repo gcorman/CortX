@@ -45,6 +45,7 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
   const [draft, setDraft] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [isRewriting, setIsRewriting] = useState(false)
+  const [confirmRewrite, setConfirmRewrite] = useState(false)
   const [rewriteUndo, setRewriteUndo] = useState<{ commitHash: string } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   // --- Title editing ---
@@ -177,13 +178,14 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
 
   async function handleRewrite(): Promise<void> {
     if (isRewriting) return
+    setConfirmRewrite(false)
     setIsRewriting(true)
     try {
       const commitHash = await window.cortx.agent.rewriteFile(path)
       setRewriteUndo({ commitHash })
       await loadFile()
       reloadGraph()
-      setTimeout(() => setRewriteUndo(null), 8000)
+      setTimeout(() => setRewriteUndo(null), 30000)
     } catch (err) {
       console.error('[FilePreview] rewrite failed', err)
       addToast(t.filePreview.rewriteError, 'error')
@@ -295,14 +297,32 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
           <div className="flex items-center gap-1 flex-shrink-0">
             {!isEditing && content && (
               <>
-                <button
-                  onClick={handleRewrite}
-                  disabled={isRewriting}
-                  className="p-1.5 rounded hover:bg-cortx-elevated text-cortx-text-secondary hover:text-cortx-accent transition-colors cursor-pointer disabled:opacity-40"
-                  title={t.filePreview.rewrite}
-                >
-                  <RefreshCw size={14} className={isRewriting ? 'animate-spin' : ''} />
-                </button>
+                {!confirmRewrite ? (
+                  <button
+                    onClick={() => setConfirmRewrite(true)}
+                    disabled={isRewriting}
+                    className="p-1.5 rounded hover:bg-cortx-elevated text-cortx-text-secondary hover:text-cortx-accent transition-colors cursor-pointer disabled:opacity-40"
+                    title={t.filePreview.rewrite}
+                  >
+                    <RefreshCw size={14} className={isRewriting ? 'animate-spin' : ''} />
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1 bg-cortx-accent/10 border border-cortx-accent/30 rounded px-2 py-0.5">
+                    <span className="text-2xs text-cortx-text-primary">{t.filePreview.rewrite}?</span>
+                    <button
+                      onClick={() => void handleRewrite()}
+                      className="text-2xs text-cortx-accent hover:text-cortx-accent-light font-medium cursor-pointer transition-colors"
+                    >
+                      {t.filePreview.yes}
+                    </button>
+                    <button
+                      onClick={() => setConfirmRewrite(false)}
+                      className="text-2xs text-cortx-text-secondary hover:text-cortx-text-primary cursor-pointer transition-colors"
+                    >
+                      {t.filePreview.no}
+                    </button>
+                  </div>
+                )}
                 {!confirmDelete ? (
                   <button
                     onClick={() => setConfirmDelete(true)}

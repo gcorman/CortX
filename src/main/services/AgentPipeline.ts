@@ -9,6 +9,13 @@ import type { AgentResponse, AgentAction, LibraryChunkResult, AppLanguage } from
 import { computeModifiedContent } from '../utils/contentMerge'
 import { normalizeActions } from '../utils/actionNormalize'
 import type { RawAction } from '../utils/actionNormalize'
+import {
+  extractBalancedJson,
+  closeUnclosedBraces,
+  repairJson,
+  toDisplayString,
+  toStringArray
+} from '../utils/jsonRepair'
 
 interface RawAgentResponse {
   input_type?: string
@@ -354,10 +361,16 @@ export class AgentPipeline {
       systemPrompt
     )
 
-    // Strip potential code fence wrapping the whole response
+    // Strip potential code fence — handles both exact wrapping and cases where
+    // the LLM adds a preamble sentence before the code block.
     let clean = raw.trim()
-    const fenceMatch = clean.match(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```\s*$/i)
-    if (fenceMatch) clean = fenceMatch[1].trim()
+    const fenceExact = clean.match(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```\s*$/i)
+    if (fenceExact) {
+      clean = fenceExact[1].trim()
+    } else {
+      const fenceInner = clean.match(/```(?:markdown|md)?\s*\n([\s\S]*?)\n```/i)
+      if (fenceInner) clean = fenceInner[1].trim()
+    }
 
     await this.fileService.writeFile(filePath, clean + '\n')
 
@@ -716,17 +729,50 @@ export class AgentPipeline {
     const codeBlockMatch = trimmed.match(/```(?:json)?\s*\n?([\s\S]*?)```/i)
     if (codeBlockMatch) candidates.push(codeBlockMatch[1].trim())
 
+    // Prefer a balanced {...} slice — survives prose before/after the JSON.
+    const balanced = extractBalancedJson(trimmed)
+    if (balanced) candidates.push(balanced)
     const jsonMatch = trimmed.match(/\{[\s\S]*\}/)
     if (jsonMatch) candidates.push(jsonMatch[0].trim())
 
     for (const c of candidates) {
       const direct = this.tryParseJson(c)
-      if (direct) return direct
-      const repaired = this.tryParseJson(this.repairJson(c))
-      if (repaired) return repaired
+      if (direct) return this.normalizeParsed(direct)
+      const repaired = this.tryParseJson(repairJson(c))
+      if (repaired) return this.normalizeParsed(repaired)
     }
 
-    return { input_type: 'question', actions: [], response: raw, conflicts: [], ambiguities: [], suggestions: [] }
+    // Last-ditch: LLM truncated mid-object. Close open strings/brackets/braces
+    // and try once more on the best candidate we have.
+    const bestCandidate = balanced ?? jsonMatch?.[0] ?? trimmed
+    const closed = this.tryParseJson(repairJson(closeUnclosedBraces(bestCandidate)))
+    if (closed) return this.normalizeParsed(closed)
+
+    // All strategies failed — do NOT dump raw JSON into the chat.
+    // Log for debug, show a friendly message to the user.
+    console.warn('[AgentPipeline] Unable to parse LLM response. First 500 chars:', raw.slice(0, 500))
+    return {
+      input_type: 'question',
+      actions: [],
+      response: "L'agent a répondu dans un format non reconnu. Réessaie, ou raccourcis ta demande si le fichier importé est volumineux.",
+      summary: '',
+      conflicts: [],
+      ambiguities: [],
+      suggestions: []
+    }
+  }
+
+  /** Coerce LLM-drifted fields (arrays, objects) back to UI-renderable shapes. */
+  private normalizeParsed(parsed: RawAgentResponse): RawAgentResponse {
+    return {
+      ...parsed,
+      summary: parsed.summary !== undefined ? toDisplayString(parsed.summary) : undefined,
+      response: parsed.response !== undefined ? toDisplayString(parsed.response) : undefined,
+      conflicts: toStringArray(parsed.conflicts),
+      ambiguities: toStringArray(parsed.ambiguities),
+      suggestions: toStringArray(parsed.suggestions),
+      sources: toStringArray(parsed.sources)
+    }
   }
 
   private tryParseJson(input: string): RawAgentResponse | null {
@@ -736,96 +782,6 @@ export class AgentPipeline {
     } catch {
       return null
     }
-  }
-
-  private repairJson(input: string): string {
-    let out = input.trim()
-    // Remove BOM if present
-    if (out.charCodeAt(0) === 0xfeff) out = out.slice(1)
-    // Escape raw control chars inside JSON strings (common LLM failure with multiline content).
-    out = this.escapeControlCharsInStrings(out)
-    // Remove trailing commas outside strings.
-    out = this.removeTrailingCommas(out)
-    return out
-  }
-
-  private escapeControlCharsInStrings(input: string): string {
-    let out = ''
-    let inString = false
-    let escaped = false
-
-    for (let i = 0; i < input.length; i++) {
-      const ch = input[i]
-      if (inString) {
-        if (escaped) {
-          out += ch
-          escaped = false
-          continue
-        }
-        if (ch === '\\') {
-          out += ch
-          escaped = true
-          continue
-        }
-        if (ch === '"') {
-          inString = false
-          out += ch
-          continue
-        }
-        if (ch === '\n') { out += '\\n'; continue }
-        if (ch === '\r') { out += '\\r'; continue }
-        if (ch === '\t') { out += '\\t'; continue }
-        out += ch
-        continue
-      }
-
-      if (ch === '"') inString = true
-      out += ch
-    }
-
-    return out
-  }
-
-  private removeTrailingCommas(input: string): string {
-    let out = ''
-    let inString = false
-    let escaped = false
-
-    for (let i = 0; i < input.length; i++) {
-      const ch = input[i]
-
-      if (inString) {
-        out += ch
-        if (escaped) {
-          escaped = false
-        } else if (ch === '\\') {
-          escaped = true
-        } else if (ch === '"') {
-          inString = false
-        }
-        continue
-      }
-
-      if (ch === '"') {
-        inString = true
-        out += ch
-        continue
-      }
-
-      if (ch === ',') {
-        let j = i + 1
-        while (j < input.length && /\s/.test(input[j])) j++
-        const next = input[j]
-        if (next === '}' || next === ']') {
-          // Skip this trailing comma
-          continue
-        }
-      }
-
-      out += ch
-    }
-
-    return out
   }
 
   private async executeActions(actions: Array<{
