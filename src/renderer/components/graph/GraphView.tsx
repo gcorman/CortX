@@ -352,7 +352,26 @@ function drawIdleOverlay(
   const dpr = window.devicePixelRatio || 1
   ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-  if (positions.length < 1 || phase === 'stopped' || phase === 'resting') return
+  if (positions.length < 1 || phase === 'stopped') return
+
+  // ── Resting phase: very subtle ambient shimmer on all nodes ──────────────
+  if (phase === 'resting') {
+    for (let i = 0; i < positions.length; i++) {
+      const pos = positions[i]
+      // Each node pulses with a slight offset so they don't all sync
+      const offset = (i * 137) % 4000
+      const pulse = (Math.sin(((t + offset) / 3000) * Math.PI * 2) + 1) / 2
+      const alpha = 0.04 + pulse * 0.06
+      const radius = (8 + pulse * 4) * dpr
+      ctx.beginPath()
+      ctx.arc(pos.x * dpr, pos.y * dpr, radius, 0, Math.PI * 2)
+      ctx.fillStyle = '#14B8A6'
+      ctx.globalAlpha = alpha
+      ctx.fill()
+      ctx.globalAlpha = 1
+    }
+    return
+  }
 
   // ── Selecting phase: expanding ripple rings from each active node ──────────
   if (phase === 'selecting') {
@@ -987,16 +1006,19 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       })
     }
 
-    // ── Camera: pan + zoom toward active nodes ────────────────────────────────
-    if (idleNodeIds.length > 0 && (idlePhase === 'examining' || idlePhase === 'thinking' || idlePhase === 'insight')) {
-      const activeNodes = cy.collection(idleNodeIds.map((id) => cy.getElementById(id)).filter((n) => n.length > 0))
+    // ── Camera: pan toward active nodes (skip if window hidden to avoid queuing) ──
+    if (
+      idleNodeIds.length > 0 &&
+      !document.hidden &&
+      (idlePhase === 'examining' || idlePhase === 'thinking' || idlePhase === 'insight')
+    ) {
+      const activeNodes = cy.nodes().filter((n) => idleNodeIds.includes(n.id() as string))
       if (activeNodes.length > 0) {
-        const zoomTarget = isInsight ? 1.5 : 1.2
+        cy.stop(true, true) // cancel any queued animations first
         cy.animate({
-          fit: { eles: activeNodes, padding: isInsight ? 100 : 140 },
-          zoom: Math.min(zoomTarget, cy.maxZoom()),
+          fit: { eles: activeNodes, padding: isInsight ? 80 : 120 },
           duration: isInsight ? 500 : 700,
-          easing: 'ease-out'
+          easing: 'ease-in-out-cubic'
         } as Parameters<typeof cy.animate>[0])
       }
     }
@@ -1009,6 +1031,17 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       setTimeout(() => flash.remove(), 1400)
     }
   }, [idlePhase, idleNodeIds, idleEdgeKeys])
+
+  // When window regains focus: cancel any Cytoscape animations that queued up while hidden
+  useEffect(() => {
+    function onVisible(): void {
+      if (!document.hidden && cyRef.current) {
+        cyRef.current.stop(true, true)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
 
   // Apply search highlight when query changes
   useEffect(() => {
@@ -1051,17 +1084,24 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       const nodeIds = idleNodeIdsRef.current
       const t = performance.now() - animStartRef.current
 
-      // Get rendered positions from Cytoscape (same coord space as canvas overlay)
+      // Get rendered positions: active nodes for most phases, ALL nodes for resting
       const positions: Pt[] = []
-      for (const id of nodeIds) {
-        const node = cy.getElementById(id)
-        if (node.length > 0) positions.push(node.renderedPosition() as Pt)
+      if (phase === 'resting' || phase === 'selecting') {
+        // During resting/selecting, collect all node positions for ambient animation
+        cy.nodes().forEach((node) => {
+          positions.push(node.renderedPosition() as Pt)
+        })
+      } else {
+        for (const id of nodeIds) {
+          const node = cy.getElementById(id)
+          if (node.length > 0) positions.push(node.renderedPosition() as Pt)
+        }
       }
 
       drawIdleOverlay(cv, positions, phase, t)
 
-      const needsAnimation = phase !== 'stopped' && phase !== 'resting'
-      if (needsAnimation) {
+      // Keep animating for all non-stopped phases (including resting for ambient)
+      if (phase !== 'stopped') {
         animFrameRef.current = requestAnimationFrame(frame)
       } else {
         const ctx = cv.getContext('2d')
@@ -1069,8 +1109,7 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       }
     }
 
-    const needsAnimation = idlePhase !== 'stopped' && idlePhase !== 'resting'
-    if (needsAnimation) {
+    if (idlePhase !== 'stopped') {
       animFrameRef.current = requestAnimationFrame(frame)
     } else {
       const ctx = canvas.getContext('2d')

@@ -116,4 +116,16 @@ if (typeof window !== 'undefined' && window.cortx) {
     const insight = args[0] as IdleInsight
     useIdleStore.getState()._addInsight(insight)
   })
+
+  // Pause/resume idle service when window loses/gains focus
+  // Prevents animation queue buildup while window is hidden
+  document.addEventListener('visibilitychange', () => {
+    const { isActive } = useIdleStore.getState()
+    if (!isActive) return
+    if (document.hidden) {
+      void window.cortx.idle.pause()
+    } else {
+      void window.cortx.idle.resume()
+    }
+  })
 }

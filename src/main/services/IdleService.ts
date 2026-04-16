@@ -26,10 +26,10 @@ interface DraftInsight {
 }
 
 const SYNTHESIS_EVERY = 3
-const DRAFT_MIN_CONF = 0.55
-const FINAL_MIN_CONF = 0.88
+const DRAFT_MIN_CONF = 0.42
+const FINAL_MIN_CONF = 0.78
 const DRAFT_POOL_MAX = 6
-const CONTENT_MIN_WORDS = 80
+const CONTENT_MIN_WORDS = 15   // words of actual file content (not headers)
 const AUTO_DISMISS_HOURS = 24
 const DEDUP_ENTITY_OVERLAP_THRESHOLD = 0.7
 
@@ -43,7 +43,7 @@ export class IdleService {
   private cycleCount = 0
   private mainWindow: BrowserWindow | null = null
   private config: IdleConfig = {
-    intervalSeconds: 12,
+    intervalSeconds: 8,
     confidenceThreshold: FINAL_MIN_CONF
   }
   // Prefetch cache: context gathered during LLM call, consumed next cycle
@@ -215,18 +215,6 @@ ${wikilinkLines}
 
     await this.sleep(700)
     if (this.phase === 'stopped' || this.paused) return
-
-    // Skip cheap: not enough content to analyze
-    const wordCount = context.split(/\s+/).length
-    if (wordCount < CONTENT_MIN_WORDS) {
-      if (this.phase !== 'stopped') {
-        this.phase = 'resting'
-        this.emit({ phase: 'resting', activeNodeIds: [], activeEdgeKeys: [], draftCount: this.draftInsights.length })
-        await this.sleep(150)
-        if (this.phase !== 'stopped') this.scheduleNext(this.config.intervalSeconds * 1000)
-      }
-      return
-    }
 
     // ── Phase: thinking ────────────────────────────────────────────────────
     this.phase = 'thinking'

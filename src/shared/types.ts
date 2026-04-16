@@ -299,6 +299,8 @@ export interface CortxAPI {
   idle: {
     start(): Promise<void>
     stop(): Promise<void>
+    pause(): Promise<void>
+    resume(): Promise<void>
     getInsights(): Promise<IdleInsight[]>
     dismissInsight(id: string): Promise<void>
     saveInsightAsFiche(id: string): Promise<string>

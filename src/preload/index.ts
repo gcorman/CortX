@@ -76,6 +76,8 @@ const api: CortxAPI = {
   idle: {
     start: () => ipcRenderer.invoke('idle:start'),
     stop: () => ipcRenderer.invoke('idle:stop'),
+    pause: () => ipcRenderer.invoke('idle:pause'),
+    resume: () => ipcRenderer.invoke('idle:resume'),
     getInsights: () => ipcRenderer.invoke('idle:getInsights'),
     dismissInsight: (id: string) => ipcRenderer.invoke('idle:dismissInsight', id),
     saveInsightAsFiche: (id: string) => ipcRenderer.invoke('idle:saveInsightAsFiche', id),

@@ -14,6 +14,14 @@ export function registerIdleHandlers(
     getIdleService().stop()
   })
 
+  ipcMain.handle('idle:pause', () => {
+    getIdleService().pause()
+  })
+
+  ipcMain.handle('idle:resume', () => {
+    getIdleService().resume()
+  })
+
   ipcMain.handle('idle:getInsights', () => {
     return getIdleService().getInsights()
   })
