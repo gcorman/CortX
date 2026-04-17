@@ -3,26 +3,26 @@ import { useState } from 'react'
 import { useIdleStore } from '../../stores/idleStore'
 import { InsightCard } from './InsightCard'
 import { useT } from '../../i18n'
+import type { IdleAttempt } from '../../../shared/types'
 
 const DRAFT_POOL_MAX = 6
 const VISIBLE_MAX = 5
+
+// ── Brain ring with progress ────────────────────────────────────────────────
 
 function BrainRing({ isActive, phase, draftCount }: { isActive: boolean; phase: string; draftCount: number }): React.JSX.Element {
   const isThinking = isActive && (phase === 'thinking' || phase === 'examining')
   const isInsight = isActive && phase === 'insight'
   const progress = isActive ? Math.min(1, draftCount / DRAFT_POOL_MAX) : 0
-  const circumference = 2 * Math.PI * 9 // r=9
+  const circumference = 2 * Math.PI * 9
   const strokeDash = circumference * progress
   const color = isInsight ? '#F97316' : '#0D9488'
 
   return (
     <div className="relative flex items-center justify-center flex-shrink-0" style={{ width: 22, height: 22 }}>
-      {/* SVG ring */}
       <svg width="22" height="22" viewBox="0 0 22 22" className="absolute inset-0" style={{ transform: 'rotate(-90deg)' }}>
-        {/* Track */}
         <circle cx="11" cy="11" r="9" fill="none" stroke="currentColor" strokeWidth="2"
           className="text-cortx-border" strokeOpacity="0.4" />
-        {/* Progress */}
         {progress > 0 && (
           <circle cx="11" cy="11" r="9" fill="none" stroke={color} strokeWidth="2"
             strokeDasharray={`${strokeDash} ${circumference}`}
@@ -31,7 +31,6 @@ function BrainRing({ isActive, phase, draftCount }: { isActive: boolean; phase: 
           />
         )}
       </svg>
-      {/* Brain icon */}
       <svg
         width="11" height="11" viewBox="0 0 24 24" fill="none"
         stroke={isActive ? color : 'currentColor'}
@@ -52,11 +51,69 @@ function BrainRing({ isActive, phase, draftCount }: { isActive: boolean; phase: 
   )
 }
 
+// ── Activity log ────────────────────────────────────────────────────────────
+
+const RESULT_DOT: Record<IdleAttempt['result'], string> = {
+  none:    'bg-cortx-border',
+  draft:   'bg-cortx-accent',
+  insight: 'bg-cortx-cta',
+}
+
+const RESULT_LABEL: Record<IdleAttempt['result'], string> = {
+  none:    '—',
+  draft:   'brouillon',
+  insight: 'insight ✦',
+}
+
+const STRATEGY_LABEL: Record<string, string> = {
+  llm:      '↗',
+  bridge:   '⇌',
+  cluster:  '◉',
+  recent:   '⟳',
+  peripheral: '○',
+  random:   '~',
+}
+
+function AttemptRow({ attempt }: { attempt: IdleAttempt }): React.JSX.Element {
+  const dotClass = RESULT_DOT[attempt.result]
+  const label = RESULT_LABEL[attempt.result]
+  const stratIcon = STRATEGY_LABEL[attempt.strategy] ?? '·'
+  const names = attempt.entityNames.slice(0, 2).join(' × ')
+
+  return (
+    <div className="flex items-start gap-2 py-1 border-b border-cortx-border/30 last:border-0">
+      <span className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${dotClass}`} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-2xs text-cortx-text-secondary/40 font-mono">{stratIcon}</span>
+          <span className="text-2xs text-cortx-text-primary/70 truncate">{names}</span>
+          {attempt.webEnriched && (
+            <span className="text-2xs text-blue-400/60 flex-shrink-0">🌐</span>
+          )}
+          <span className={`text-2xs ml-auto flex-shrink-0 ${
+            attempt.result === 'insight' ? 'text-cortx-cta/80' :
+            attempt.result === 'draft'   ? 'text-cortx-accent/70' :
+            'text-cortx-text-secondary/30'
+          }`}>{label}</span>
+        </div>
+        {attempt.snippet && (
+          <p className="text-2xs text-cortx-text-secondary/50 leading-snug mt-0.5 truncate">
+            {attempt.snippet}{attempt.snippet.length >= 70 ? '…' : ''}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Main panel ──────────────────────────────────────────────────────────────
+
 export function InsightPanel(): React.JSX.Element | null {
-  const insights = useIdleStore((s) => s.insights)
-  const isActive = useIdleStore((s) => s.isActive)
-  const phase = useIdleStore((s) => s.phase)
+  const insights  = useIdleStore((s) => s.insights)
+  const isActive  = useIdleStore((s) => s.isActive)
+  const phase     = useIdleStore((s) => s.phase)
   const draftCount = useIdleStore((s) => s.draftCount)
+  const attempts  = useIdleStore((s) => s.attempts)
   const [collapsed, setCollapsed] = useState(false)
   const [showAll, setShowAll] = useState(false)
   const t = useT()
@@ -65,7 +122,6 @@ export function InsightPanel(): React.JSX.Element | null {
   const visibleInsights = showAll ? newInsights : newInsights.slice(0, VISIBLE_MAX)
   const hiddenCount = newInsights.length - VISIBLE_MAX
 
-  // Don't render if not active and no new insights
   if (!isActive && newInsights.length === 0) return null
 
   return (
@@ -85,32 +141,46 @@ export function InsightPanel(): React.JSX.Element | null {
           )}
           {isActive && phase !== 'stopped' && (
             <span className="text-2xs text-cortx-text-secondary/50 italic">
-              {phase === 'selecting' && t.insightPanel.selecting}
-              {phase === 'examining' && t.insightPanel.examining}
-              {phase === 'thinking' && t.insightPanel.analyzing}
-              {phase === 'insight' && t.insightPanel.insightFound}
-              {phase === 'resting' && t.insightPanel.resting}
+              {phase === 'selecting'  && t.insightPanel.selecting}
+              {phase === 'examining'  && t.insightPanel.examining}
+              {phase === 'thinking'   && t.insightPanel.analyzing}
+              {phase === 'insight'    && t.insightPanel.insightFound}
+              {phase === 'resting'    && t.insightPanel.resting}
             </span>
           )}
         </div>
-        {collapsed ? <ChevronDown size={13} className="text-cortx-text-secondary" /> : <ChevronUp size={13} className="text-cortx-text-secondary" />}
+        {collapsed
+          ? <ChevronDown size={13} className="text-cortx-text-secondary" />
+          : <ChevronUp   size={13} className="text-cortx-text-secondary" />}
       </button>
 
       {!collapsed && (
-        <div className="px-3 pb-3 space-y-2 max-h-72 overflow-y-auto">
+        <div className="px-3 pb-3 space-y-2 max-h-80 overflow-y-auto">
+
+          {/* ── Activity log (always shown when active) ─────────────── */}
+          {isActive && attempts.length > 0 && (
+            <div className="bg-cortx-bg/60 rounded-card px-2 pt-1.5 pb-0.5 border border-cortx-border/40">
+              <p className="text-2xs text-cortx-text-secondary/40 uppercase tracking-wider mb-1 font-mono">
+                activité
+              </p>
+              {attempts.map((a) => (
+                <AttemptRow key={a.id} attempt={a} />
+              ))}
+              {draftCount > 0 && (
+                <p className="text-2xs text-cortx-accent/50 mt-1.5 pb-0.5">
+                  {draftCount} brouillon{draftCount > 1 ? 's' : ''} en mémoire — synthèse en cours…
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* ── Insights list ────────────────────────────────────────── */}
           {newInsights.length === 0 ? (
-            <div className="text-center py-4">
+            <div className="text-center py-3">
               {isActive ? (
-                <div className="space-y-1 text-center">
-                  <p className="text-2xs text-cortx-text-secondary/40 italic">
-                    {t.insightPanel.accumulating}
-                  </p>
-                  {draftCount > 0 && (
-                    <p className="text-2xs text-cortx-accent/60 font-medium">
-                      {draftCount} {draftCount > 1 ? t.insightPanel.drafts : t.insightPanel.draft} {t.insightPanel.synthesizing}
-                    </p>
-                  )}
-                </div>
+                <p className="text-2xs text-cortx-text-secondary/40 italic">
+                  {t.insightPanel.accumulating}
+                </p>
               ) : (
                 <p className="text-2xs text-cortx-text-secondary/40 italic">
                   {t.insightPanel.activateIdle}
@@ -137,4 +207,3 @@ export function InsightPanel(): React.JSX.Element | null {
     </div>
   )
 }
-

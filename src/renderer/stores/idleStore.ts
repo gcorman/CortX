@@ -1,7 +1,9 @@
 import { create } from 'zustand'
-import type { IdleInsight, IdleExplorationEvent } from '../../shared/types'
+import type { IdleInsight, IdleAttempt, IdleExplorationEvent } from '../../shared/types'
 import { useFicheStore } from './ficheStore'
 import { useGraphStore } from './graphStore'
+
+const MAX_ATTEMPTS = 6
 
 interface IdleState {
   isActive: boolean
@@ -11,6 +13,7 @@ interface IdleState {
   currentThought: string
   draftCount: number
   insights: IdleInsight[]
+  attempts: IdleAttempt[]   // recent cycle results, newest first
 
   toggle: () => Promise<void>
   start: () => Promise<void>
@@ -31,6 +34,7 @@ export const useIdleStore = create<IdleState>((set, get) => ({
   currentThought: '',
   draftCount: 0,
   insights: [],
+  attempts: [],
 
   toggle: async () => {
     if (get().isActive) {
@@ -42,14 +46,14 @@ export const useIdleStore = create<IdleState>((set, get) => ({
 
   start: async () => {
     await window.cortx.idle.start()
-    set({ isActive: true, phase: 'selecting' })
+    set({ isActive: true, phase: 'selecting', attempts: [] })
     get()._applyBodyClass(true, 'selecting')
     await get().loadInsights()
   },
 
   stop: async () => {
     await window.cortx.idle.stop()
-    set({ isActive: false, phase: 'stopped', activeNodeIds: [], activeEdgeKeys: [] })
+    set({ isActive: false, phase: 'stopped', activeNodeIds: [], activeEdgeKeys: [], attempts: [] })
     get()._applyBodyClass(false, 'stopped')
   },
 
@@ -69,26 +73,28 @@ export const useIdleStore = create<IdleState>((set, get) => ({
 
   saveInsightAsFiche: async (id: string) => {
     const path = await window.cortx.idle.saveInsightAsFiche(id)
-    // Mark saved in local store
     set((state) => ({
       insights: state.insights.map((i) =>
         i.id === id ? { ...i, status: 'saved' as const } : i
       )
     }))
-    // Immediately refresh FichePanel and graph so the new fiche appears without waiting for polls
     void useFicheStore.getState().loadFiches()
     void useGraphStore.getState().loadGraph()
     return path
   },
 
   _setExploration: (event: IdleExplorationEvent) => {
-    set({
+    const updates: Partial<IdleState> = {
       phase: event.phase,
       activeNodeIds: event.activeNodeIds,
       activeEdgeKeys: event.activeEdgeKeys,
       currentThought: event.currentThought ?? '',
       draftCount: event.draftCount ?? 0
-    })
+    }
+    if (event.lastAttempt) {
+      updates.attempts = [event.lastAttempt, ...get().attempts].slice(0, MAX_ATTEMPTS)
+    }
+    set(updates)
     get()._applyBodyClass(get().isActive, event.phase)
   },
 
@@ -118,7 +124,6 @@ if (typeof window !== 'undefined' && window.cortx) {
   })
 
   // Pause/resume idle service when window loses/gains focus
-  // Prevents animation queue buildup while window is hidden
   document.addEventListener('visibilitychange', () => {
     const { isActive } = useIdleStore.getState()
     if (!isActive) return

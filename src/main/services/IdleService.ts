@@ -5,7 +5,8 @@ import type { BrowserWindow } from 'electron'
 import type { DatabaseService } from './DatabaseService'
 import type { FileService } from './FileService'
 import type { LLMService } from './LLMService'
-import type { IdleInsight, IdleExplorationEvent, IdleConfig, Entity, Relation } from '../../shared/types'
+import type { IdleInsight, IdleAttempt, IdleExplorationEvent, IdleConfig, Entity, Relation } from '../../shared/types'
+import { webService } from './WebService'
 
 type Phase = 'stopped' | 'selecting' | 'examining' | 'thinking' | 'insight' | 'resting'
 
@@ -13,7 +14,7 @@ interface ExplorationTarget {
   entityIds: number[]
   entityNames: string[]
   edgeKeys: string[]
-  strategy: 'peripheral' | 'bridge' | 'cluster' | 'recent' | 'random'
+  strategy: 'peripheral' | 'bridge' | 'cluster' | 'recent' | 'random' | 'llm'
 }
 
 interface DraftInsight {
@@ -26,12 +27,14 @@ interface DraftInsight {
 }
 
 const SYNTHESIS_EVERY = 3
-const DRAFT_MIN_CONF = 0.42
-const FINAL_MIN_CONF = 0.78
+const DRAFT_MIN_CONF = 0.28
+const FINAL_MIN_CONF = 0.60
 const DRAFT_POOL_MAX = 6
-const CONTENT_MIN_WORDS = 15   // words of actual file content (not headers)
 const AUTO_DISMISS_HOURS = 24
 const DEDUP_ENTITY_OVERLAP_THRESHOLD = 0.7
+const LLM_TARGET_BATCH = 5    // how many targets LLM picks per selection pass
+// Web enrichment: strategies that justify a DuckDuckGo search for extra context
+const WEB_ENRICH_STRATEGIES = new Set(['llm', 'bridge'])
 
 export class IdleService {
   private phase: Phase = 'stopped'
@@ -49,6 +52,9 @@ export class IdleService {
   // Prefetch cache: context gathered during LLM call, consumed next cycle
   private prefetchedTarget: ExplorationTarget | null = null
   private prefetchedContext: string | null = null
+  // LLM-selected target queue: filled by selectTargetsWithLLM(), drained cycle by cycle
+  private llmTargetQueue: ExplorationTarget[] = []
+  private isSelectingTargets = false
 
   constructor(
     private dbService: DatabaseService,
@@ -74,6 +80,8 @@ export class IdleService {
     this.phase = 'stopped'
     this.prefetchedTarget = null
     this.prefetchedContext = null
+    this.llmTargetQueue = []
+    this.isSelectingTargets = false
     this.emit({ phase: 'resting', activeNodeIds: [], activeEdgeKeys: [] })
   }
 
@@ -158,6 +166,14 @@ ${wikilinkLines}
       return
     }
 
+    // Refill LLM target queue asynchronously when it runs low (non-blocking)
+    if (this.llmTargetQueue.length <= 1 && !this.isSelectingTargets) {
+      this.isSelectingTargets = true
+      void this.selectTargetsWithLLM(entities, relations).finally(() => {
+        this.isSelectingTargets = false
+      })
+    }
+
     // Use prefetched target if available, otherwise pick fresh
     let target: ExplorationTarget | null = null
     let context: string | null = null
@@ -176,7 +192,8 @@ ${wikilinkLines}
     }
 
     if (!target) {
-      target = this.pickTarget(entities, relations)
+      // Drain LLM queue first, fall back to heuristics
+      target = this.dequeueTarget(entities) ?? this.pickTarget(entities, relations)
       if (!target) {
         this.exploredPairs.clear()
         this.scheduleNext(this.config.intervalSeconds * 1000)
@@ -209,8 +226,11 @@ ${wikilinkLines}
     })
 
     // Gather context now if not prefetched
+    let webEnriched = false
     if (!context) {
-      context = await this.gatherContext(target, entities, relations)
+      const gathered = await this.gatherContext(target, entities, relations)
+      context = gathered.context
+      webEnriched = gathered.webEnriched
     }
 
     await this.sleep(700)
@@ -222,18 +242,28 @@ ${wikilinkLines}
       phase: 'thinking',
       activeNodeIds: nodeIds,
       activeEdgeKeys: target.edgeKeys,
-      currentThought: this.makeThinkingThought(target),
+      currentThought: this.makeThinkingThought(target) + (webEnriched ? ' 🌐' : ''),
       draftCount: this.draftInsights.length
     })
+
+    // Track this cycle's outcome for the activity log
+    let cycleAttempt: IdleAttempt = {
+      id: randomUUID(),
+      timestamp: new Date().toISOString(),
+      entityNames: target.entityNames.slice(0, 3),
+      strategy: target.strategy,
+      result: 'none',
+      webEnriched
+    }
 
     try {
       // Prefetch next target context in parallel with LLM call
       const nextTarget = this.pickTarget(entities, relations)
       const prefetchPromise = nextTarget
-        ? this.gatherContext(nextTarget, entities, relations).then((ctx) => {
+        ? this.gatherContext(nextTarget, entities, relations).then((gathered) => {
             if (this.phase !== 'stopped') {
               this.prefetchedTarget = nextTarget
-              this.prefetchedContext = ctx
+              this.prefetchedContext = gathered.context
             }
           }).catch(() => { /* non-fatal */ })
         : Promise.resolve()
@@ -253,6 +283,8 @@ ${wikilinkLines}
           this.insights.unshift(insight)
           if (this.insights.length > 50) this.insights = this.insights.slice(0, 50)
           this.persistInsights()
+
+          cycleAttempt = { ...cycleAttempt, result: 'insight', category: result.category, snippet: result.content.slice(0, 70) }
 
           this.phase = 'insight'
           this.emit({
@@ -277,6 +309,7 @@ ${wikilinkLines}
             this.draftInsights.sort((a, b) => b.confidence - a.confidence)
             this.draftInsights = this.draftInsights.slice(0, DRAFT_POOL_MAX - 1)
           }
+          cycleAttempt = { ...cycleAttempt, result: 'draft', category: result.category, snippet: result.content.slice(0, 70) }
         }
       }
 
@@ -293,7 +326,13 @@ ${wikilinkLines}
 
     if (this.phase !== 'stopped') {
       this.phase = 'resting'
-      this.emit({ phase: 'resting', activeNodeIds: [], activeEdgeKeys: [], draftCount: this.draftInsights.length })
+      this.emit({
+        phase: 'resting',
+        activeNodeIds: [],
+        activeEdgeKeys: [],
+        draftCount: this.draftInsights.length,
+        lastAttempt: cycleAttempt
+      })
       await this.sleep(150)
       if (this.phase !== 'stopped') {
         this.scheduleNext(this.config.intervalSeconds * 1000)
@@ -427,6 +466,7 @@ Sinon (max 1) : {"promoted": [{"category": "opportunity|development|pattern|cont
   // ── Thought generation ────────────────────────────────────────────────────
 
   private makeSelectingThought(target: ExplorationTarget): string {
+    if (target.strategy === 'llm') return `↗ Cible choisie : ${target.entityNames.slice(0, 2).join(' × ')}`
     if (target.strategy === 'bridge') return `Pont potentiel : ${target.entityNames.join(' ↔ ')}`
     if (target.strategy === 'cluster') return `Cluster : ${target.entityNames.slice(0, 2).join(' + ')}…`
     if (target.strategy === 'peripheral') return `Nœud isolé : ${target.entityNames[0]}`
@@ -436,6 +476,7 @@ Sinon (max 1) : {"promoted": [{"category": "opportunity|development|pattern|cont
 
   private makeExaminingThought(target: ExplorationTarget): string {
     const names = target.entityNames.slice(0, 2).map((n) => `"${n}"`).join(' et ')
+    if (target.strategy === 'llm') return `Analyse ciblée de ${names}`
     if (target.strategy === 'bridge') return `Connexion non documentée entre ${names} ?`
     if (target.strategy === 'cluster') return `Pattern autour de ${names} ?`
     if (target.strategy === 'recent') return `Analyse de ${names} (récemment modifié)`
@@ -444,6 +485,7 @@ Sinon (max 1) : {"promoted": [{"category": "opportunity|development|pattern|cont
 
   private makeThinkingThought(target: ExplorationTarget): string {
     const names = target.entityNames.slice(0, 2).join(' et ')
+    if (target.strategy === 'llm') return `Insight potentiel entre ${names}…`
     if (target.strategy === 'bridge') return `Opportunité entre ${names} ?`
     if (target.strategy === 'cluster') return `Que révèle le contenu de ${names} ?`
     if (target.strategy === 'peripheral') return `Aspect sous-développé autour de "${target.entityNames[0]}" ?`
@@ -545,9 +587,146 @@ Sinon (max 1) : {"promoted": [{"category": "opportunity|development|pattern|cont
       .map((r) => `${r.sourceEntityId}->${r.targetEntityId}`)
   }
 
+  /** Pop the next LLM-selected target if it still refers to valid entity IDs. */
+  private dequeueTarget(entities: Entity[]): ExplorationTarget | null {
+    const validIds = new Set(entities.map((e) => e.id))
+    while (this.llmTargetQueue.length > 0) {
+      const t = this.llmTargetQueue.shift()!
+      if (t.entityIds.every((id) => validIds.has(id))) return t
+    }
+    return null
+  }
+
+  /**
+   * Ask the LLM to survey the whole graph and return the N most promising
+   * entity pairs to explore next. Runs asynchronously — fills llmTargetQueue.
+   */
+  private async selectTargetsWithLLM(entities: Entity[], relations: Relation[]): Promise<void> {
+    if (entities.length < 2) return
+
+    const summary = this.buildGraphSummary(entities, relations)
+
+    const existingInsightNames = this.insights
+      .filter((i) => i.status !== 'dismissed')
+      .slice(0, 10)
+      .map((i) => `- ${i.entityNames.join(' × ')} : "${i.content.slice(0, 60)}…"`)
+      .join('\n')
+
+    const alreadyExplored = [...this.exploredPairs].slice(-30).join(', ')
+
+    const systemPrompt = `Tu es un analyste stratégique qui aide un utilisateur à explorer sa base de connaissances personnelle.
+Tu reçois le graphe complet (entités, relations, insights déjà trouvés).
+Ta mission : identifier les ${LLM_TARGET_BATCH} binômes ou groupes d'entités les PLUS PROMETTEURS à analyser en profondeur.
+Réponds UNIQUEMENT en JSON valide.`
+
+    const userMsg = `${summary}
+
+## INSIGHTS DÉJÀ TROUVÉS (éviter la redondance)
+${existingInsightNames || '(aucun pour l\'instant)'}
+
+## PAIRES DÉJÀ EXPLORÉES (IDs, à éviter)
+${alreadyExplored || '(aucune)'}
+
+## MISSION
+Sélectionne exactement ${LLM_TARGET_BATCH} binômes ou groupes d'entités à explorer en priorité.
+
+Critères de sélection — par ordre de priorité :
+1. **Pont inattendu** : deux entités de types différents, sans relation directe, qui pourraient révéler une opportunité cachée
+2. **Tension latente** : entités qui semblent en contradiction ou compétition dans le graphe
+3. **Cluster sous-exploité** : groupe d'entités fortement connectées dont les liens n'ont pas encore été creusés
+4. **Entité pivot orpheline** : entité très connectée mais dont les voisins ne se connaissent pas entre eux
+5. **Paire cross-domaine** : entités de domaines très différents — les connexions les plus surprenantes viennent souvent de là
+
+Fournis un court motif pour chaque sélection (1 phrase).
+
+## FORMAT JSON STRICT
+{
+  "targets": [
+    { "entityIds": [1, 2], "reason": "..." },
+    { "entityIds": [3, 4, 5], "reason": "..." }
+  ]
+}`
+
+    try {
+      const raw = await this.llmService.sendMessage(
+        [{ role: 'user', content: userMsg }],
+        systemPrompt
+      )
+      if (this.phase === 'stopped') return
+
+      const jsonMatch = raw.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) return
+
+      const parsed = JSON.parse(jsonMatch[0]) as {
+        targets?: Array<{ entityIds?: number[]; reason?: string }>
+      }
+
+      const entityMap = new Map(entities.map((e) => [e.id, e]))
+      const newTargets: ExplorationTarget[] = []
+
+      for (const t of parsed.targets ?? []) {
+        if (!t.entityIds || t.entityIds.length < 2) continue
+        const ids = t.entityIds.filter((id) => entityMap.has(id))
+        if (ids.length < 2) continue
+
+        const key = [...ids].sort().join('-')
+        if (this.exploredPairs.has(key)) continue
+        this.exploredPairs.add(key)
+
+        newTargets.push({
+          entityIds: ids,
+          entityNames: ids.map((id) => entityMap.get(id)!.name),
+          edgeKeys: this.getEdgeKeys(relations, ids),
+          strategy: 'llm'
+        })
+      }
+
+      // Prepend to queue (fresh LLM picks take priority over stale ones)
+      this.llmTargetQueue = [...newTargets, ...this.llmTargetQueue].slice(0, LLM_TARGET_BATCH * 2)
+      console.log(`[IdleService] LLM selected ${newTargets.length} targets`)
+    } catch (err) {
+      console.error('[IdleService] Target selection error:', err)
+    }
+  }
+
+  /** Build a compact, token-efficient summary of the graph for the LLM. */
+  private buildGraphSummary(entities: Entity[], relations: Relation[]): string {
+    const lines: string[] = []
+
+    // Entity list — capped at 60 to stay within token budget
+    const cappedEntities = entities.slice(0, 60)
+    lines.push('## ENTITÉS (id | nom | type)')
+    for (const e of cappedEntities) {
+      lines.push(`${e.id} | ${e.name} | ${e.type}`)
+    }
+    if (entities.length > 60) lines.push(`… et ${entities.length - 60} autres`)
+
+    // Relations — capped at 120
+    const cappedRelations = relations.slice(0, 120)
+    lines.push('\n## RELATIONS (source → [type] → cible)')
+    const entityById = new Map(entities.map((e) => [e.id, e.name]))
+    for (const r of cappedRelations) {
+      const src = entityById.get(r.sourceEntityId) ?? `#${r.sourceEntityId}`
+      const tgt = entityById.get(r.targetEntityId) ?? `#${r.targetEntityId}`
+      lines.push(`${src} → [${r.relationType}] → ${tgt}`)
+    }
+    if (relations.length > 120) lines.push(`… et ${relations.length - 120} autres`)
+
+    // Structural stats
+    const typeCounts = new Map<string, number>()
+    for (const e of entities) typeCounts.set(e.type, (typeCounts.get(e.type) ?? 0) + 1)
+    lines.push(`\n## STATISTIQUES\n${entities.length} entités (${[...typeCounts.entries()].map(([t, c]) => `${c} ${t}`).join(', ')}), ${relations.length} relations`)
+
+    return lines.join('\n')
+  }
+
   // ── Context gathering ──────────────────────────────────────────────────────
 
-  private async gatherContext(target: ExplorationTarget, entities: Entity[], relations: Relation[]): Promise<string> {
+  private async gatherContext(
+    target: ExplorationTarget,
+    entities: Entity[],
+    relations: Relation[]
+  ): Promise<{ context: string; webEnriched: boolean }> {
     const lines: string[] = ['## ENTITÉS EXAMINÉES (contenu intégral)']
 
     const examIds = new Set(target.entityIds)
@@ -610,7 +789,39 @@ Sinon (max 1) : {"promoted": [{"category": "opportunity|development|pattern|cont
     lines.push(`\n## BASE DE CONNAISSANCES\n${entities.length} entités (${[...typeCount.entries()].map(([t, c]) => `${c} ${t}`).join(', ')}), ${relations.length} relations.`)
     lines.push(`Stratégie d'exploration : ${target.strategy} | Brouillons accumulés : ${this.draftInsights.length}`)
 
-    return lines.join('\n')
+    // ── Web enrichment for high-value targets ─────────────────────────────────
+    let webEnriched = false
+    if (WEB_ENRICH_STRATEGIES.has(target.strategy)) {
+      try {
+        // Build a targeted query from entity names (max 2 most meaningful ones)
+        const queryNames = target.entityNames
+          .filter((n) => n.length > 2)
+          .slice(0, 2)
+          .join(' ')
+        const query = queryNames
+
+        // Race against 6s timeout — don't block cycle if web is slow
+        const results = await Promise.race([
+          webService.search(query, 4, 'fr'),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000))
+        ])
+
+        if (results.length > 0) {
+          lines.push('\n## CONTEXTE WEB RÉCENT (DuckDuckGo)')
+          lines.push(`*Recherche : "${query}"*\n`)
+          for (const r of results) {
+            lines.push(`**${r.title}**`)
+            if (r.snippet) lines.push(r.snippet)
+            lines.push('')
+          }
+          webEnriched = true
+        }
+      } catch {
+        // Web search failed or timed out — continue without enrichment
+      }
+    }
+
+    return { context: lines.join('\n'), webEnriched }
   }
 
   // ── LLM evaluation ────────────────────────────────────────────────────────
@@ -618,48 +829,47 @@ Sinon (max 1) : {"promoted": [{"category": "opportunity|development|pattern|cont
   private async evaluateInsight(
     context: string
   ): Promise<{ content: string; confidence: number; category: IdleInsight['category'] } | null> {
-    const systemPrompt = `Tu es un analyste stratégique et intellectuel qui explore une base de connaissances personnelle.
-Tu analyses à la fois la STRUCTURE du graphe ET le CONTENU des notes pour dégager des insights à valeur ajoutée.
+    const systemPrompt = `Tu es un analyste stratégique qui explore une base de connaissances personnelle.
+Ton rôle est de TROUVER des connexions, tensions et opportunités — même spéculatives.
+Tu dois TOUJOURS produire une observation si le contenu le permet.
 Réponds UNIQUEMENT en JSON valide, rien d'autre.`
 
     const userMessage = `${context}
 
 ## MISSION
-Analyse ces entités sous deux angles complémentaires et cherche UNE observation remarquable :
+Analyse ces entités et produis UNE observation utile pour l'utilisateur.
 
 **A) ANALYSE DE FOND — priorité haute**
-Lis le contenu des notes et demande-toi :
-- Y a-t-il une opportunité business, stratégique ou intellectuelle que l'utilisateur n'a pas encore explorée ?
-- Un sujet ou domaine sous-représenté qui mériterait d'être approfondi ?
-- Une convergence entre des sujets qui semblent pointer vers la même direction ?
-- Un risque, une tension ou une contradiction dans les idées ou plans documentés ?
-- Un angle d'action concret que le contenu suggère implicitement ?
+- Opportunité business, stratégique ou intellectuelle non encore exploitée ?
+- Sujet sous-représenté qui mériterait d'être approfondi ?
+- Convergence entre sujets pointant vers la même direction ?
+- Risque, tension ou contradiction dans les idées documentées ?
+- Angle d'action concret suggéré implicitement par le contenu ?
+- Si contexte web présent : info récente qui change la donne pour ces entités ?
 
-**B) ANALYSE STRUCTURELLE — priorité secondaire**
-- Un lien indirect non documenté entre ces entités ?
-- Une connexion attendue qui manque ?
-- Un pattern dans la façon dont ces entités sont reliées ?
+**B) ANALYSE STRUCTURELLE — si rien de mieux**
+- Lien indirect non documenté entre ces entités ?
+- Connexion attendue qui manque ?
+- Pattern dans la façon dont ces entités sont reliées ?
 
-## RÈGLES ABSOLUES
-- Prioritise toujours l'analyse de fond sur l'analyse structurelle
-- Ne signale JAMAIS l'évident, le déjà documenté, ou le trivial
-- Si rien de vraiment intéressant : {"found": false} — c'est la réponse normale la plupart du temps
-- Sois concret, précis, actionnable (1-3 phrases max)
-- Ne génère PAS de conseils génériques ("il faudrait mieux documenter…")
+## RÈGLES
+- Sois concret et actionnable (1-3 phrases max)
+- Pas de conseils génériques ou évidents
+- {"found": false} uniquement si vraiment AUCUNE piste n'existe (cas rare)
 
 ## GUIDE DE CONFIANCE
-- 0.88-1.0 : insight solide, supporté par le contenu, directement actionnable
-- 0.70-0.88 : inférence plausible, bien fondée
-- 0.55-0.70 : piste intéressante mais spéculative
-- < 0.55 : trop incertain, ne pas signaler
+- 0.60-1.0 : observation bien fondée, directement utile
+- 0.40-0.60 : piste intéressante, plausible
+- 0.28-0.40 : spéculatif mais vaut la peine de noter
+- < 0.28 : trop incertain → {"found": false}
 
 ## CATÉGORIES
-- opportunity : opportunité business, stratégique ou intellectuelle détectée dans le contenu
-- development : aspect sous-développé qui mériterait d'être approfondi
-- pattern : convergence ou tendance répétée dans les contenus
-- contradiction : tension ou incohérence dans les idées documentées
-- hidden_connection : lien indirect non documenté entre deux entités
-- gap : connexion structurelle attendue mais absente
+- opportunity : opportunité business, stratégique ou intellectuelle
+- development : aspect sous-développé à approfondir
+- pattern : convergence ou tendance répétée
+- contradiction : tension ou incohérence dans les idées
+- hidden_connection : lien indirect non documenté
+- gap : connexion attendue mais absente
 - cluster : regroupement thématique révélateur
 
 ## FORMAT JSON STRICT (rien d'autre)

@@ -211,6 +211,17 @@ export interface IdleInsight {
   status: 'new' | 'dismissed' | 'saved'
 }
 
+export interface IdleAttempt {
+  id: string
+  timestamp: string
+  entityNames: string[]
+  strategy: string
+  result: 'none' | 'draft' | 'insight'
+  category?: IdleInsight['category']
+  snippet?: string        // first ~70 chars of content if draft/insight
+  webEnriched?: boolean   // true if DuckDuckGo search was used
+}
+
 export interface IdleExplorationEvent {
   phase: 'selecting' | 'examining' | 'thinking' | 'insight' | 'resting'
   activeNodeIds: string[]
@@ -220,6 +231,8 @@ export interface IdleExplorationEvent {
   /** Number of draft insights accumulated (not yet promoted) */
   draftCount?: number
   insight?: IdleInsight
+  /** Result of the just-completed cycle, emitted on transition to resting */
+  lastAttempt?: IdleAttempt
 }
 
 export interface IdleConfig {
