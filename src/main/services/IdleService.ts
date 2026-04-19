@@ -33,8 +33,20 @@ const DRAFT_POOL_MAX = 6
 const AUTO_DISMISS_HOURS = 24
 const DEDUP_ENTITY_OVERLAP_THRESHOLD = 0.7
 const LLM_TARGET_BATCH = 5    // how many targets LLM picks per selection pass
-// Web enrichment: strategies that justify a DuckDuckGo search for extra context
-const WEB_ENRICH_STRATEGIES = new Set(['llm', 'bridge'])
+const WEB_ENRICH_COOLDOWN_MS = 20_000  // min ms between DuckDuckGo calls
+
+/** Extract the partial value of "content" from a streaming JSON fragment. */
+function extractPartialContent(raw: string): string | null {
+  // Match: "content": "captured text (may be incomplete)
+  const match = raw.match(/"content"\s*:\s*"((?:[^"\\]|\\.)*)/s)
+  if (!match) return null
+  // Unescape basic JSON sequences so the text is readable
+  return match[1]
+    .replace(/\\n/g, ' ')
+    .replace(/\\"/g, '"')
+    .replace(/\\\\/g, '\\')
+    .trim()
+}
 
 export class IdleService {
   private phase: Phase = 'stopped'
@@ -55,6 +67,8 @@ export class IdleService {
   // LLM-selected target queue: filled by selectTargetsWithLLM(), drained cycle by cycle
   private llmTargetQueue: ExplorationTarget[] = []
   private isSelectingTargets = false
+  // Web enrichment throttle
+  private lastWebSearchAt = 0
 
   constructor(
     private dbService: DatabaseService,
@@ -269,7 +283,16 @@ ${wikilinkLines}
         : Promise.resolve()
 
       const [result] = await Promise.all([
-        this.evaluateInsight(context),
+        this.evaluateInsight(context, (thought) => {
+          // Live-stream partial insight text into the thought bubble
+          this.emit({
+            phase: 'thinking',
+            activeNodeIds: nodeIds,
+            activeEdgeKeys: target.edgeKeys,
+            currentThought: thought,
+            draftCount: this.draftInsights.length
+          })
+        }),
         prefetchPromise
       ])
 
@@ -284,7 +307,7 @@ ${wikilinkLines}
           if (this.insights.length > 50) this.insights = this.insights.slice(0, 50)
           this.persistInsights()
 
-          cycleAttempt = { ...cycleAttempt, result: 'insight', category: result.category, snippet: result.content.slice(0, 70) }
+          cycleAttempt = { ...cycleAttempt, result: 'insight', category: result.category, snippet: result.content.slice(0, 70), fullContent: result.content }
 
           this.phase = 'insight'
           this.emit({
@@ -309,7 +332,10 @@ ${wikilinkLines}
             this.draftInsights.sort((a, b) => b.confidence - a.confidence)
             this.draftInsights = this.draftInsights.slice(0, DRAFT_POOL_MAX - 1)
           }
-          cycleAttempt = { ...cycleAttempt, result: 'draft', category: result.category, snippet: result.content.slice(0, 70) }
+          cycleAttempt = { ...cycleAttempt, result: 'draft', category: result.category, snippet: result.content.slice(0, 70), fullContent: result.content }
+        } else if (result.content) {
+          // Below draft threshold but LLM did produce text — keep it for the activity log
+          cycleAttempt = { ...cycleAttempt, fullContent: result.content }
         }
       }
 
@@ -789,22 +815,24 @@ Fournis un court motif pour chaque sélection (1 phrase).
     lines.push(`\n## BASE DE CONNAISSANCES\n${entities.length} entités (${[...typeCount.entries()].map(([t, c]) => `${c} ${t}`).join(', ')}), ${relations.length} relations.`)
     lines.push(`Stratégie d'exploration : ${target.strategy} | Brouillons accumulés : ${this.draftInsights.length}`)
 
-    // ── Web enrichment for high-value targets ─────────────────────────────────
+    // ── Web enrichment — every cycle (cooldown-throttled) ────────────────────
     let webEnriched = false
-    if (WEB_ENRICH_STRATEGIES.has(target.strategy)) {
+    const now = Date.now()
+    if (now - this.lastWebSearchAt >= WEB_ENRICH_COOLDOWN_MS) {
       try {
-        // Build a targeted query from entity names (max 2 most meaningful ones)
-        const queryNames = target.entityNames
+        // Build a meaningful query: entity names + their types as context
+        const queryParts = target.entityNames
           .filter((n) => n.length > 2)
           .slice(0, 2)
-          .join(' ')
-        const query = queryNames
+        const query = queryParts.join(' ')
 
-        // Race against 6s timeout — don't block cycle if web is slow
+        // Race against 10s timeout
         const results = await Promise.race([
           webService.search(query, 4, 'fr'),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 6000))
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 10_000))
         ])
+
+        this.lastWebSearchAt = Date.now()
 
         if (results.length > 0) {
           lines.push('\n## CONTEXTE WEB RÉCENT (DuckDuckGo)')
@@ -818,6 +846,7 @@ Fournis un court motif pour chaque sélection (1 phrase).
         }
       } catch {
         // Web search failed or timed out — continue without enrichment
+        this.lastWebSearchAt = Date.now() // still advance cooldown to avoid hammering
       }
     }
 
@@ -827,7 +856,8 @@ Fournis un court motif pour chaque sélection (1 phrase).
   // ── LLM evaluation ────────────────────────────────────────────────────────
 
   private async evaluateInsight(
-    context: string
+    context: string,
+    onThoughtUpdate?: (thought: string) => void
   ): Promise<{ content: string; confidence: number; category: IdleInsight['category'] } | null> {
     const systemPrompt = `Tu es un analyste stratégique qui explore une base de connaissances personnelle.
 Ton rôle est de TROUVER des connexions, tensions et opportunités — même spéculatives.
@@ -877,9 +907,26 @@ Analyse ces entités et produis UNE observation utile pour l'utilisateur.
 OU
 {"found": true, "category": "opportunity|development|pattern|contradiction|hidden_connection|gap|cluster", "content": "...", "confidence": 0.0}`
 
+    // Stream the response — extract "content" value progressively for live thought updates
+    let accumulated = ''
+    let lastEmittedLength = 0
+
+    const onDelta = onThoughtUpdate
+      ? (delta: string) => {
+          accumulated += delta
+          // Try to extract the content field value from partial JSON
+          const partial = extractPartialContent(accumulated)
+          if (partial && partial.length > lastEmittedLength + 12) {
+            lastEmittedLength = partial.length
+            onThoughtUpdate(partial)
+          }
+        }
+      : undefined
+
     const raw = await this.llmService.sendMessage(
       [{ role: 'user', content: userMessage }],
-      systemPrompt
+      systemPrompt,
+      onDelta
     )
     const jsonMatch = raw.match(/\{[\s\S]*\}/)
     if (!jsonMatch) return null

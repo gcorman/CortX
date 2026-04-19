@@ -601,6 +601,8 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
   const prevActiveNodeIdsRef = useRef<string[]>([])
 
   const [thoughtBubblePos, setThoughtBubblePos] = useState<Pt | null>(null)
+  const [thinkingElapsed, setThinkingElapsed] = useState(0)
+  const thinkingStartRef = useRef<number | null>(null)
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -1144,6 +1146,23 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
     setThoughtBubblePos({ x, y })
   }, [idlePhase, idleNodeIds])
 
+  // Elapsed-time ticker for the thinking phase
+  useEffect(() => {
+    if (idlePhase === 'thinking') {
+      if (thinkingStartRef.current === null) {
+        thinkingStartRef.current = Date.now()
+        setThinkingElapsed(0)
+      }
+      const timer = setInterval(() => {
+        setThinkingElapsed(Math.floor((Date.now() - (thinkingStartRef.current ?? Date.now())) / 1000))
+      }, 1000)
+      return () => clearInterval(timer)
+    } else {
+      thinkingStartRef.current = null
+      setThinkingElapsed(0)
+    }
+  }, [idlePhase])
+
   // Always render the container div so the Cytoscape setup effect can attach
   // to it on the very first mount — even before data loads.
   // Loading / empty states are overlaid on top rather than replacing the container.
@@ -1175,22 +1194,44 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
           }}
         >
           <div
-            className={`relative backdrop-blur-md rounded-xl px-3 py-2 text-center shadow-xl border transition-all duration-500 max-w-[200px] ${
+            className={`relative backdrop-blur-md rounded-xl px-3 py-2 text-center shadow-xl border transition-all duration-500 max-w-[240px] ${
               isInsightPhase
                 ? 'bg-orange-950/80 border-orange-400/50 shadow-orange-500/20'
                 : 'bg-cortx-surface/85 border-cortx-accent/35 shadow-cortx-accent/10'
             }`}
           >
-            {/* Phase label */}
-            <div className={`text-2xs font-mono uppercase tracking-widest mb-1 ${isInsightPhase ? 'text-orange-400/70' : 'text-cortx-accent/60'}`}>
-              {idlePhase === 'examining' && '⬡ examen'}
-              {idlePhase === 'thinking' && '◌ analyse'}
-              {idlePhase === 'insight' && '✦ insight'}
+            {/* Phase label + elapsed time for thinking */}
+            <div className={`text-2xs font-mono uppercase tracking-widest mb-1 flex items-center justify-center gap-1.5 ${isInsightPhase ? 'text-orange-400/70' : 'text-cortx-accent/60'}`}>
+              {idlePhase === 'examining' && <span>⬡ examen</span>}
+              {idlePhase === 'thinking' && <span>◌ analyse</span>}
+              {idlePhase === 'insight' && <span>✦ insight</span>}
+              {idlePhase === 'thinking' && thinkingElapsed > 0 && (
+                <span className="opacity-50">{thinkingElapsed}s</span>
+              )}
             </div>
-            {/* Thought content */}
-            <p className={`text-xs leading-snug font-medium ${isInsightPhase ? 'text-orange-100' : 'text-cortx-text-primary/90'}`}>
-              {idleThought || '…'}
-            </p>
+            {/* Thought content — always shows tail of streamed text */}
+            {(() => {
+              const TAIL = 110
+              const hasOverflow = idleThought.length > TAIL
+              const tail = hasOverflow ? idleThought.slice(-TAIL) : idleThought
+              return (
+                <p className={`text-xs leading-snug font-medium text-left ${isInsightPhase ? 'text-orange-100' : 'text-cortx-text-primary/90'}`}>
+                  {tail ? (
+                    <>
+                      {hasOverflow && <span className="opacity-30">… </span>}
+                      {tail}
+                      {idlePhase === 'thinking' && (
+                        <span className="inline-block w-[2px] h-[0.85em] bg-current align-middle ml-0.5 animate-pulse" />
+                      )}
+                    </>
+                  ) : (
+                    idlePhase === 'thinking'
+                      ? <span className="opacity-40">…</span>
+                      : '…'
+                  )}
+                </p>
+              )
+            })()}
             {/* Draft count badge */}
             {idleDraftCount > 0 && !isInsightPhase && (
               <div className="mt-1.5 text-2xs text-cortx-text-secondary/50">

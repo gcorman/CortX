@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronDown, ChevronUp, Eye, X } from 'lucide-react'
 import { useState } from 'react'
 import { useIdleStore } from '../../stores/idleStore'
 import { InsightCard } from './InsightCard'
@@ -75,33 +75,57 @@ const STRATEGY_LABEL: Record<string, string> = {
 }
 
 function AttemptRow({ attempt }: { attempt: IdleAttempt }): React.JSX.Element {
+  const [expanded, setExpanded] = useState(false)
   const dotClass = RESULT_DOT[attempt.result]
   const label = RESULT_LABEL[attempt.result]
   const stratIcon = STRATEGY_LABEL[attempt.strategy] ?? '·'
   const names = attempt.entityNames.slice(0, 2).join(' × ')
+  const hasContent = Boolean(attempt.fullContent)
 
   return (
-    <div className="flex items-start gap-2 py-1 border-b border-cortx-border/30 last:border-0">
-      <span className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${dotClass}`} />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-2xs text-cortx-text-secondary/40 font-mono">{stratIcon}</span>
-          <span className="text-2xs text-cortx-text-primary/70 truncate">{names}</span>
-          {attempt.webEnriched && (
-            <span className="text-2xs text-blue-400/60 flex-shrink-0">🌐</span>
+    <div className="border-b border-cortx-border/30 last:border-0">
+      <div className="flex items-start gap-2 py-1">
+        <span className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${dotClass}`} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-2xs text-cortx-text-secondary/40 font-mono">{stratIcon}</span>
+            <span className="text-2xs text-cortx-text-primary/70 truncate">{names}</span>
+            {attempt.webEnriched && (
+              <span className="text-2xs text-blue-400/60 flex-shrink-0">🌐</span>
+            )}
+            <span className={`text-2xs ml-auto flex-shrink-0 ${
+              attempt.result === 'insight' ? 'text-cortx-cta/80' :
+              attempt.result === 'draft'   ? 'text-cortx-accent/70' :
+              'text-cortx-text-secondary/30'
+            }`}>{label}</span>
+            {hasContent && (
+              <button
+                onClick={() => setExpanded((e) => !e)}
+                className={`flex-shrink-0 transition-colors cursor-pointer ${
+                  expanded
+                    ? 'text-cortx-accent'
+                    : 'text-cortx-text-secondary/60 hover:text-cortx-accent'
+                }`}
+                title="Voir le contenu généré"
+              >
+                {expanded ? <X size={11} /> : <Eye size={11} />}
+              </button>
+            )}
+          </div>
+          {!expanded && attempt.snippet && (
+            <p className="text-2xs text-cortx-text-secondary/50 leading-snug mt-0.5 truncate">
+              {attempt.snippet}{attempt.snippet.length >= 70 ? '…' : ''}
+            </p>
           )}
-          <span className={`text-2xs ml-auto flex-shrink-0 ${
-            attempt.result === 'insight' ? 'text-cortx-cta/80' :
-            attempt.result === 'draft'   ? 'text-cortx-accent/70' :
-            'text-cortx-text-secondary/30'
-          }`}>{label}</span>
         </div>
-        {attempt.snippet && (
-          <p className="text-2xs text-cortx-text-secondary/50 leading-snug mt-0.5 truncate">
-            {attempt.snippet}{attempt.snippet.length >= 70 ? '…' : ''}
-          </p>
-        )}
       </div>
+      {expanded && attempt.fullContent && (
+        <div className="ml-3.5 mb-1.5 px-2 py-1.5 rounded-md bg-cortx-bg/80 border border-cortx-border/40">
+          <p className="text-2xs text-cortx-text-secondary/70 leading-relaxed whitespace-pre-wrap">
+            {attempt.fullContent}
+          </p>
+        </div>
+      )}
     </div>
   )
 }

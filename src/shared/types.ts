@@ -219,6 +219,7 @@ export interface IdleAttempt {
   result: 'none' | 'draft' | 'insight'
   category?: IdleInsight['category']
   snippet?: string        // first ~70 chars of content if draft/insight
+  fullContent?: string    // full LLM output (even if below confidence threshold)
   webEnriched?: boolean   // true if DuckDuckGo search was used
 }
 
