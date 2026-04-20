@@ -1,3 +1,5 @@
+import * as path from 'path'
+import * as fs from 'fs'
 import { FileService } from './FileService'
 import { DatabaseService } from './DatabaseService'
 import { GitService } from './GitService'
@@ -574,6 +576,31 @@ export class AgentPipeline {
       console.error('[AgentPipeline] Git commit failed on deleteFiche:', err)
     }
     await this.reindexAll()
+  }
+
+  /**
+   * Copy a raw .md file (provided as content string) directly into the KB root.
+   * No LLM involved — content is written as-is.
+   */
+  async importRawMarkdown(filename: string, content: string): Promise<{ path: string }> {
+    const safe = filename.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_').trim()
+    const baseName = safe.endsWith('.md') ? safe : `${safe}.md`
+
+    let relPath = baseName
+    let i = 2
+    while (fs.existsSync(path.join(this.basePath, relPath))) {
+      relPath = `${baseName.replace(/\.md$/, '')}_${i}.md`
+      i++
+    }
+
+    await this.fileService.writeFile(relPath, content)
+    try {
+      await this.gitService.commitAll(`Import: ${relPath}`)
+    } catch (err) {
+      console.error('[AgentPipeline] importRawMarkdown: git error', err)
+    }
+    await this.reindexAll()
+    return { path: relPath }
   }
 
   /**

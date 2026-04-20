@@ -2,16 +2,17 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { LiveStreamBubble } from './LiveStreamBubble'
+import { ImportMdModal } from '../dialogs/ImportMdModal'
 import { useChatStore } from '../../stores/chatStore'
 import { useUIStore } from '../../stores/uiStore'
 import { Brain, Sparkles, FileText } from 'lucide-react'
 import { useT } from '../../i18n'
 
 export function ChatView(): React.JSX.Element {
-  const { messages, isProcessing, sendMessage, importMarkdown } = useChatStore()
+  const { messages, isProcessing, sendMessage } = useChatStore()
   const streamActive = useChatStore((s) => s.streamActive)
   const streamText = useChatStore((s) => s.streamText)
-  const { addToast } = useUIStore()
+  const { addToast, showMdImportModal } = useUIStore()
   const scrollRef = useRef<HTMLDivElement>(null)
   const [globalDragOver, setGlobalDragOver] = useState(false)
   const dragCounterRef = useRef(0)
@@ -54,13 +55,14 @@ export function ChatView(): React.JSX.Element {
       if (!name.endsWith('.md') && !name.endsWith('.txt')) continue
       try {
         const content = await file.text()
-        await importMarkdown(file.name, content)
+        const absolutePath = (file as File & { path?: string }).path || ''
+        showMdImportModal({ filename: file.name, content, absolutePath })
       } catch (err) {
         console.error('[ChatView] drop error:', err)
         addToast(err instanceof Error ? err.message : String(err), 'error')
       }
     }
-  }, [importMarkdown])
+  }, [showMdImportModal, addToast])
 
   return (
     <div
@@ -96,9 +98,11 @@ export function ChatView(): React.JSX.Element {
       {/* Input */}
       <ChatInput
         onSend={sendMessage}
-        onImportMarkdown={importMarkdown}
         disabled={isProcessing}
       />
+
+      {/* .md import choice modal */}
+      <ImportMdModal />
     </div>
   )
 }

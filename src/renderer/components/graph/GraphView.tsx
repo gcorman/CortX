@@ -27,7 +27,7 @@ function getCssColor(varName: string): string {
   return raw
 }
 
-const NODE_COLORS: Record<string, string> = {
+export const NODE_COLORS: Record<string, string> = {
   personne:   '#0D9488',
   entreprise: '#3B82F6',
   domaine:    '#8B5CF6',
@@ -622,6 +622,10 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
   const pendingDataRef = useRef<{ nodes: typeof nodes; edges: typeof edges; filterTypes: Set<string> } | null>(null)
   // Debounce timer for re-fitting the viewport after a window/panel resize
   const resizeFitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Lens effect: canonical (non-lens-offset) positions + rAF state
+  const restPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map())
+  const lensRafRef = useRef<number | null>(null)
+  const lensActiveRef = useRef(false)
 
   const [contextMenu, setContextMenu] = useState<{
     x: number; y: number; nodeId: string; filePath: string; label: string; isLibDoc: boolean
@@ -854,6 +858,8 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
     cy.on('grab', 'node', (evt) => {
       stopLive()
       draggedNodeRef.current = evt.target as cytoscape.NodeSingular
+      // Pause lens while dragging — nodes should follow the mouse, not spring
+      lensActiveRef.current = false
     })
 
     cy.on('drag', 'node', () => {
@@ -872,10 +878,13 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       })
     })
 
-    cy.on('dragfree', 'node', () => {
+    cy.on('dragfree', 'node', (evt) => {
       stopLive()
+      const droppedNode = evt.target as cytoscape.NodeSingular
+      // Persist the intentional drop position as the new canonical position
+      restPositionsRef.current.set(droppedNode.id() as string, { ...droppedNode.position() })
       draggedNodeRef.current = null
-      // Let physics settle smoothly after release
+      // Let physics settle smoothly after release (layoutstop will sync all restPositions)
       const settle = cy.layout(makeSettleLayout())
       settle.run()
     })
@@ -916,6 +925,105 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       setTooltip(null)
     })
 
+    // ── Lens effect: radial dilation at viewport centre ──────────────────────
+    //
+    // Nodes near the centre of the current viewport are pushed outward
+    // (graph-space spring physics). When the viewport stops moving, nodes
+    // spring back to their canonical rest positions over ~400 ms.
+    //
+    // restPositionsRef holds the authoritative positions; lens offsets are
+    // applied on top and never committed back to rest (except on drag-drop
+    // or layoutstop, which represent intentional position changes).
+
+    const LENS_RADIUS_PX = 270  // screen-space radius of the lens bubble
+    const LENS_STRENGTH  = 0.30 // max push as a fraction of lensRadius (graph units)
+    const LENS_LERP      = 0.10 // spring stiffness per frame (at 60 fps ≈ 400 ms to 98%)
+
+    let lensViewportTimer: ReturnType<typeof setTimeout> | null = null
+
+    function runLensFrame(): void {
+      const container = cy.container()
+      if (!container) { lensRafRef.current = null; return }
+
+      const pan  = cy.pan()
+      const zoom = cy.zoom()
+      const screenCx = container.clientWidth  / 2
+      const screenCy = container.clientHeight / 2
+
+      // Viewport centre in graph coordinates
+      const graphCx = (screenCx - pan.x) / zoom
+      const graphCy = (screenCy - pan.y) / zoom
+      const lensRadius = LENS_RADIUS_PX / zoom   // convert to graph units
+
+      let anyMovement = false
+
+      cy.batch(() => {
+        cy.nodes().forEach((node) => {
+          // Never push the node currently being dragged
+          if (node === draggedNodeRef.current) return
+
+          const id   = node.id() as string
+          const rest = restPositionsRef.current.get(id)
+          if (!rest) return
+
+          let targetX = rest.x
+          let targetY = rest.y
+
+          if (lensActiveRef.current) {
+            const dx   = rest.x - graphCx
+            const dy   = rest.y - graphCy
+            const dist = Math.sqrt(dx * dx + dy * dy)
+            if (dist < lensRadius && dist > 0.5) {
+              // Smooth quadratic falloff: full push at centre, zero at edge
+              const t    = 1 - dist / lensRadius
+              const push = LENS_STRENGTH * t * t * lensRadius
+              targetX += (dx / dist) * push
+              targetY += (dy / dist) * push
+            }
+          }
+
+          const cur  = node.position()
+          const newX = cur.x + (targetX - cur.x) * LENS_LERP
+          const newY = cur.y + (targetY - cur.y) * LENS_LERP
+
+          if (Math.abs(newX - cur.x) + Math.abs(newY - cur.y) > 0.06) {
+            node.position({ x: newX, y: newY })
+            anyMovement = true
+          }
+        })
+      })
+
+      lensRafRef.current = anyMovement ? requestAnimationFrame(runLensFrame) : null
+    }
+
+    cy.on('viewport', () => {
+      // Don't activate during node drag (live-layout handles that)
+      if (draggedNodeRef.current) return
+
+      lensActiveRef.current = true
+      if (lensRafRef.current === null) {
+        lensRafRef.current = requestAnimationFrame(runLensFrame)
+      }
+
+      // After viewport stops, deactivate push so nodes spring back to rest
+      if (lensViewportTimer) clearTimeout(lensViewportTimer)
+      lensViewportTimer = setTimeout(() => {
+        lensViewportTimer = null
+        lensActiveRef.current = false
+        // Keep rAF alive so the spring-back animation completes
+        if (lensRafRef.current === null) {
+          lensRafRef.current = requestAnimationFrame(runLensFrame)
+        }
+      }, 120)
+    })
+
+    // Capture authoritative positions after every layout run
+    cy.on('layoutstop', () => {
+      cy.nodes().forEach((node) => {
+        restPositionsRef.current.set(node.id() as string, { ...node.position() })
+      })
+    })
+
     // ResizeObserver: detect when the container gets real dimensions and
     // replay any data that arrived before the container was visible.
     const ro = new ResizeObserver((entries) => {
@@ -950,6 +1058,11 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       ro.disconnect()
       if (resizeFitTimerRef.current) clearTimeout(resizeFitTimerRef.current)
       if (zoomLodTimer) clearTimeout(zoomLodTimer)
+      if (lensViewportTimer) clearTimeout(lensViewportTimer)
+      if (lensRafRef.current !== null) {
+        cancelAnimationFrame(lensRafRef.current)
+        lensRafRef.current = null
+      }
       stopLive()
       cy.destroy()
       cyRef.current = null
@@ -1014,11 +1127,13 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       const existingNodeIds = new Set<string>()
       cy.nodes().forEach((n) => existingNodeIds.add(n.id() as string))
 
-      // Save positions of nodes that will survive the update
+      // Use canonical rest positions (not lens-offset rendered positions) for surviving nodes
       const savedPositions = new Map<string, { x: number; y: number }>()
       cy.nodes().forEach((node) => {
-        if (filteredNodeIds.has(node.id() as string)) {
-          savedPositions.set(node.id() as string, { ...node.position() })
+        const id = node.id() as string
+        if (filteredNodeIds.has(id)) {
+          const rest = restPositionsRef.current.get(id)
+          savedPositions.set(id, rest ? { ...rest } : { ...node.position() })
         }
       })
 
@@ -1060,6 +1175,10 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       // Run settle layout only when topology actually changed
       if (nodesToAdd.length > 0 || nodesToRemove.length > 0) {
         cy.layout({ ...makeSettleLayout(), animationDuration: 500 } as unknown as cytoscape.LayoutOptions).run()
+        // layoutstop handler will sync restPositions after the layout settles
+      } else {
+        // No layout ran — sync rest positions now (from savedPositions, which are canonical)
+        savedPositions.forEach((pos, id) => { restPositionsRef.current.set(id, { ...pos }) })
       }
     }
 

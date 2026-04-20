@@ -74,4 +74,8 @@ export function registerAgentHandlers(getAgent: () => AgentPipeline): void {
   ipcMain.handle('agent:previewWebContext', (_event, input: string) =>
     getAgent().previewWebContext(input)
   )
+
+  ipcMain.handle('agent:importRawMarkdown', (_event, filename: string, content: string) =>
+    getAgent().importRawMarkdown(filename, content)
+  )
 }

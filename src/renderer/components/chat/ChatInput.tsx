@@ -7,11 +7,10 @@ import { useT } from '../../i18n'
 
 interface ChatInputProps {
   onSend: (message: string) => void
-  onImportMarkdown?: (filename: string, content: string) => void
   disabled: boolean
 }
 
-export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps): React.JSX.Element {
+export function ChatInput({ onSend, disabled }: ChatInputProps): React.JSX.Element {
   const [value, setValue] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
   const [webPreview, setWebPreview] = useState<string | null>(null)
@@ -19,6 +18,7 @@ export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const files = useFileStore((s) => s.files)
   const setChatFocusedTitles = useUIStore((s) => s.setChatFocusedTitles)
+  const showMdImportModal = useUIStore((s) => s.showMdImportModal)
   const t = useT()
 
   // --- @mention state ---
@@ -197,8 +197,12 @@ export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps
     if (disabled) return
     try {
       const result = await window.cortx.files.openMarkdownDialog()
-      if (result && onImportMarkdown) {
-        onImportMarkdown(result.filename, result.content)
+      if (result) {
+        showMdImportModal({
+          filename: result.filename,
+          content: result.content,
+          absolutePath: result.path || ''
+        })
       }
     } catch (err) {
       console.error('[ChatInput] openMarkdownDialog error:', err)
@@ -224,7 +228,7 @@ export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps
     e.preventDefault()
     e.stopPropagation() // Prevent ChatView from also handling the same drop
     setIsDragOver(false)
-    if (!onImportMarkdown || disabled) return
+    if (disabled) return
 
     const droppedFiles = Array.from(e.dataTransfer.files)
     for (const file of droppedFiles) {
@@ -232,7 +236,8 @@ export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps
       if (!name.endsWith('.md') && !name.endsWith('.txt')) continue
       try {
         const content = await file.text()
-        onImportMarkdown(file.name, content)
+        const absolutePath = (file as File & { path?: string }).path || ''
+        showMdImportModal({ filename: file.name, content, absolutePath })
       } catch (err) {
         console.error('[ChatInput] file read error:', err)
       }

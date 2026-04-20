@@ -258,6 +258,18 @@ export interface T {
     noTags: string
     noTagsHint: string
   }
+  importMdModal: {
+    title: string
+    subtitle: string
+    libraryTitle: string
+    libraryDesc: string
+    agentTitle: string
+    agentDesc: string
+    rawTitle: string
+    rawDesc: string
+    cancel: string
+    noPath: string
+  }
   createFile: {
     title: string
     personne: string
@@ -596,6 +608,18 @@ const fr: T = {
     created: (title) => `Fiche créée : ${title}`,
     createError: 'Erreur lors de la création de la fiche'
   },
+  importMdModal: {
+    title: 'Importer le fichier',
+    subtitle: 'Comment souhaitez-vous intégrer ce fichier ?',
+    libraryTitle: 'Bibliothèque (Docling)',
+    libraryDesc: 'Extraction de texte et indexation sémantique complète',
+    agentTitle: "Analyser avec l'agent",
+    agentDesc: "L'agent propose des modifications structurées dans la base",
+    rawTitle: 'Import brut dans la base',
+    rawDesc: 'Copie le fichier .md tel quel dans la base de connaissances',
+    cancel: 'Annuler',
+    noPath: 'Chemin indisponible pour cet import'
+  },
   library: {
     searchPlaceholder: 'Rechercher dans la bibliothèque…',
     import: 'Importer',
@@ -915,6 +939,18 @@ const en: T = {
     create: 'Create',
     created: (title) => `Card created: ${title}`,
     createError: 'Error creating card'
+  },
+  importMdModal: {
+    title: 'Import file',
+    subtitle: 'How do you want to integrate this file?',
+    libraryTitle: 'Library (Docling)',
+    libraryDesc: 'Full text extraction and semantic indexing',
+    agentTitle: 'Analyze with agent',
+    agentDesc: 'Agent proposes structured edits to the knowledge base',
+    rawTitle: 'Raw import into KB',
+    rawDesc: 'Copy the .md file as-is into the knowledge base',
+    cancel: 'Cancel',
+    noPath: 'Path unavailable for this import'
   },
   library: {
     searchPlaceholder: 'Search the library…',

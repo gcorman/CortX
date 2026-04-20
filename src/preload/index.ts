@@ -47,7 +47,9 @@ const api: CortxAPI = {
     rewriteFile: (filePath: string) => ipcRenderer.invoke('agent:rewriteFile', filePath),
     deleteFile: (filePath: string) => ipcRenderer.invoke('agent:deleteFile', filePath),
     wikiToMd: (topic: string, lang?: string) => ipcRenderer.invoke('agent:wikiToMd', topic, lang),
-    previewWebContext: (input: string) => ipcRenderer.invoke('agent:previewWebContext', input)
+    previewWebContext: (input: string) => ipcRenderer.invoke('agent:previewWebContext', input),
+    importRawMarkdown: (filename: string, content: string) =>
+      ipcRenderer.invoke('agent:importRawMarkdown', filename, content)
   },
   app: {
     getBasePath: () => ipcRenderer.invoke('app:getBasePath'),

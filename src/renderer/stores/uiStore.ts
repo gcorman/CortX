@@ -21,6 +21,11 @@ interface UIState {
   // Title editing
   titleEditingPath: string | null
 
+  // .md import modal (drag-drop or + button)
+  mdImportModal: { filename: string; content: string; absolutePath: string } | null
+  showMdImportModal: (file: { filename: string; content: string; absolutePath: string }) => void
+  hideMdImportModal: () => void
+
   // Chat @mention → graph highlight bridge
   chatFocusedTitles: string[]
   setChatFocusedTitles: (titles: string[]) => void
@@ -69,6 +74,11 @@ export const useUIStore = create<UIState>((set) => ({
 
   // Title editing
   titleEditingPath: null,
+
+  // .md import modal
+  mdImportModal: null,
+  showMdImportModal: (file) => set({ mdImportModal: file }),
+  hideMdImportModal: () => set({ mdImportModal: null }),
 
   chatFocusedTitles: [],
   setChatFocusedTitles: (titles) => set({ chatFocusedTitles: titles }),
