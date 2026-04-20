@@ -5,7 +5,7 @@ import { LLMService } from './LLMService'
 import { libraryService } from './LibraryService'
 import { webService } from './WebService'
 import { buildSystemPrompt } from '../utils/promptBuilder'
-import type { AgentResponse, AgentAction, LibraryChunkResult, AppLanguage } from '../../shared/types'
+import type { AgentResponse, AgentAction, LibraryChunkResult, AppLanguage, StreamEvent, WebFetchEvent, PartialAction } from '../../shared/types'
 import { computeModifiedContent } from '../utils/contentMerge'
 import { normalizeActions } from '../utils/actionNormalize'
 import type { RawAction } from '../utils/actionNormalize'
@@ -37,25 +37,153 @@ interface RawAgentResponse {
   }>
 }
 
+/**
+ * Tolerant streaming parser for the `actions: [...]` array in the LLM's JSON
+ * response. Scans the accumulated buffer each feed(), emits a PartialAction
+ * per action object it can locate — even before that object is closed.
+ * Only re-emits when the shape changes (to throttle IPC traffic).
+ */
+class PartialActionParser {
+  private lastKey: string[] = []
+  private emitted = new Set<number>()
+
+  constructor(private onAction: (pa: PartialAction) => void) {}
+
+  feed(buffer: string): void {
+    // Locate the actions array start.
+    const arrMatch = buffer.match(/"actions"\s*:\s*\[/)
+    if (!arrMatch) return
+    const start = arrMatch.index! + arrMatch[0].length
+
+    // Walk the array, splitting into top-level object slices by brace depth.
+    const slices: Array<{ text: string; closed: boolean }> = []
+    let depth = 0
+    let objStart = -1
+    let inStr = false
+    let escape = false
+    let arrEnded = false
+
+    for (let i = start; i < buffer.length; i++) {
+      const c = buffer[i]
+      if (inStr) {
+        if (escape) { escape = false; continue }
+        if (c === '\\') { escape = true; continue }
+        if (c === '"') { inStr = false }
+        continue
+      }
+      if (c === '"') { inStr = true; continue }
+      if (c === '{') {
+        if (depth === 0) objStart = i
+        depth++
+      } else if (c === '}') {
+        depth--
+        if (depth === 0 && objStart !== -1) {
+          slices.push({ text: buffer.slice(objStart, i + 1), closed: true })
+          objStart = -1
+        }
+      } else if (c === ']' && depth === 0) {
+        arrEnded = true
+        break
+      }
+    }
+    if (!arrEnded && depth > 0 && objStart !== -1) {
+      slices.push({ text: buffer.slice(objStart), closed: false })
+    }
+
+    for (let idx = 0; idx < slices.length; idx++) {
+      const slice = slices[idx]
+      const pa = this.extractPartial(idx, slice.text, slice.closed)
+      const key = `${pa.action ?? ''}|${pa.file ?? ''}|${(pa.content ?? '').length}|${pa.complete}`
+      if (this.lastKey[idx] === key) continue
+      this.lastKey[idx] = key
+      // Only emit once per completion so UI locks the final state.
+      if (pa.complete && this.emitted.has(idx)) continue
+      if (pa.complete) this.emitted.add(idx)
+      this.onAction(pa)
+    }
+  }
+
+  private extractPartial(index: number, slice: string, closed: boolean): PartialAction {
+    const action = this.extractField(slice, 'action') as 'create' | 'modify' | undefined
+    const file = this.extractField(slice, 'file')
+      ?? this.extractField(slice, 'path')
+      ?? this.extractField(slice, 'filename')
+    const content = this.extractField(slice, 'content')
+    return {
+      index,
+      action: action === 'create' || action === 'modify' ? action : undefined,
+      file,
+      content,
+      complete: closed
+    }
+  }
+
+  /**
+   * Extract `"key": "value"` from a JSON-ish slice. Handles escaped quotes
+   * and lets an unterminated trailing string pass through (for in-flight
+   * streaming of the `content` field).
+   */
+  private extractField(slice: string, key: string): string | undefined {
+    const re = new RegExp(`"${key}"\\s*:\\s*"`, 'g')
+    const m = re.exec(slice)
+    if (!m) return undefined
+    const start = m.index + m[0].length
+    let out = ''
+    let escape = false
+    for (let i = start; i < slice.length; i++) {
+      const c = slice[i]
+      if (escape) {
+        if (c === 'n') out += '\n'
+        else if (c === 't') out += '\t'
+        else if (c === 'r') out += '\r'
+        else out += c
+        escape = false
+        continue
+      }
+      if (c === '\\') { escape = true; continue }
+      if (c === '"') return out
+      out += c
+    }
+    return out // string unterminated — mid-stream
+  }
+}
+
 export class AgentPipeline {
+  private notifyRenderer?: () => void
+
   constructor(
     private fileService: FileService,
     private dbService: DatabaseService,
     private gitService: GitService,
     private llmService: LLMService,
     private basePath: string,
-    private language: AppLanguage = 'fr'
-  ) {}
+    private language: AppLanguage = 'fr',
+    notifyRenderer?: () => void
+  ) {
+    this.notifyRenderer = notifyRenderer
+  }
 
   setLanguage(language: AppLanguage): void {
     this.language = language
+  }
+
+  /** Fetch web context for /wiki and /internet directives without calling the LLM. */
+  async previewWebContext(input: string): Promise<string> {
+    return this.fetchWebContext(input)
   }
 
   /**
    * Process user input: call LLM, parse response, return proposed actions.
    * Actions are NOT executed — they are proposals for the user to review.
    */
-  async process(input: string, onStreamDelta?: (delta: string) => void): Promise<AgentResponse> {
+  async process(
+    input: string,
+    onStreamDelta?: (delta: string) => void,
+    onEvent?: (ev: StreamEvent) => void
+  ): Promise<AgentResponse> {
+    const emit = (ev: StreamEvent): void => { try { onEvent?.(ev) } catch { /* swallow */ } }
+
+    emit({ kind: 'phase', phase: 'retrieving' })
     const [contextFiles, libraryChunks] = await Promise.all([
       this.retrieveContext(input),
       this.retrieveLibraryContext(input),
@@ -78,7 +206,7 @@ export class AgentPipeline {
     // Detect /wiki <topic> and /internet <url> directives in user input.
     // Fetched content is appended to the system prompt so the LLM can reference
     // it when proposing actions — nothing is written yet (propose-then-execute).
-    const webContext = await this.fetchWebContext(input)
+    const webContext = await this.fetchWebContext(input, emit)
 
     let systemPrompt = buildSystemPrompt(
       this.dbService,
@@ -93,12 +221,32 @@ export class AgentPipeline {
       systemPrompt += `\n\n==================================================\nSOURCES WEB RÉCUPÉRÉES\n==================================================\n${webContext}`
     }
 
+    emit({ kind: 'phase', phase: 'thinking' })
+
+    // Track streaming text to parse partial actions in-flight.
+    let streamAccum = ''
+    let phaseSwitched = false
+    const partialParser = new PartialActionParser((pa) => emit({ kind: 'partial-action', action: pa }))
+
+    const wrappedOnDelta = (delta: string): void => {
+      if (!delta) return
+      if (!phaseSwitched) {
+        phaseSwitched = true
+        emit({ kind: 'phase', phase: 'writing' })
+      }
+      streamAccum += delta
+      emit({ kind: 'delta', text: delta })
+      partialParser.feed(streamAccum)
+      onStreamDelta?.(delta)
+    }
+
     const rawResponse = await this.llmService.sendMessage(
       [{ role: 'user', content: input }],
       systemPrompt,
-      onStreamDelta
+      wrappedOnDelta
     )
 
+    emit({ kind: 'phase', phase: 'proposing' })
     console.log('[AgentPipeline] Raw LLM response length:', rawResponse.length)
 
     const parsed = this.parseResponse(rawResponse)
@@ -503,6 +651,8 @@ export class AgentPipeline {
     this.updateKbEmbeddingsAsync().catch((err) =>
       console.warn('[AgentPipeline] KB embedding update failed:', err)
     )
+
+    this.notifyRenderer?.()
   }
 
   /**
@@ -836,20 +986,38 @@ export class AgentPipeline {
    * Fetches content and returns a formatted string to inject into the system prompt.
    * Returns empty string if no directives found or all fetches fail.
    */
-  private async fetchWebContext(input: string): Promise<string> {
+  private async fetchWebContext(input: string, emit?: (ev: StreamEvent) => void): Promise<string> {
     const parts: string[] = []
+    const emitFetch = (fetch: WebFetchEvent): void => {
+      if (emit) emit({ kind: 'web-fetch', fetch })
+    }
+    const hasAny =
+      /\/wiki\s+[^\n/]+/i.test(input) || /\/internet\b/i.test(input)
+    if (hasAny && emit) emit({ kind: 'phase', phase: 'fetching-web' })
 
     // /wiki <topic> — fetch Wikipedia
     const wikiMatches = [...input.matchAll(/\/wiki\s+([^\n/]+)/gi)]
     for (const m of wikiMatches) {
       const topic = m[1].trim()
+      const id = `wiki-${topic}`
+      emitFetch({ id, kind: 'wikipedia', label: topic, status: 'pending' })
       try {
         const result = await webService.fetchWikipedia(topic, this.language === 'en' ? 'en' : 'fr')
-        parts.push(webService.formatWikipediaAsContext(result))
+        const formatted = webService.formatWikipediaAsContext(result)
+        parts.push(formatted)
         console.log(`[AgentPipeline] Fetched Wikipedia: ${result.title} (${result.lang})`)
+        emitFetch({
+          id, kind: 'wikipedia', label: result.title,
+          url: `https://${result.lang}.wikipedia.org/wiki/${encodeURIComponent(result.title.replace(/\s+/g, '_'))}`,
+          status: 'done', chars: formatted.length
+        })
       } catch (err) {
         console.warn(`[AgentPipeline] Wikipedia fetch failed for "${topic}":`, err)
         parts.push(`## Source web — Wikipedia\nErreur : impossible de récupérer "${topic}"`)
+        emitFetch({
+          id, kind: 'wikipedia', label: topic, status: 'error',
+          errorMessage: err instanceof Error ? err.message : String(err)
+        })
       }
     }
 
@@ -883,15 +1051,24 @@ export class AgentPipeline {
       seen.add(key)
 
       if (target.type === 'url') {
+        const id = `url-${target.value}`
+        emitFetch({ id, kind: 'url', label: target.value, url: target.value, status: 'pending' })
         try {
           const text = await webService.fetchUrl(target.value)
           parts.push(webService.formatUrlAsContext(target.value, text))
           console.log(`[AgentPipeline] Fetched URL: ${target.value}`)
+          emitFetch({ id, kind: 'url', label: target.value, url: target.value, status: 'done', chars: text.length })
         } catch (err) {
           console.warn(`[AgentPipeline] URL fetch failed for "${target.value}":`, err)
           parts.push(`## Source web — ${target.value}\nErreur : impossible de récupérer cette URL`)
+          emitFetch({
+            id, kind: 'url', label: target.value, url: target.value, status: 'error',
+            errorMessage: err instanceof Error ? err.message : String(err)
+          })
         }
       } else {
+        const id = `search-${target.value}`
+        emitFetch({ id, kind: 'search', label: target.value, status: 'pending' })
         try {
           const batch = await webService.searchAndFetch(target.value, {
             limit: 4,
@@ -901,14 +1078,24 @@ export class AgentPipeline {
           })
           if (batch.results.length === 0) {
             parts.push(`## Recherche web — "${target.value}"\nAucun résultat DuckDuckGo.`)
+            emitFetch({ id, kind: 'search', label: target.value, status: 'done', resultCount: 0 })
           } else {
             parts.push(webService.formatSearchAsContext(batch))
             const ok = batch.results.filter(r => !r.error).length
             console.log(`[AgentPipeline] Web search "${target.value}" — ${ok}/${batch.results.length} pages récupérées`)
+            emitFetch({
+              id, kind: 'search', label: target.value, status: 'done',
+              resultCount: ok,
+              chars: batch.results.reduce((n, r) => n + (r.content?.length ?? 0), 0)
+            })
           }
         } catch (err) {
           console.warn(`[AgentPipeline] Web search failed for "${target.value}":`, err)
           parts.push(`## Recherche web — "${target.value}"\nErreur : ${err instanceof Error ? err.message : String(err)}`)
+          emitFetch({
+            id, kind: 'search', label: target.value, status: 'error',
+            errorMessage: err instanceof Error ? err.message : String(err)
+          })
         }
       }
     }

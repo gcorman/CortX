@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
 import type { AgentPipeline } from '../services/AgentPipeline'
 import type { IdleService } from '../services/IdleService'
-import type { AgentAction } from '../../shared/types'
+import type { AgentAction, StreamEvent } from '../../shared/types'
 
 let _idleService: IdleService | null = null
 
@@ -17,19 +17,24 @@ export function registerAgentHandlers(getAgent: () => AgentPipeline): void {
 
   ipcMain.handle('agent:processStream', async (event, input: string, requestId: string) => {
     _idleService?.pause()
+    // Legacy `delta` field kept for backwards-compat with older renderer code;
+    // the new `event` field carries structured StreamEvent payloads.
     const onDelta = (delta: string) => {
       if (!delta) return
       event.sender.send('agent:stream', { requestId, delta })
     }
+    const onEvent = (ev: StreamEvent) => {
+      event.sender.send('agent:stream', { requestId, event: ev })
+    }
     try {
-      const response = await getAgent().process(input, onDelta)
+      const response = await getAgent().process(input, onDelta, onEvent)
+      event.sender.send('agent:stream', { requestId, event: { kind: 'done' } as StreamEvent })
       event.sender.send('agent:stream', { requestId, done: true })
       return response
     } catch (err) {
-      event.sender.send('agent:stream', {
-        requestId,
-        error: err instanceof Error ? err.message : String(err)
-      })
+      const message = err instanceof Error ? err.message : String(err)
+      event.sender.send('agent:stream', { requestId, event: { kind: 'error', message } as StreamEvent })
+      event.sender.send('agent:stream', { requestId, error: message })
       throw err
     } finally {
       _idleService?.resume()
@@ -64,5 +69,9 @@ export function registerAgentHandlers(getAgent: () => AgentPipeline): void {
 
   ipcMain.handle('agent:wikiToMd', (_event, topic: string, lang?: string) =>
     getAgent().wikiToMd(topic, lang)
+  )
+
+  ipcMain.handle('agent:previewWebContext', (_event, input: string) =>
+    getAgent().previewWebContext(input)
   )
 }

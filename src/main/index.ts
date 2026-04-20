@@ -125,7 +125,8 @@ async function initializeServices(): Promise<void> {
     gitService,
     llmService,
     config.basePath,
-    config.language
+    config.language,
+    () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('db:changed') }
   )
 
   // Initialise library service (creates Bibliotheque/ if needed)

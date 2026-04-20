@@ -96,6 +96,38 @@ export class WebService {
    *  - Filters out ad results (class `result--ad`).
    */
   async search(query: string, limit = 5, lang: 'fr' | 'en' = 'fr'): Promise<SearchResult[]> {
+    const params = new URLSearchParams({
+      q: query,
+      kl: lang === 'en' ? 'us-en' : 'fr-fr'
+    }).toString()
+
+    // Prefer DDG Lite — simpler table HTML, less bot-detection friction
+    try {
+      const res = await this.fetchWithTimeout(
+        `https://lite.duckduckgo.com/lite/?${params}`,
+        {
+          headers: {
+            'User-Agent': DEFAULT_UA,
+            'Accept-Language': lang === 'en' ? 'en-US,en;q=0.9' : 'fr-FR,fr;q=0.9,en;q=0.7',
+            'Accept': 'text/html'
+          }
+        },
+        12000
+      )
+      if (res.ok) {
+        const html = await res.text()
+        console.log('[WebService] DDG Lite tail:', html.substring(html.length - 4000))
+        const results = this.parseDuckDuckGoLiteHtml(html, limit)
+        if (results.length > 0) return results
+        console.warn('[WebService] DDG Lite returned 0 results, falling back to html endpoint')
+      } else {
+        console.warn('[WebService] DDG Lite HTTP', res.status)
+      }
+    } catch (err) {
+      console.warn('[WebService] DDG Lite failed, falling back:', err)
+    }
+
+    // Fallback: original HTML endpoint
     const body = new URLSearchParams({
       q: query,
       kl: lang === 'en' ? 'us-en' : 'fr-fr'
@@ -117,6 +149,7 @@ export class WebService {
 
     if (!res.ok) throw new Error(`DuckDuckGo search failed: HTTP ${res.status}`)
     const html = await res.text()
+    console.log('[WebService] DDG HTML snippet:', html.substring(0, 800))
     return this.parseDuckDuckGoHtml(html, limit)
   }
 
@@ -244,6 +277,39 @@ export class WebService {
     } finally {
       clearTimeout(timer)
     }
+  }
+
+  /** Parse DDG Lite table layout — simpler and more stable than full HTML SERP. */
+  private parseDuckDuckGoLiteHtml(html: string, limit: number): SearchResult[] {
+    const results: SearchResult[] = []
+    const seen = new Set<string>()
+
+    // DDG Lite: href comes before class in attr order — match the full tag, extract both separately
+    const anchorRe = /<a\s[^>]*class='result-link'[^>]*>[\s\S]*?<\/a>/g
+    const snippetRe = /<td[^>]+class='result-snippet'[^>]*>([\s\S]*?)<\/td>/g
+
+    const links: Array<{ url: string; title: string }> = []
+    let m: RegExpExecArray | null
+    while ((m = anchorRe.exec(html)) && links.length < limit * 2) {
+      const tag = m[0]
+      const hrefMatch = /href="([^"]+)"/.exec(tag)
+      const titleMatch = />([^<]+)<\/a>/.exec(tag)
+      if (!hrefMatch || !titleMatch) continue
+      const url = this.resolveDuckDuckGoUrl(this.decodeHtmlEntities(hrefMatch[1]))
+      if (!url || seen.has(url)) continue
+      seen.add(url)
+      links.push({ url, title: this.stripHtml(titleMatch[1]) })
+    }
+
+    const snippets: string[] = []
+    while ((m = snippetRe.exec(html))) {
+      snippets.push(this.stripHtml(m[1]))
+    }
+
+    for (let i = 0; i < Math.min(links.length, limit); i++) {
+      results.push({ ...links[i], snippet: snippets[i] ?? '' })
+    }
+    return results
   }
 
   /** Parse DuckDuckGo HTML SERP into SearchResult[]. Skips ads. */

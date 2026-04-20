@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { ActionButtons } from './ActionButtons'
 import { ActionPreview } from './ActionPreview'
+import { MarkdownRenderer } from '../files/MarkdownRenderer'
 import { WikiText } from '../../utils/wikilink'
 import { useChatStore } from '../../stores/chatStore'
 import type { ActionEdit } from '../../stores/chatStore'
@@ -238,10 +239,33 @@ export function ChatMessage({ message }: ChatMessageProps): React.JSX.Element {
       </div>
       <div className="flex-1 min-w-0 space-y-2">
 
-        {/* Summary */}
-        <p className="text-sm text-cortx-text-primary leading-relaxed whitespace-pre-wrap">
-          <WikiText text={response?.summary || response?.response || message.content} />
-        </p>
+        {/* Summary / response body — render markdown when long-form content present */}
+        {(() => {
+          const body = response?.response?.trim()
+          const summary = response?.summary?.trim()
+          // Use markdown rendering for the long-form `response` field (bullets, bold,
+          // headings). Keep the shorter `summary` as a plain paragraph above it.
+          const hasRichBody = !!body && (
+            body.includes('\n') || /[*_#`>-]/.test(body) || body.length > 140
+          )
+          if (hasRichBody) {
+            return (
+              <div className="space-y-2">
+                {summary && summary !== body && (
+                  <p className="text-sm text-cortx-text-primary leading-relaxed whitespace-pre-wrap">
+                    <WikiText text={summary} />
+                  </p>
+                )}
+                <MarkdownRenderer content={body!} />
+              </div>
+            )
+          }
+          return (
+            <p className="text-sm text-cortx-text-primary leading-relaxed whitespace-pre-wrap">
+              <WikiText text={summary || body || message.content} />
+            </p>
+          )
+        })()}
 
         {/* Clarification */}
         {response?.clarification && (

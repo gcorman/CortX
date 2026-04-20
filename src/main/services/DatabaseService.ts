@@ -572,13 +572,15 @@ export class DatabaseService {
 
     try {
       const rows = this.db.prepare(`
-        SELECT f.* FROM files f
-        JOIN files_fts fts ON f.path = fts.path
+        SELECT f.path, f.type, f.title, f.tags, f.created_at, f.modified_at, f.status,
+               snippet(files_fts, 2, '**', '**', '…', 12) AS snippet
+        FROM files_fts
+        INNER JOIN files f ON f.path = files_fts.path
         WHERE files_fts MATCH ?
-        ORDER BY rank
+        ORDER BY files_fts.rank
         LIMIT 20
       `).all(ftsQuery) as Array<{
-        path: string; type: string; title: string; tags: string; created_at: string; modified_at: string; status: string
+        path: string; type: string; title: string; tags: string; created_at: string; modified_at: string; status: string; snippet: string
       }>
 
       return rows.map((r) => ({
@@ -589,7 +591,8 @@ export class DatabaseService {
         created: r.created_at,
         modified: r.modified_at,
         related: [],
-        status: r.status as CortxFile['status']
+        status: r.status as CortxFile['status'],
+        snippet: r.snippet || undefined
       }))
     } catch {
       // FTS query syntax error, fall back to LIKE

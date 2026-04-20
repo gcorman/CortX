@@ -104,6 +104,19 @@ export interface T {
     welcome: string
     welcomeHint: string
   }
+  liveStream: {
+    phaseRetrieving: string
+    phaseFetchingWeb: string
+    phaseThinking: string
+    phaseWriting: string
+    phaseProposing: string
+    phaseDone: string
+    phaseError: string
+    phaseWorking: string
+    waitingFirstToken: string
+    results: string
+    pendingFile: string
+  }
   actionButtons: {
     accept: string
     reject: string
@@ -412,6 +425,19 @@ const fr: T = {
     welcome: 'Bienvenue dans CortX',
     welcomeHint: 'Tape une info, pose une question, ou utilise une commande pour commencer.'
   },
+  liveStream: {
+    phaseRetrieving: 'Lecture de la base',
+    phaseFetchingWeb: 'Récupération web',
+    phaseThinking: 'Réflexion',
+    phaseWriting: 'Rédaction',
+    phaseProposing: 'Finalisation des actions',
+    phaseDone: 'Terminé',
+    phaseError: 'Erreur',
+    phaseWorking: 'Travail en cours',
+    waitingFirstToken: "En attente du premier token…",
+    results: 'résultats',
+    pendingFile: 'fichier en cours…'
+  },
   actionButtons: {
     accept: 'Accepter',
     reject: 'Refuser',
@@ -718,6 +744,19 @@ const en: T = {
     webFetching: 'Fetching web results...',
     welcome: 'Welcome to CortX',
     welcomeHint: 'Type info, ask a question, or use a command to get started.'
+  },
+  liveStream: {
+    phaseRetrieving: 'Scanning base',
+    phaseFetchingWeb: 'Fetching web',
+    phaseThinking: 'Thinking',
+    phaseWriting: 'Writing',
+    phaseProposing: 'Finalizing actions',
+    phaseDone: 'Done',
+    phaseError: 'Error',
+    phaseWorking: 'Working',
+    waitingFirstToken: 'Waiting for first token…',
+    results: 'results',
+    pendingFile: 'pending file…'
   },
   actionButtons: {
     accept: 'Accept',

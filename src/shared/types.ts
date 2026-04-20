@@ -15,6 +15,7 @@ export interface CortxFile {
   modified: string
   related: string[]
   status: 'actif' | 'archivé' | 'brouillon'
+  snippet?: string
 }
 
 export interface FileContent {
@@ -119,6 +120,47 @@ export interface AgentLogEntry {
   commitHash: string
   status: 'success' | 'error' | 'partial'
 }
+
+// --- Agent streaming events (live UI) ---
+
+export type AgentPhase =
+  | 'retrieving'     // KB + library context search
+  | 'fetching-web'   // web directive fetch in progress
+  | 'thinking'       // LLM call started, waiting for first token
+  | 'writing'        // LLM streaming tokens
+  | 'proposing'      // parse + normalize actions
+  | 'done'
+  | 'error'
+
+export interface WebFetchEvent {
+  id: string
+  kind: 'wikipedia' | 'url' | 'search'
+  label: string
+  url?: string
+  status: 'pending' | 'done' | 'error'
+  chars?: number
+  resultCount?: number
+  errorMessage?: string
+}
+
+export interface PartialAction {
+  /** Stable index in the actions[] array of the streaming response */
+  index: number
+  action?: 'create' | 'modify'
+  file?: string
+  /** Content accumulated so far — may be incomplete */
+  content?: string
+  /** True once the JSON closing brace for this action has been parsed */
+  complete: boolean
+}
+
+export type StreamEvent =
+  | { kind: 'phase'; phase: AgentPhase; detail?: string }
+  | { kind: 'delta'; text: string }
+  | { kind: 'web-fetch'; fetch: WebFetchEvent }
+  | { kind: 'partial-action'; action: PartialAction }
+  | { kind: 'done' }
+  | { kind: 'error'; message: string }
 
 // --- Chat ---
 
@@ -286,6 +328,7 @@ export interface CortxAPI {
     rewriteFile(filePath: string): Promise<string>
     deleteFile(filePath: string): Promise<void>
     wikiToMd(topic: string, lang?: string): Promise<AgentResponse>
+    previewWebContext(input: string): Promise<string>
   }
   app: {
     getBasePath(): Promise<string>

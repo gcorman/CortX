@@ -8,10 +8,16 @@ interface TagInfo {
   count: number
 }
 
+interface TagFile {
+  path: string
+  title: string
+  snippet?: string
+}
+
 export function TagBrowser(): React.JSX.Element {
   const [tags, setTags] = useState<TagInfo[]>([])
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
-  const [tagFiles, setTagFiles] = useState<Array<{ path: string; title: string }>>([])
+  const [tagFiles, setTagFiles] = useState<TagFile[]>([])
   const openFilePreview = useUIStore((s) => s.openFilePreview)
   const t = useT()
 
@@ -24,22 +30,18 @@ export function TagBrowser(): React.JSX.Element {
     }
   }, [])
 
-  // Reload tags every time the component mounts (tab switch)
+  // Reload tags on mount and whenever main process signals a KB change
   useEffect(() => {
     loadTags()
-  }, [loadTags])
-
-  // Also poll for new tags periodically
-  useEffect(() => {
-    const interval = setInterval(loadTags, 5000)
-    return () => clearInterval(interval)
+    window.cortx.on('db:changed', loadTags)
+    return () => window.cortx.off('db:changed', loadTags)
   }, [loadTags])
 
   async function selectTag(tag: string): Promise<void> {
     setSelectedTag(tag)
     try {
       const files = await window.cortx.db.search(tag)
-      setTagFiles(files.map((f) => ({ path: f.path, title: f.title })))
+      setTagFiles(files.map((f) => ({ path: f.path, title: f.title, snippet: f.snippet })))
     } catch {
       setTagFiles([])
     }
@@ -95,10 +97,17 @@ export function TagBrowser(): React.JSX.Element {
               <button
                 key={file.path}
                 onClick={() => openFilePreview(file.path)}
-                className="flex items-center gap-2 w-full text-left px-2 py-1.5 rounded text-xs text-cortx-text-secondary hover:bg-cortx-elevated hover:text-cortx-text-primary transition-colors cursor-pointer"
+                className="flex flex-col gap-0.5 w-full text-left px-2 py-1.5 rounded hover:bg-cortx-elevated transition-colors cursor-pointer"
               >
-                <FileText size={12} className="flex-shrink-0" />
-                <span className="truncate">{file.title}</span>
+                <div className="flex items-center gap-2">
+                  <FileText size={12} className="flex-shrink-0 text-cortx-text-secondary" />
+                  <span className="text-xs text-cortx-text-secondary truncate">{file.title}</span>
+                </div>
+                {file.snippet && (
+                  <p className="text-2xs text-cortx-text-secondary/50 line-clamp-2 pl-5 leading-relaxed">
+                    {file.snippet.replace(/\*\*/g, '')}
+                  </p>
+                )}
               </button>
             ))}
           </div>

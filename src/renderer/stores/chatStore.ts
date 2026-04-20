@@ -1,5 +1,8 @@
 import { create } from 'zustand'
-import type { ChatMessage, AgentResponse, AgentAction } from '../../shared/types'
+import type {
+  ChatMessage, AgentResponse, AgentAction,
+  AgentPhase, StreamEvent, WebFetchEvent, PartialAction
+} from '../../shared/types'
 
 /** User-supplied overrides for a create action before execution. */
 export interface ActionEdit {
@@ -58,6 +61,11 @@ interface ChatState {
   isProcessing: boolean
   streamProgress: number
   streamActive: boolean
+  /** Live text accumulated from the LLM stream — reset on each new request. */
+  streamText: string
+  streamPhase: AgentPhase | null
+  streamWebFetches: WebFetchEvent[]
+  streamPartialActions: PartialAction[]
   /** Set of suggestion texts the user has dismissed — hides them from chat AND right panel */
   dismissedSuggestions: Set<string>
   sendMessage: (content: string) => Promise<void>
@@ -126,11 +134,30 @@ function startStreamSession(
     clearTimeout(streamResetTimer)
     streamResetTimer = undefined
   }
-  set({ streamProgress: 0, streamActive: true })
+  set({
+    streamProgress: 0,
+    streamActive: true,
+    streamText: '',
+    streamPhase: 'retrieving',
+    streamWebFetches: [],
+    streamPartialActions: []
+  })
 
   const handleStream = (payload: unknown) => {
-    const data = payload as { requestId?: string; delta?: string; done?: boolean; error?: string }
+    const data = payload as {
+      requestId?: string
+      delta?: string
+      done?: boolean
+      error?: string
+      event?: StreamEvent
+    }
     if (!data || data.requestId !== requestId) return
+
+    if (data.event) {
+      applyStreamEvent(data.event, streamMode, set)
+      return
+    }
+
     if (data.delta) {
       streamBuffer += data.delta
       const progress = computeStreamProgress(streamBuffer, streamMode)
@@ -140,13 +167,19 @@ function startStreamSession(
       }))
     }
     if (data.done) {
-      set({ streamProgress: 1, streamActive: false })
+      set({ streamProgress: 1, streamActive: false, streamPhase: 'done' })
       streamResetTimer = setTimeout(() => {
-        set({ streamProgress: 0 })
+        set({
+          streamProgress: 0,
+          streamText: '',
+          streamPhase: null,
+          streamWebFetches: [],
+          streamPartialActions: []
+        })
       }, 450)
     }
     if (data.error) {
-      set({ streamActive: false })
+      set({ streamActive: false, streamPhase: 'error' })
     }
   }
 
@@ -159,12 +192,66 @@ function startStreamSession(
       set({ streamActive: false, streamProgress: 1 })
       if (!streamResetTimer) {
         streamResetTimer = setTimeout(() => {
-          set({ streamProgress: 0 })
+          set({
+            streamProgress: 0,
+            streamText: '',
+            streamPhase: null,
+            streamWebFetches: [],
+            streamPartialActions: []
+          })
         }, 450)
       }
     } else {
-      set({ streamActive: false })
+      set({
+        streamActive: false,
+        streamText: '',
+        streamPhase: null,
+        streamWebFetches: [],
+        streamPartialActions: []
+      })
     }
+  }
+}
+
+function applyStreamEvent(
+  ev: StreamEvent,
+  streamMode: StreamMode,
+  set: (partial: Partial<ChatState> | ((state: ChatState) => Partial<ChatState>)) => void
+): void {
+  switch (ev.kind) {
+    case 'phase':
+      set({ streamPhase: ev.phase })
+      break
+    case 'delta': {
+      streamBuffer += ev.text
+      const progress = computeStreamProgress(streamBuffer, streamMode)
+      set((s) => ({
+        streamText: s.streamText + ev.text,
+        streamProgress: Math.max(s.streamProgress, progress),
+        streamActive: true
+      }))
+      break
+    }
+    case 'web-fetch':
+      set((s) => {
+        const next = s.streamWebFetches.filter((f) => f.id !== ev.fetch.id)
+        next.push(ev.fetch)
+        return { streamWebFetches: next }
+      })
+      break
+    case 'partial-action':
+      set((s) => {
+        const next = [...s.streamPartialActions]
+        next[ev.action.index] = ev.action
+        return { streamPartialActions: next }
+      })
+      break
+    case 'done':
+      set({ streamPhase: 'done' })
+      break
+    case 'error':
+      set({ streamPhase: 'error', streamActive: false })
+      break
   }
 }
 
@@ -215,6 +302,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isProcessing: false,
   streamProgress: 0,
   streamActive: false,
+  streamText: '',
+  streamPhase: null,
+  streamWebFetches: [],
+  streamPartialActions: [],
   dismissedSuggestions: new Set<string>(),
 
   sendMessage: async (content: string) => {

@@ -282,6 +282,58 @@ function buildCyStyle(): cytoscape.StylesheetStyle[] {
         'transition-property': 'opacity',
         'transition-duration': 900
       } as unknown as cytoscape.Css.Edge
+    },
+
+    // ── Chat @mention live-focus classes ─────────────────────────────────────
+    // These sit after idle-* so they take visual priority via CSS order.
+
+    // Nodes not mentioned — fade out
+    {
+      selector: 'node.chat-dimmed',
+      style: { opacity: 0.07, 'transition-property': 'opacity', 'transition-duration': 200 } as cytoscape.Css.Node
+    },
+    {
+      selector: 'edge.chat-dimmed',
+      style: { opacity: 0.03, 'transition-property': 'opacity', 'transition-duration': 200 } as cytoscape.Css.Edge
+    },
+    // Directly mentioned node — orange glow
+    {
+      selector: 'node.chat-focused',
+      style: {
+        opacity: 1,
+        width: 28,
+        height: 28,
+        'border-color': '#F97316',
+        'border-opacity': 1,
+        'border-width': 3,
+        'background-opacity': 1,
+        'transition-property': 'opacity, width, height, border-width, border-color, border-opacity',
+        'transition-duration': 220
+      } as unknown as cytoscape.Css.Node
+    },
+    // Neighbors of mentioned nodes — teal accent
+    {
+      selector: 'node.chat-neighbor',
+      style: {
+        opacity: 0.9,
+        'border-color': '#14B8A6',
+        'border-opacity': 0.75,
+        'border-width': 2,
+        'transition-property': 'opacity, border-width, border-color, border-opacity',
+        'transition-duration': 220
+      } as unknown as cytoscape.Css.Node
+    },
+    // Edges connected to mentioned nodes
+    {
+      selector: 'edge.chat-neighbor',
+      style: {
+        opacity: 0.6,
+        'line-color': '#14B8A6',
+        'target-arrow-color': '#14B8A6',
+        width: 1.5,
+        'transition-property': 'opacity, line-color, width',
+        'transition-duration': 220
+      } as unknown as cytoscape.Css.Edge
     }
   ]
 }
@@ -290,7 +342,9 @@ function buildCyStyle(): cytoscape.StylesheetStyle[] {
 function makeInitialLayout(): cytoscape.LayoutOptions {
   return {
     name: 'fcose',
-    animate: false,
+    animate: true,
+    animationDuration: 400,
+    animationEasing: 'ease-out-cubic',
     randomize: true,
     quality: 'proof',
     fit: true,
@@ -556,6 +610,8 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
   const draggedNodeRef = useRef<cytoscape.NodeSingular | null>(null)
   // Snapshot of last data so we can replay it once the container is ready
   const pendingDataRef = useRef<{ nodes: typeof nodes; edges: typeof edges; filterTypes: Set<string> } | null>(null)
+  // Debounce timer for re-fitting the viewport after a window/panel resize
+  const resizeFitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [contextMenu, setContextMenu] = useState<{
     x: number; y: number; nodeId: string; filePath: string; label: string; isLibDoc: boolean
@@ -572,6 +628,7 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
   const setActiveCenterView = useUIStore((s) => s.setActiveCenterView)
   const addToast = useUIStore((s) => s.addToast)
   const theme = useUIStore((s) => s.theme)
+  const chatFocusedTitles = useUIStore((s) => s.chatFocusedTitles)
   const loadFiles = useFileStore((s) => s.loadFiles)
   const { selectDocument, deleteDocument } = useLibraryStore()
   const openFilePreviewRef = useRef(openFilePreview)
@@ -724,7 +781,7 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
     }
 
     function clearSelection(): void {
-      cy.elements().removeClass('dimmed highlighted selected-node idle-examining idle-attended idle-bg idle-insight')
+      cy.elements().removeClass('dimmed highlighted selected-node idle-examining idle-attended idle-bg idle-insight chat-focused chat-neighbor chat-dimmed')
       selectedNodeRef.current = null
     }
 
@@ -828,6 +885,14 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
             pendingDataRef.current = null
             applyData(cy, pending.nodes, pending.edges, pending.filterTypes)
           }
+        } else {
+          // Container resized after initial layout — debounce a viewport re-fit
+          // so nodes don't get clipped or pushed out of frame on window resize.
+          if (resizeFitTimerRef.current) clearTimeout(resizeFitTimerRef.current)
+          resizeFitTimerRef.current = setTimeout(() => {
+            resizeFitTimerRef.current = null
+            if (cyRef.current) cyRef.current.fit(undefined, 48)
+          }, 150)
         }
       }
     })
@@ -836,6 +901,7 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
     cyRef.current = cy
     return () => {
       ro.disconnect()
+      if (resizeFitTimerRef.current) clearTimeout(resizeFitTimerRef.current)
       stopLive()
       cy.destroy()
       cyRef.current = null
@@ -915,13 +981,20 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
     })
 
     const isFirst = !layoutRanOnce.current
+    layoutRanOnce.current = true
     const layout = cy.layout(
       isFirst
         ? makeInitialLayout()
         : ({ ...makeSettleLayout(), animationDuration: 500 } as unknown as cytoscape.LayoutOptions)
     )
+    if (isFirst) {
+      // After the animated layout settles, do an explicit fit so the viewport
+      // always matches the final container size (avoids off-center on first load).
+      layout.one('layoutstop', () => {
+        requestAnimationFrame(() => { cy.fit(undefined, 48) })
+      })
+    }
     layout.run()
-    layoutRanOnce.current = true
     applySearchClasses(cy, searchQueryRef.current)
   }
 
@@ -938,6 +1011,46 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
 
     applyData(cy, nodes, edges, filterTypes)
   }, [nodes, edges, filterTypes]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Live graph focus driven by @mentions typed in the chat input
+  useEffect(() => {
+    const cy = cyRef.current
+    if (!cy) return
+
+    cy.elements().removeClass('chat-focused chat-neighbor chat-dimmed')
+
+    // Yield to idle mode — don't fight its visuals
+    if (idlePhase !== 'stopped' && idlePhase !== 'resting') return
+    if (chatFocusedTitles.length === 0) return
+
+    const matched = cy.nodes().filter((n) => {
+      const label = (n.data('label') as string).toLowerCase()
+      return chatFocusedTitles.some((t) => {
+        const tl = t.toLowerCase()
+        return tl.length > 0 && (label.includes(tl) || tl.includes(label))
+      })
+    })
+    if (matched.length === 0) return
+
+    // Dim everything, then light up matched nodes + their direct neighbors
+    cy.elements().addClass('chat-dimmed')
+    matched.removeClass('chat-dimmed').addClass('chat-focused')
+    const neighborNodes = matched.neighborhood().nodes()
+    const neighborEdges = matched.connectedEdges().union(matched.neighborhood().edges())
+    neighborNodes.removeClass('chat-dimmed').addClass('chat-neighbor')
+    neighborEdges.removeClass('chat-dimmed').addClass('chat-neighbor')
+
+    // Animate viewport to frame all relevant nodes
+    if (!document.hidden) {
+      const eles = matched.union(neighborNodes)
+      cy.stop(true, true)
+      cy.animate({
+        fit: { eles, padding: 80 },
+        duration: 450,
+        easing: 'ease-in-out-cubic'
+      } as Parameters<typeof cy.animate>[0])
+    }
+  }, [chatFocusedTitles, idlePhase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync idle mode visual classes on the Cytoscape graph
   useEffect(() => {
@@ -962,8 +1075,8 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       }, 5000)
     }
 
-    // Clear all idle classes
-    cy.elements().removeClass('idle-examining idle-attended idle-bg idle-insight')
+    // Clear all idle + chat classes
+    cy.elements().removeClass('idle-examining idle-attended idle-bg idle-insight chat-focused chat-neighbor chat-dimmed')
 
     if (idlePhase === 'stopped' || idlePhase === 'resting' || idleNodeIds.length === 0) {
       prevActiveNodeIdsRef.current = []

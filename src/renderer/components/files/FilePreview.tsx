@@ -48,6 +48,9 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
   const [confirmRewrite, setConfirmRewrite] = useState(false)
   const [rewriteUndo, setRewriteUndo] = useState<{ commitHash: string } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  // --- Autosave draft recovery ---
+  const [draftRecovery, setDraftRecovery] = useState<{ content: string; timestamp: number } | null>(null)
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // --- Title editing ---
   const [isTitleEditing, setIsTitleEditing] = useState(false)
   const [editedTitle, setEditedTitle] = useState('')
@@ -118,6 +121,17 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
       const result = await window.cortx.files.read(path)
       setContent(result)
       setDraft(result?.raw || '')
+      setDraftRecovery(null)
+      // Check for a locally-autosaved draft newer than the committed file
+      try {
+        const saved = localStorage.getItem(`autosave:${path}`)
+        if (saved) {
+          const parsed = JSON.parse(saved) as { content: string; timestamp: number }
+          if (parsed.content !== result?.raw) {
+            setDraftRecovery(parsed)
+          }
+        }
+      } catch { /* ignore malformed localStorage */ }
       // Initialize edited title with the current filename
       const fileName = path.split('/').pop()?.replace('.md', '') ?? path
       setEditedTitle(fileName)
@@ -148,11 +162,18 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
     return () => window.removeEventListener('keydown', handler)
   }, [onClose, isEditing, content])
 
+  function clearAutosave(): void {
+    if (autosaveTimer.current) { clearTimeout(autosaveTimer.current); autosaveTimer.current = null }
+    localStorage.removeItem(`autosave:${path}`)
+    setDraftRecovery(null)
+  }
+
   async function handleSave(): Promise<void> {
     if (isSaving) return
     setIsSaving(true)
     try {
       await window.cortx.agent.saveManualEdit(path, draft)
+      clearAutosave()
       addToast(t.filePreview.saved, 'success')
       setIsEditing(false)
       // Reload everything that depends on this file
@@ -167,6 +188,7 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
   }
 
   function handleCancel(): void {
+    clearAutosave()
     setDraft(content?.raw || '')
     setIsEditing(false)
   }
@@ -430,6 +452,22 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
           ) : content ? (
             isEditing ? (
               <div className="relative flex flex-col h-full min-h-[60vh]">
+                {/* Draft recovery banner */}
+                {draftRecovery && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border-b border-amber-500/30 flex-shrink-0">
+                    <span className="text-2xs text-amber-400 flex-1">Brouillon local non sauvegardé trouvé</span>
+                    <button
+                      type="button"
+                      onClick={() => { setDraft(draftRecovery.content); setDraftRecovery(null) }}
+                      className="text-2xs text-amber-400 hover:text-amber-300 underline cursor-pointer"
+                    >Restaurer</button>
+                    <button
+                      type="button"
+                      onClick={() => clearAutosave()}
+                      className="text-2xs text-cortx-text-secondary hover:text-cortx-text-primary underline cursor-pointer"
+                    >Ignorer</button>
+                  </div>
+                )}
                 {/* Graph title info bar */}
                 {(() => {
                   const { fmTitle, body } = parseDraftForTitle(draft)
@@ -480,6 +518,11 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
                   onChange={(e) => {
                     const val = e.target.value
                     setDraft(val)
+                    // Debounced autosave to localStorage — recovery only, no git commit
+                    if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
+                    autosaveTimer.current = setTimeout(() => {
+                      localStorage.setItem(`autosave:${path}`, JSON.stringify({ content: val, timestamp: Date.now() }))
+                    }, 2000)
                     const cursor = e.target.selectionStart ?? val.length
                     const wl = detectWikilink(val, cursor)
                     if (wl) {

@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
-import { SendHorizontal, Slash, AtSign, Plus, FileText, BookOpen } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { SendHorizontal, Slash, AtSign, Plus, FileText, BookOpen, Globe, X, Loader2 } from 'lucide-react'
 import { useFileStore } from '../../stores/fileStore'
 import { useLibraryStore } from '../../stores/libraryStore'
+import { useUIStore } from '../../stores/uiStore'
 import { useT } from '../../i18n'
 
 interface ChatInputProps {
@@ -13,8 +14,11 @@ interface ChatInputProps {
 export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps): React.JSX.Element {
   const [value, setValue] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
+  const [webPreview, setWebPreview] = useState<string | null>(null)
+  const [isFetchingPreview, setIsFetchingPreview] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const files = useFileStore((s) => s.files)
+  const setChatFocusedTitles = useUIStore((s) => s.setChatFocusedTitles)
   const t = useT()
 
   // --- @mention state ---
@@ -32,6 +36,21 @@ export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps
       textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px'
     }
   }, [value])
+
+  // Titles to highlight in the graph: locked @[Title] mentions + current typing query
+  const chatFocusedTitles = useMemo(() => {
+    const locked = [...value.matchAll(/@\[([^\]|]+?)(?:\|[^\]]*)?\]/g)].map((m) => m[1])
+    return mentionQuery !== null && mentionQuery.length > 0
+      ? [...locked, mentionQuery]
+      : locked
+  }, [value, mentionQuery])
+
+  useEffect(() => {
+    setChatFocusedTitles(chatFocusedTitles)
+  }, [chatFocusedTitles, setChatFocusedTitles])
+
+  // Clear graph focus when this input is destroyed (e.g. chat panel hidden)
+  useEffect(() => () => setChatFocusedTitles([]), [setChatFocusedTitles])
 
   // Unified mention targets: KB files + indexed library documents
   type MentionTarget =
@@ -152,8 +171,25 @@ export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps
     if (!trimmed || disabled) return
     onSend(trimmed)
     setValue('')
+    setWebPreview(null)
     setMentionQuery(null)
     setMentionStart(-1)
+    setChatFocusedTitles([])
+  }
+
+  const hasWebDirective = /\/wiki\s+\S|\/internet/i.test(value)
+
+  async function handleWebPreview(): Promise<void> {
+    if (isFetchingPreview || !value.trim()) return
+    setIsFetchingPreview(true)
+    setWebPreview(null)
+    try {
+      const result = await window.cortx.agent.previewWebContext(value)
+      setWebPreview(result || '(aucun contenu récupéré)')
+    } catch (err) {
+      setWebPreview(`Erreur : ${err instanceof Error ? err.message : String(err)}`)
+    }
+    setIsFetchingPreview(false)
   }
 
   // --- Markdown import via button ---
@@ -234,6 +270,22 @@ export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      {/* Web context preview panel */}
+      {webPreview && (
+        <div className="mb-2 rounded-card border border-cortx-border bg-cortx-surface text-xs overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-1.5 border-b border-cortx-border bg-cortx-elevated/60">
+            <Globe size={11} className="text-cortx-accent flex-shrink-0" />
+            <span className="text-cortx-text-secondary font-medium flex-1">Aperçu sources web</span>
+            <button type="button" onClick={() => setWebPreview(null)} className="text-cortx-text-secondary hover:text-cortx-text-primary cursor-pointer">
+              <X size={11} />
+            </button>
+          </div>
+          <pre className="px-3 py-2 text-2xs text-cortx-text-secondary/70 whitespace-pre-wrap max-h-40 overflow-y-auto leading-relaxed font-mono">
+            {webPreview.slice(0, 1200)}{webPreview.length > 1200 ? '\n…(tronqué)' : ''}
+          </pre>
+        </div>
+      )}
+
       {/* Drag overlay hint */}
       {isDragOver && (
         <div className="absolute inset-x-3 -top-12 flex items-center justify-center pointer-events-none">
@@ -326,6 +378,19 @@ export function ChatInput({ onSend, onImportMarkdown, disabled }: ChatInputProps
           <Plus size={9} />
           {t.chat.importMdShort}
         </span>
+        {hasWebDirective && (
+          <button
+            type="button"
+            onClick={() => void handleWebPreview()}
+            disabled={isFetchingPreview || disabled}
+            className="flex items-center gap-1 text-2xs text-cortx-accent hover:text-cortx-accent/80 disabled:opacity-50 cursor-pointer transition-opacity"
+          >
+            {isFetchingPreview
+              ? <Loader2 size={9} className="animate-spin" />
+              : <Globe size={9} />}
+            {isFetchingPreview ? 'Chargement…' : 'Aperçu web'}
+          </button>
+        )}
         <span className="text-2xs text-cortx-text-secondary/40 ml-auto">{t.chat.ctrlEnter}</span>
       </div>
     </div>

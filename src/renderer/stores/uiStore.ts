@@ -21,6 +21,10 @@ interface UIState {
   // Title editing
   titleEditingPath: string | null
 
+  // Chat @mention → graph highlight bridge
+  chatFocusedTitles: string[]
+  setChatFocusedTitles: (titles: string[]) => void
+
   setActiveCenterView: (view: CenterView) => void
   toggleRightPanel: () => void
   openFilePreview: (path: string) => void
@@ -65,6 +69,9 @@ export const useUIStore = create<UIState>((set) => ({
 
   // Title editing
   titleEditingPath: null,
+
+  chatFocusedTitles: [],
+  setChatFocusedTitles: (titles) => set({ chatFocusedTitles: titles }),
 
   setActiveCenterView: (view) => set({ activeCenterView: view }),
   toggleRightPanel: () => set((s) => ({ rightPanelVisible: !s.rightPanelVisible })),
