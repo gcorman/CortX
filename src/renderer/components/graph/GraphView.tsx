@@ -76,7 +76,7 @@ function buildCyStyle(): cytoscape.StylesheetStyle[] {
         'text-overflow-wrap': 'ellipsis',
 
         // Smooth transitions for highlight states
-        'transition-property': 'opacity, width, height, border-width, border-color, border-opacity, background-opacity',
+        'transition-property': 'opacity, width, height, border-width, border-color, border-opacity, background-opacity, text-opacity',
         'transition-duration': 180
       } as unknown as cytoscape.Css.Node
     },
@@ -98,8 +98,9 @@ function buildCyStyle(): cytoscape.StylesheetStyle[] {
         'text-background-opacity': 0.65,
         'text-background-padding': '1px',
         'text-background-shape': 'round-rectangle',
+        'text-opacity': 0,
         opacity: 0.7,
-        'transition-property': 'opacity, line-color, width',
+        'transition-property': 'opacity, line-color, width, text-opacity',
         'transition-duration': 180
       } as unknown as cytoscape.Css.Edge
     },
@@ -159,7 +160,8 @@ function buildCyStyle(): cytoscape.StylesheetStyle[] {
         opacity: 1,
         'line-color': '#0D9488',
         'target-arrow-color': '#0D9488',
-        width: 2
+        width: 2,
+        'text-opacity': 0.85
       } as unknown as cytoscape.Css.Edge
     },
 
@@ -183,6 +185,14 @@ function buildCyStyle(): cytoscape.StylesheetStyle[] {
     {
       selector: 'edge.search-dim',
       style: { opacity: 0.04 } as cytoscape.Css.Edge
+    },
+
+    // --- Labels hidden when zoomed out ---
+    {
+      selector: 'node.labels-hidden',
+      style: {
+        'text-opacity': 0
+      } as unknown as cytoscape.Css.Node
     },
 
     // ── Idle mode classes (slow transitions for a "meditative" feel) ──────────
@@ -621,6 +631,9 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
   const [confirmRewrite, setConfirmRewrite] = useState(false)
   const [isRewriting, setIsRewriting] = useState(false)
   const [rewriteUndo, setRewriteUndo] = useState<{ commitHash: string } | null>(null)
+  const [tooltip, setTooltip] = useState<{
+    x: number; y: number; label: string; type: string; degree: number
+  } | null>(null)
 
   const t = useT()
   const { nodes, edges, isLoading, loadGraph, filterTypes, toggleFilterType } = useGraphStore()
@@ -751,8 +764,6 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
 
   useEffect(() => {
     loadGraph()
-    const id = setInterval(loadGraph, 5000)
-    return () => clearInterval(id)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Create cy instance once — event handlers wired here
@@ -869,6 +880,42 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       settle.run()
     })
 
+    // ── Zoom-based LOD: hide labels below threshold ──────────────────────────
+    let zoomLodTimer: ReturnType<typeof setTimeout> | null = null
+    cy.on('zoom', () => {
+      if (zoomLodTimer) clearTimeout(zoomLodTimer)
+      zoomLodTimer = setTimeout(() => {
+        zoomLodTimer = null
+        const z = cy.zoom()
+        cy.batch(() => {
+          if (z < 0.6) cy.nodes().addClass('labels-hidden')
+          else cy.nodes().removeClass('labels-hidden')
+        })
+      }, 50)
+    })
+
+    // ── Hover tooltip ─────────────────────────────────────────────────────────
+    cy.on('mouseover', 'node', (evt) => {
+      const node = evt.target as cytoscape.NodeSingular
+      const pos = node.renderedPosition()
+      setTooltip({
+        x: pos.x,
+        y: pos.y,
+        label: node.data('label') as string,
+        type: node.data('type') as string,
+        degree: node.degree(false)
+      })
+    })
+
+    cy.on('mouseout', 'node', () => {
+      setTooltip(null)
+    })
+
+    // Also clear tooltip on any canvas interaction
+    cy.on('tap grab', () => {
+      setTooltip(null)
+    })
+
     // ResizeObserver: detect when the container gets real dimensions and
     // replay any data that arrived before the container was visible.
     const ro = new ResizeObserver((entries) => {
@@ -902,6 +949,7 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
     return () => {
       ro.disconnect()
       if (resizeFitTimerRef.current) clearTimeout(resizeFitTimerRef.current)
+      if (zoomLodTimer) clearTimeout(zoomLodTimer)
       stopLive()
       cy.destroy()
       cyRef.current = null
@@ -936,65 +984,96 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       (e) => filteredNodeIds.has(e.source) && filteredNodeIds.has(e.target)
     )
 
-    // Save existing node positions so incremental updates don't reset them
-    const savedPositions = new Map<string, { x: number; y: number }>()
-    cy.nodes().forEach((node) => {
-      savedPositions.set(node.id() as string, { ...node.position() })
-    })
-
-    selectedNodeRef.current = null
-    cy.elements().remove()
-    if (filteredNodes.length === 0) return
-
-    cy.add([
-      ...filteredNodes.map((n) => ({
-        data: { id: n.id, label: n.label, type: n.type, filePath: n.filePath }
-      })),
-      ...filteredEdges.map((e, i) => ({
-        data: {
-          id: `e${i}`,
-          source: e.source,
-          target: e.target,
-          label: (e.label || 'lien').replace(/_/g, ' ')
-        }
-      }))
-    ])
-
-    // Restore saved positions; place brand-new nodes with random jitter near
-    // the origin so force-directed physics can spread them naturally.
-    const centerX = savedPositions.size > 0
-      ? Array.from(savedPositions.values()).reduce((s, p) => s + p.x, 0) / savedPositions.size
-      : 0
-    const centerY = savedPositions.size > 0
-      ? Array.from(savedPositions.values()).reduce((s, p) => s + p.y, 0) / savedPositions.size
-      : 0
-    cy.nodes().forEach((node) => {
-      const saved = savedPositions.get(node.id() as string)
-      if (saved) {
-        node.position(saved)
-      } else {
-        node.position({
-          x: centerX + (Math.random() - 0.5) * 120,
-          y: centerY + (Math.random() - 0.5) * 120
-        })
+    const edgeElements = filteredEdges.map((e, i) => ({
+      data: {
+        id: `e${i}`,
+        source: e.source,
+        target: e.target,
+        label: (e.label || 'lien').replace(/_/g, ' ')
       }
-    })
+    }))
 
     const isFirst = !layoutRanOnce.current
-    layoutRanOnce.current = true
-    const layout = cy.layout(
-      isFirst
-        ? makeInitialLayout()
-        : ({ ...makeSettleLayout(), animationDuration: 500 } as unknown as cytoscape.LayoutOptions)
-    )
+
     if (isFirst) {
-      // After the animated layout settles, do an explicit fit so the viewport
-      // always matches the final container size (avoids off-center on first load).
-      layout.one('layoutstop', () => {
-        requestAnimationFrame(() => { cy.fit(undefined, 48) })
+      // ── First load: full setup with initial layout ────────────────────────
+      selectedNodeRef.current = null
+      cy.elements().remove()
+      if (filteredNodes.length === 0) return
+
+      cy.add([
+        ...filteredNodes.map((n) => ({ data: { id: n.id, label: n.label, type: n.type, filePath: n.filePath } })),
+        ...edgeElements
+      ])
+      layoutRanOnce.current = true
+      const layout = cy.layout(makeInitialLayout())
+      layout.one('layoutstop', () => requestAnimationFrame(() => cy.fit(undefined, 48)))
+      layout.run()
+    } else {
+      // ── Incremental diff: preserve node positions ─────────────────────────
+      const existingNodeIds = new Set<string>()
+      cy.nodes().forEach((n) => existingNodeIds.add(n.id() as string))
+
+      // Save positions of nodes that will survive the update
+      const savedPositions = new Map<string, { x: number; y: number }>()
+      cy.nodes().forEach((node) => {
+        if (filteredNodeIds.has(node.id() as string)) {
+          savedPositions.set(node.id() as string, { ...node.position() })
+        }
       })
+
+      const posArr = Array.from(savedPositions.values())
+      const centerX = posArr.length > 0 ? posArr.reduce((s, p) => s + p.x, 0) / posArr.length : 0
+      const centerY = posArr.length > 0 ? posArr.reduce((s, p) => s + p.y, 0) / posArr.length : 0
+
+      const nodesToAdd = filteredNodes.filter((n) => !existingNodeIds.has(n.id))
+      const nodesToRemove = cy.nodes().filter((n) => !filteredNodeIds.has(n.id() as string))
+
+      // Clear selection if selected node is being removed
+      if (selectedNodeRef.current && !filteredNodeIds.has(selectedNodeRef.current)) {
+        selectedNodeRef.current = null
+        cy.elements().removeClass('dimmed highlighted selected-node')
+      }
+
+      // Remove stale nodes (their edges are removed automatically)
+      if (nodesToRemove.length > 0) nodesToRemove.remove()
+
+      // Rebuild all edges (no positions to preserve)
+      cy.edges().remove()
+      if (edgeElements.length > 0) cy.add(edgeElements)
+
+      // Add new nodes, placed near the graph center
+      if (nodesToAdd.length > 0) {
+        cy.add(nodesToAdd.map((n) => ({ data: { id: n.id, label: n.label, type: n.type, filePath: n.filePath } })))
+      }
+
+      // Restore positions for surviving nodes; jitter new ones
+      cy.nodes().forEach((node) => {
+        const saved = savedPositions.get(node.id() as string)
+        if (saved) {
+          node.position(saved)
+        } else {
+          node.position({ x: centerX + (Math.random() - 0.5) * 120, y: centerY + (Math.random() - 0.5) * 120 })
+        }
+      })
+
+      // Run settle layout only when topology actually changed
+      if (nodesToAdd.length > 0 || nodesToRemove.length > 0) {
+        cy.layout({ ...makeSettleLayout(), animationDuration: 500 } as unknown as cytoscape.LayoutOptions).run()
+      }
     }
-    layout.run()
+
+    // ── Size nodes by degree (hubs larger, leaves smaller) ───────────────────
+    let maxDeg = 1
+    cy.nodes().forEach((n) => { const d = n.degree(false); if (d > maxDeg) maxDeg = d })
+    cy.nodes().forEach((node) => {
+      const size = 14 + Math.round((node.degree(false) / maxDeg) * 18) // 14 → 32 px
+      node.style({ width: size, height: size })
+    })
+
+    // ── Apply LOD class based on current zoom level ───────────────────────────
+    if (cy.zoom() < 0.6) cy.nodes().addClass('labels-hidden')
+
     applySearchClasses(cy, searchQueryRef.current)
   }
 
@@ -1293,6 +1372,29 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
         className="absolute inset-0 pointer-events-none"
         style={{ zIndex: 5 }}
       />
+
+      {/* Hover tooltip */}
+      {tooltip && (
+        <div
+          className="absolute pointer-events-none"
+          style={{ left: tooltip.x + 14, top: tooltip.y - 52, zIndex: 25 }}
+        >
+          <div className="bg-cortx-surface/96 backdrop-blur-md border border-cortx-border rounded-xl px-3 py-2 shadow-2xl max-w-[200px]">
+            <p className="text-xs font-semibold text-cortx-text-primary truncate leading-tight">{tooltip.label}</p>
+            <div className="flex items-center gap-1.5 mt-1">
+              <span
+                className="text-2xs px-1.5 py-0.5 rounded-full text-white font-medium"
+                style={{ backgroundColor: NODE_COLORS[tooltip.type] || '#94A3B8' }}
+              >
+                {tooltip.type}
+              </span>
+              <span className="text-2xs text-cortx-text-secondary">
+                {tooltip.degree} lien{tooltip.degree !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Idle thought bubble — floats near active nodes */}
       {showThoughtBubble && (

@@ -21,14 +21,26 @@ export function registerLibraryHandlers(
     }
   }
 
+  // Helper to signal graph/file changes to the renderer (triggers graph reload)
+  const notifyDbChanged = () => {
+    const win = getWindow()
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('db:changed')
+    }
+  }
+
   // ── Import ──────────────────────────────────────────────────────────────
 
   ipcMain.handle('library:ingest', async (_event, absolutePath: string) => {
-    return getLibrary().ingest(absolutePath, emitProgress)
+    const result = await getLibrary().ingest(absolutePath, emitProgress)
+    notifyDbChanged()
+    return result
   })
 
   ipcMain.handle('library:ingestMany', async (_event, absolutePaths: string[]) => {
-    return getLibrary().ingestMany(absolutePaths, emitProgress)
+    const result = await getLibrary().ingestMany(absolutePaths, emitProgress)
+    notifyDbChanged()
+    return result
   })
 
   ipcMain.handle('library:openImportDialog', async () => {
@@ -44,7 +56,7 @@ export function registerLibraryHandlers(
     })
     if (result.canceled || result.filePaths.length === 0) return []
     // Kick off ingestion and return immediately (progress via events)
-    getLibrary().ingestMany(result.filePaths, emitProgress).catch(console.error)
+    getLibrary().ingestMany(result.filePaths, emitProgress).then(notifyDbChanged).catch(console.error)
     return result.filePaths
   })
 
@@ -58,8 +70,10 @@ export function registerLibraryHandlers(
     return getLibrary().get(id)
   })
 
-  ipcMain.handle('library:delete', (_event, id: string) => {
-    return getLibrary().delete(id)
+  ipcMain.handle('library:delete', async (_event, id: string) => {
+    const result = await getLibrary().delete(id)
+    notifyDbChanged()
+    return result
   })
 
   ipcMain.handle('library:rename', (_event, id: string, newFilename: string) => {
