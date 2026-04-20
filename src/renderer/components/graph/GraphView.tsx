@@ -935,9 +935,9 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
     // applied on top and never committed back to rest (except on drag-drop
     // or layoutstop, which represent intentional position changes).
 
-    const LENS_RADIUS_PX = 270  // screen-space radius of the lens bubble
-    const LENS_STRENGTH  = 0.30 // max push as a fraction of lensRadius (graph units)
-    const LENS_LERP      = 0.10 // spring stiffness per frame (at 60 fps ≈ 400 ms to 98%)
+    const LENS_RADIUS_PX = 480  // screen-space radius of the lens bubble
+    const LENS_STRENGTH  = 0.10 // max push as a fraction of lensRadius (graph units)
+    const LENS_LERP      = 0.045 // spring stiffness per frame (at 60 fps ≈ 900 ms to 98%)
 
     let lensViewportTimer: ReturnType<typeof setTimeout> | null = null
 
