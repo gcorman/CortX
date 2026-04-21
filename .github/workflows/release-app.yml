@@ -59,7 +59,7 @@ jobs:
             -DestinationPath resources\python-sidecar `
             -Force
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Setup Node.js 20
         uses: actions/setup-node@v4
