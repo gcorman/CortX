@@ -247,6 +247,7 @@ function registerAppHandlers(): void {
     gitService = new GitService(normalizedPath)
     await gitService.initialize()
     agentPipeline = new AgentPipeline(fileService, dbService, gitService, llmService, normalizedPath, config.language)
+    canvasService = new CanvasService(normalizedPath, dbService, llmService)
     await indexAllFiles()
     startFileWatcher(normalizedPath)
   })
@@ -301,6 +302,7 @@ function registerAppHandlers(): void {
     gitService = new GitService(basePath)
     await gitService.initialize()
     agentPipeline = new AgentPipeline(fileService, dbService, gitService, llmService, basePath, config.language)
+    canvasService = new CanvasService(basePath, dbService, llmService)
 
     console.log('[Reset] Base de connaissances réinitialisée')
   })

@@ -135,14 +135,17 @@ export class CanvasService {
     )
 
     const allFiles = this.db.getFiles().slice(0, 200)
-    const kbCatalog = allFiles
-      .map((f) => `- "${f.title}" | type=${f.type} | path=${f.path}`)
-      .join('\n')
+    console.log(`[CanvasService.agentSuggest] catalog size: ${allFiles.length} files`)
+
+    // Numbered catalog — LLM returns idx instead of copying a path string
+    const kbCatalog = allFiles.length > 0
+      ? allFiles.map((f, i) => `[${i}] "${f.title}" | ${f.type}`).join('\n')
+      : '(aucun fichier indexé)'
 
     const existingNodes = (canvas?.nodes || [])
       .slice(0, 30)
       .map((n) => {
-        if (n.kind === 'entity') return `- entity "${n.data.title}" (${n.data.filePath})`
+        if (n.kind === 'entity') return `- entity "${n.data.title}"`
         if (n.kind === 'note') return `- note "${(n.data.text || '').slice(0, 60)}"`
         return `- group "${n.data.text || ''}"`
       })
@@ -150,22 +153,21 @@ export class CanvasService {
 
     const systemPrompt = `Tu aides un utilisateur à construire un canvas spatial de connaissances.
 Tu reçois un prompt et tu proposes des TUILES à ajouter au canvas. Deux types:
-- "entity": référence un fichier existant de la base de connaissances (filePath copié EXACTEMENT depuis le catalogue)
+- "entity": référence une entrée du catalogue KB par son numéro (champ "idx")
 - "note": texte libre (2-30 mots) pour commenter ou ponctuer
 
 RÈGLES STRICTES:
-- Les entités DOIVENT copier un filePath du catalogue à l'identique (ne reformule pas, ne traduis pas, ne raccourcis pas)
+- Les entités utilisent "idx" = le numéro entre crochets dans le catalogue (ex: [3] → "idx": 3)
 - Ne duplique pas les entités déjà présentes dans le canvas
 - Propose 3 à 8 tuiles au total (au moins une entity quand le catalogue contient des éléments pertinents)
-- Propose 0 à 6 edges reliant des tuiles (par indices), avec un label court optionnel (2-5 mots)
+- Propose 0 à 6 edges reliant des tuiles (par leur position dans le tableau nodes), avec un label court optionnel (2-5 mots)
 - Les couleurs de notes: teal, orange, purple, blue, pink, neutral
-- Les positions x/y sont optionnelles (le client les recalcule si absentes)
 
 Réponds UNIQUEMENT en JSON valide, sans texte autour, sans \`\`\`. Format:
 {
   "summary": "court résumé en 1 phrase",
   "nodes": [
-    { "kind": "entity", "filePath": "Reseau/Nom.md" },
+    { "kind": "entity", "idx": 3 },
     { "kind": "note", "text": "Idée courte", "color": "teal" }
   ],
   "edges": [ { "sourceIdx": 0, "targetIdx": 1, "label": "lien" } ]
@@ -215,7 +217,8 @@ Propose les tuiles et liens à ajouter.`
     type LLMNode = {
       kind?: string
       type?: string
-      filePath?: string
+      idx?: number         // new: catalog index (preferred)
+      filePath?: string    // legacy fallback
       path?: string
       file?: string
       title?: string
@@ -247,16 +250,29 @@ Propose les tuiles et liens à ajouter.`
     )
 
     const resolveFile = (n: LLMNode): { path: string; title: string; type: string } | null => {
+      // Primary: catalog index (new format — most reliable)
+      if (typeof n.idx === 'number' && n.idx >= 0 && n.idx < allFiles.length) {
+        return allFiles[n.idx]
+      }
+      // Fallback: path string matching (legacy / other LLMs)
       const candidatePath = n.filePath || n.path || n.file
       if (candidatePath) {
         const exact = pathLookup.get(candidatePath)
         if (exact) return exact
-        // try case-insensitive + slash normalization
+        // case-insensitive + slash normalization
         const norm = candidatePath.replace(/\\/g, '/').toLowerCase()
         for (const [k, v] of pathLookup) {
           if (k.replace(/\\/g, '/').toLowerCase() === norm) return v
         }
+        // filename-only match (LLM sometimes strips directory prefix)
+        const fileName = norm.split('/').pop()
+        if (fileName) {
+          for (const [k, v] of pathLookup) {
+            if (k.replace(/\\/g, '/').toLowerCase().split('/').pop() === fileName) return v
+          }
+        }
       }
+      // Fallback: title match
       const candidateTitle = (n.title || '').toLowerCase().trim()
       if (candidateTitle) {
         const byTitle = titleLookup.get(candidateTitle)
@@ -272,12 +288,12 @@ Propose les tuiles et liens à ajouter.`
     rawNodes.forEach((n, idx) => {
       const pos = { x: Number(n.x) || 0, y: Number(n.y) || 0 }
       const kind = String(n.kind || n.type || '').toLowerCase()
-      const looksEntity = kind === 'entity' || !!(n.filePath || n.path || n.file)
+      const looksEntity = kind === 'entity' || typeof n.idx === 'number' || !!(n.filePath || n.path || n.file)
 
       if (looksEntity) {
         const file = resolveFile(n)
         if (!file) {
-          console.warn('[CanvasService] entity node skipped (path/title not found):', n.filePath || n.path || n.title)
+          console.warn('[CanvasService] entity node skipped — not found in catalog:', { idx: n.idx, filePath: n.filePath, title: n.title })
           return
         }
         if (existingEntityPaths.has(file.path)) return
