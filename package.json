@@ -17,6 +17,11 @@
   "build": {
     "appId": "com.cortx.app",
     "productName": "CortX",
+    "publish": {
+      "provider": "github",
+      "owner": "gcorman",
+      "repo": "CortX"
+    },
     "directories": {
       "output": "dist"
     },
