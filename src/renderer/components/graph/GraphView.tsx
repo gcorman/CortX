@@ -625,7 +625,6 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
   // Lens effect: canonical (non-lens-offset) positions + rAF state
   const restPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map())
   const lensRafRef = useRef<number | null>(null)
-  const lensActiveRef = useRef(false)
 
   const [contextMenu, setContextMenu] = useState<{
     x: number; y: number; nodeId: string; filePath: string; label: string; isLibDoc: boolean
@@ -858,8 +857,7 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
     cy.on('grab', 'node', (evt) => {
       stopLive()
       draggedNodeRef.current = evt.target as cytoscape.NodeSingular
-      // Pause lens while dragging — nodes should follow the mouse, not spring
-      lensActiveRef.current = false
+      // lensRafRef keeps running but skips draggedNode — no conflict
     })
 
     cy.on('drag', 'node', () => {
@@ -925,21 +923,21 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       setTooltip(null)
     })
 
-    // ── Lens effect: radial dilation at viewport centre ──────────────────────
+    // ── Lens effect: permanent radial dilation at viewport centre ───────────
     //
-    // Nodes near the centre of the current viewport are pushed outward
-    // (graph-space spring physics). When the viewport stops moving, nodes
-    // spring back to their canonical rest positions over ~400 ms.
+    // The lens is ALWAYS active — it continuously pushes nodes near the
+    // viewport centre outward. The target position for each node is:
+    //   target = restPos + lensOffset(restPos, viewportCentre)
     //
-    // restPositionsRef holds the authoritative positions; lens offsets are
-    // applied on top and never committed back to rest (except on drag-drop
-    // or layoutstop, which represent intentional position changes).
+    // rAF loop is self-terminating once all nodes converge, then restarts
+    // on every `viewport` event (pan / zoom). CPU cost ≈ 0 at rest.
+    //
+    // restPositionsRef = canonical positions (layout + user drops).
+    // Lens offsets are NEVER written back to rest — purely visual.
 
-    const LENS_RADIUS_PX = 480  // screen-space radius of the lens bubble
-    const LENS_STRENGTH  = 0.10 // max push as a fraction of lensRadius (graph units)
-    const LENS_LERP      = 0.045 // spring stiffness per frame (at 60 fps ≈ 900 ms to 98%)
-
-    let lensViewportTimer: ReturnType<typeof setTimeout> | null = null
+    const LENS_RADIUS_PX = 480   // screen-space bubble radius
+    const LENS_STRENGTH  = 0.08  // peak push (fraction of graph-unit radius)
+    const LENS_LERP      = 0.04  // spring per frame — 60 fps → ~1.2 s to settle
 
     function runLensFrame(): void {
       const container = cy.container()
@@ -947,81 +945,65 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
 
       const pan  = cy.pan()
       const zoom = cy.zoom()
-      const screenCx = container.clientWidth  / 2
-      const screenCy = container.clientHeight / 2
-
-      // Viewport centre in graph coordinates
-      const graphCx = (screenCx - pan.x) / zoom
-      const graphCy = (screenCy - pan.y) / zoom
-      const lensRadius = LENS_RADIUS_PX / zoom   // convert to graph units
+      const graphCx = (container.clientWidth  / 2 - pan.x) / zoom
+      const graphCy = (container.clientHeight / 2 - pan.y) / zoom
+      const lensRadius = LENS_RADIUS_PX / zoom
 
       let anyMovement = false
 
       cy.batch(() => {
         cy.nodes().forEach((node) => {
-          // Never push the node currently being dragged
           if (node === draggedNodeRef.current) return
 
           const id   = node.id() as string
           const rest = restPositionsRef.current.get(id)
           if (!rest) return
 
+          // Smoothstep falloff: 6t⁵ − 15t⁴ + 10t³  (C2-continuous, zero derivative at 0 and 1)
+          const dx   = rest.x - graphCx
+          const dy   = rest.y - graphCy
+          const dist = Math.sqrt(dx * dx + dy * dy)
           let targetX = rest.x
           let targetY = rest.y
-
-          if (lensActiveRef.current) {
-            const dx   = rest.x - graphCx
-            const dy   = rest.y - graphCy
-            const dist = Math.sqrt(dx * dx + dy * dy)
-            if (dist < lensRadius && dist > 0.5) {
-              // Smooth quadratic falloff: full push at centre, zero at edge
-              const t    = 1 - dist / lensRadius
-              const push = LENS_STRENGTH * t * t * lensRadius
-              targetX += (dx / dist) * push
-              targetY += (dy / dist) * push
-            }
+          if (dist < lensRadius && dist > 0.5) {
+            const t      = 1 - dist / lensRadius
+            const smooth = t * t * t * (t * (t * 6 - 15) + 10)  // smootherstep
+            const push   = LENS_STRENGTH * smooth * lensRadius
+            targetX += (dx / dist) * push
+            targetY += (dy / dist) * push
           }
 
           const cur  = node.position()
           const newX = cur.x + (targetX - cur.x) * LENS_LERP
           const newY = cur.y + (targetY - cur.y) * LENS_LERP
 
-          if (Math.abs(newX - cur.x) + Math.abs(newY - cur.y) > 0.06) {
+          if (Math.abs(newX - cur.x) + Math.abs(newY - cur.y) > 0.04) {
             node.position({ x: newX, y: newY })
             anyMovement = true
           }
         })
       })
 
+      // Keep looping while nodes are still moving; stop when settled (saves CPU)
       lensRafRef.current = anyMovement ? requestAnimationFrame(runLensFrame) : null
     }
 
-    cy.on('viewport', () => {
-      // Don't activate during node drag (live-layout handles that)
+    function startLens(): void {
       if (draggedNodeRef.current) return
-
-      lensActiveRef.current = true
       if (lensRafRef.current === null) {
         lensRafRef.current = requestAnimationFrame(runLensFrame)
       }
+    }
 
-      // After viewport stops, deactivate push so nodes spring back to rest
-      if (lensViewportTimer) clearTimeout(lensViewportTimer)
-      lensViewportTimer = setTimeout(() => {
-        lensViewportTimer = null
-        lensActiveRef.current = false
-        // Keep rAF alive so the spring-back animation completes
-        if (lensRafRef.current === null) {
-          lensRafRef.current = requestAnimationFrame(runLensFrame)
-        }
-      }, 120)
-    })
+    // Viewport change → targets moved → restart convergence loop
+    cy.on('viewport', startLens)
 
-    // Capture authoritative positions after every layout run
+    // Capture authoritative positions after every layout run, then re-apply lens
     cy.on('layoutstop', () => {
       cy.nodes().forEach((node) => {
         restPositionsRef.current.set(node.id() as string, { ...node.position() })
       })
+      startLens()
     })
 
     // ResizeObserver: detect when the container gets real dimensions and
@@ -1058,7 +1040,6 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
       ro.disconnect()
       if (resizeFitTimerRef.current) clearTimeout(resizeFitTimerRef.current)
       if (zoomLodTimer) clearTimeout(zoomLodTimer)
-      if (lensViewportTimer) clearTimeout(lensViewportTimer)
       if (lensRafRef.current !== null) {
         cancelAnimationFrame(lensRafRef.current)
         lensRafRef.current = null
