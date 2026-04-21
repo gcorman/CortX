@@ -96,6 +96,7 @@ export function SettingsDialog(): React.JSX.Element {
   async function handleSave(): Promise<void> {
     setIsSaving(true)
     try {
+      const trimmedBasePath = basePath.trim()
       const llmConfig: LLMConfig = {
         provider,
         apiKey,
@@ -105,14 +106,17 @@ export function SettingsDialog(): React.JSX.Element {
       await window.cortx.app.setConfig({ llm: llmConfig, language })
 
       const currentBasePath = await window.cortx.app.getBasePath()
-      if (basePath && basePath !== currentBasePath) {
-        await window.cortx.app.setBasePath(basePath)
+      if (trimmedBasePath && trimmedBasePath !== currentBasePath) {
+        await window.cortx.app.setBasePath(trimmedBasePath)
       }
 
       addToast(t.settings.configSaved, 'success')
       toggleSettings()
-    } catch {
-      addToast(t.settings.saveError, 'error')
+    } catch (err) {
+      addToast(
+        err instanceof Error && err.message ? err.message : t.settings.saveError,
+        'error'
+      )
     }
     setIsSaving(false)
   }

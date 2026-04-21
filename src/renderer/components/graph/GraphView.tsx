@@ -4,6 +4,7 @@ import coseBilkent from 'cytoscape-cose-bilkent'
 import fcose from 'cytoscape-fcose'
 import { useGraphStore } from '../../stores/graphStore'
 import { useUIStore } from '../../stores/uiStore'
+import type { Theme } from '../../stores/uiStore'
 import { useFileStore } from '../../stores/fileStore'
 import { useLibraryStore } from '../../stores/libraryStore'
 import { useIdleStore } from '../../stores/idleStore'
@@ -38,10 +39,19 @@ export const NODE_COLORS: Record<string, string> = {
   document:   '#F59E0B'
 }
 
-function buildCyStyle(): cytoscape.StylesheetStyle[] {
+function buildCyStyle(theme: Theme): cytoscape.StylesheetStyle[] {
   const bg = getCssColor('--cortx-bg')
+  const surface = getCssColor('--cortx-surface')
+  const elevated = getCssColor('--cortx-elevated')
   const border = getCssColor('--cortx-border')
+  const textPrimary = getCssColor('--cortx-text-primary')
   const textSec = getCssColor('--cortx-text-secondary')
+  const isLight = theme === 'light'
+
+  const nodeLabelBg = isLight ? surface : bg
+  const edgeLabelBg = isLight ? elevated : bg
+  const nodeBorder = isLight ? border : 'white'
+  const edgeStroke = isLight ? textSec : border
 
   return [
     {
@@ -55,8 +65,8 @@ function buildCyStyle(): cytoscape.StylesheetStyle[] {
           NODE_COLORS[ele.data('type') as string] || '#94A3B8',
         'background-opacity': 0.9,
         'border-width': 1.5,
-        'border-color': 'white',
-        'border-opacity': 0.18,
+        'border-color': nodeBorder,
+        'border-opacity': isLight ? 0.95 : 0.18,
 
         // Label below the node
         label: 'data(label)',
@@ -66,12 +76,15 @@ function buildCyStyle(): cytoscape.StylesheetStyle[] {
         'font-size': '9px',
         'font-family': 'Inter, system-ui, sans-serif',
         'font-weight': '500',
-        color: '#F8FAFC',
+        color: textPrimary,
         'text-outline-width': 0,
-        'text-background-color': bg,
-        'text-background-opacity': 0.72,
-        'text-background-padding': '2px',
+        'text-background-color': nodeLabelBg,
+        'text-background-opacity': isLight ? 0.94 : 0.72,
+        'text-background-padding': isLight ? '3px' : '2px',
         'text-background-shape': 'round-rectangle',
+        'text-border-width': isLight ? 1 : 0,
+        'text-border-color': border,
+        'text-border-opacity': isLight ? 0.9 : 0,
         'text-max-width': '90px',
         'text-overflow-wrap': 'ellipsis',
 
@@ -84,8 +97,8 @@ function buildCyStyle(): cytoscape.StylesheetStyle[] {
       selector: 'edge',
       style: {
         width: 1,
-        'line-color': border,
-        'target-arrow-color': border,
+        'line-color': edgeStroke,
+        'target-arrow-color': edgeStroke,
         'target-arrow-shape': 'triangle',
         'arrow-scale': 0.7,
         'curve-style': 'bezier',
@@ -94,12 +107,15 @@ function buildCyStyle(): cytoscape.StylesheetStyle[] {
         'font-family': 'Inter, system-ui, sans-serif',
         color: textSec,
         'text-rotation': 'autorotate',
-        'text-background-color': bg,
-        'text-background-opacity': 0.65,
-        'text-background-padding': '1px',
+        'text-background-color': edgeLabelBg,
+        'text-background-opacity': isLight ? 0.9 : 0.65,
+        'text-background-padding': isLight ? '2px' : '1px',
         'text-background-shape': 'round-rectangle',
+        'text-border-width': isLight ? 1 : 0,
+        'text-border-color': border,
+        'text-border-opacity': isLight ? 0.8 : 0,
         'text-opacity': 0,
-        opacity: 0.7,
+        opacity: isLight ? 0.55 : 0.7,
         'transition-property': 'opacity, line-color, width, text-opacity',
         'transition-duration': 180
       } as unknown as cytoscape.Css.Edge
@@ -762,7 +778,7 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
   useEffect(() => {
     const cy = cyRef.current
     if (!cy) return
-    cy.style(buildCyStyle())
+    cy.style(buildCyStyle(theme))
   }, [theme])
 
   useEffect(() => {
@@ -776,7 +792,7 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
     const cy = cytoscape({
       container: containerRef.current,
       elements: [],
-      style: buildCyStyle(),
+      style: buildCyStyle(theme),
       pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
       minZoom: 0.15,
       maxZoom: 5,
@@ -1124,6 +1140,7 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
 
       const nodesToAdd = filteredNodes.filter((n) => !existingNodeIds.has(n.id))
       const nodesToRemove = cy.nodes().filter((n) => !filteredNodeIds.has(n.id() as string))
+      const nodesToUpdate = filteredNodes.filter((n) => existingNodeIds.has(n.id))
 
       // Clear selection if selected node is being removed
       if (selectedNodeRef.current && !filteredNodeIds.has(selectedNodeRef.current)) {
@@ -1131,17 +1148,30 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
         cy.elements().removeClass('dimmed highlighted selected-node')
       }
 
-      // Remove stale nodes (their edges are removed automatically)
-      if (nodesToRemove.length > 0) nodesToRemove.remove()
+      cy.batch(() => {
+        // Remove stale nodes first; Cytoscape drops their incident edges too.
+        if (nodesToRemove.length > 0) nodesToRemove.remove()
 
-      // Rebuild all edges (no positions to preserve)
-      cy.edges().remove()
-      if (edgeElements.length > 0) cy.add(edgeElements)
+        // New nodes must exist before we recreate edges, otherwise Cytoscape
+        // throws "nonexistent source/target" during fast incremental updates.
+        if (nodesToAdd.length > 0) {
+          cy.add(nodesToAdd.map((n) => ({ data: { id: n.id, label: n.label, type: n.type, filePath: n.filePath } })))
+        }
 
-      // Add new nodes, placed near the graph center
-      if (nodesToAdd.length > 0) {
-        cy.add(nodesToAdd.map((n) => ({ data: { id: n.id, label: n.label, type: n.type, filePath: n.filePath } })))
-      }
+        // Keep existing node metadata in sync so renames refresh immediately
+        // without forcing a full remount of the graph view.
+        for (const nextNode of nodesToUpdate) {
+          const currentNode = cy.getElementById(nextNode.id)
+          if (currentNode.length === 0) continue
+          currentNode.data('label', nextNode.label)
+          currentNode.data('type', nextNode.type)
+          currentNode.data('filePath', nextNode.filePath)
+        }
+
+        // Rebuild all edges once the full node set is in place.
+        cy.edges().remove()
+        if (edgeElements.length > 0) cy.add(edgeElements)
+      })
 
       // Restore positions for surviving nodes; jitter new ones
       cy.nodes().forEach((node) => {

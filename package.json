@@ -79,6 +79,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
     "@types/cytoscape": "^3.21.9",
+    "@xyflow/react": "^12.10.2",
     "better-sqlite3": "^12.8.0",
     "cytoscape": "^3.33.1",
     "cytoscape-cose-bilkent": "^4.1.0",

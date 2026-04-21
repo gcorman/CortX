@@ -70,12 +70,58 @@ export interface T {
     graph: string
     tags: string
     library: string
+    canvas: string
     disableIdle: string
     enableIdle: string
     idle: string
     newFile: string
     newShort: string
     searchPlaceholder: string
+  }
+  canvas: {
+    sidebarTitle: string
+    newCanvas: string
+    newPlaceholder: string
+    emptyList: string
+    rename: string
+    delete: string
+    confirmDelete: string
+    yes: string
+    no: string
+    tilesShort: string
+    edgesShort: string
+    collapseSidebar: string
+    expandSidebar: string
+    currentCanvas: string
+    addEntity: string
+    addNote: string
+    agentButton: string
+    saving: string
+    saved: string
+    unsaved: string
+    upToDate: string
+    emptyCanvasTitle: string
+    emptyCanvasHint: string
+    emptyTitle: string
+    emptyDescription: string
+    yourCanvases: string
+    createFirst: string
+    defaultName: string
+    pickerPlaceholder: string
+    pickerEmpty: string
+    pickerResults: string
+    pickerClose: string
+    agentTitle: string
+    agentPromptLabel: string
+    agentPromptPlaceholder: string
+    agentRun: string
+    agentThinking: string
+    agentPreview: string
+    agentApply: string
+    agentCancel: string
+    agentRetry: string
+    agentLinks: string
+    agentError: string
   }
   chat: {
     dropToAnalyze: string
@@ -234,6 +280,9 @@ export interface T {
     graphTitleFromH1: string
     graphTitleFromFilename: string
     titleUpdatedWithLinks: (n: number) => string
+    implicitBacklinksTitle: string
+    implicitBacklinksEmpty: string
+    implicitBacklinksScore: string
   }
   graph: {
     zoomIn: string
@@ -403,12 +452,58 @@ const fr: T = {
     graph: 'Graphe',
     tags: 'Tags',
     library: 'Bibliothèque',
+    canvas: 'Canvas',
     disableIdle: 'Désactiver le mode Idle',
     enableIdle: "Activer le mode Idle — l'agent médite sur le graphe",
     idle: 'Idle',
     newFile: 'Créer une nouvelle fiche',
     newShort: 'Nouveau',
     searchPlaceholder: 'Rechercher dans la base...'
+  },
+  canvas: {
+    sidebarTitle: 'Mes canvas',
+    newCanvas: 'Nouveau canvas',
+    newPlaceholder: 'Nom du canvas...',
+    emptyList: 'Aucun canvas. Crée-en un pour commencer.',
+    rename: 'Renommer',
+    delete: 'Supprimer',
+    confirmDelete: 'Supprimer ?',
+    yes: 'Oui',
+    no: 'Non',
+    tilesShort: 'tuiles',
+    edgesShort: 'liens',
+    collapseSidebar: 'Réduire',
+    expandSidebar: 'Étendre',
+    currentCanvas: 'Canvas actif',
+    addEntity: 'Ajouter une entité',
+    addNote: 'Note',
+    agentButton: 'Agent',
+    saving: 'Enregistrement...',
+    saved: 'Enregistré',
+    unsaved: 'Modifications en attente',
+    upToDate: 'À jour',
+    emptyCanvasTitle: 'Canvas vide',
+    emptyCanvasHint: "Ajoute des entités depuis ta base ou fais-toi aider par l'agent.",
+    emptyTitle: 'Canvas spatial',
+    emptyDescription: 'Assemble visuellement des entités, des notes et des liens. Organise ta pensée sur un plan infini.',
+    yourCanvases: 'Tes canvas récents',
+    createFirst: 'Créer mon premier canvas',
+    defaultName: 'Nouveau canvas',
+    pickerPlaceholder: 'Rechercher une entité...',
+    pickerEmpty: 'Aucun résultat.',
+    pickerResults: 'résultats',
+    pickerClose: 'pour fermer',
+    agentTitle: "Agent — suggérer des tuiles",
+    agentPromptLabel: 'Décris ce que tu veux explorer',
+    agentPromptPlaceholder: "Ex : Panorama de mon réseau dans l'aéronautique, avec projets liés...",
+    agentRun: 'Proposer',
+    agentThinking: 'Réflexion...',
+    agentPreview: 'Tuiles proposées',
+    agentApply: 'Ajouter au canvas',
+    agentCancel: 'Annuler',
+    agentRetry: 'Recommencer',
+    agentLinks: 'liens suggérés',
+    agentError: "L'agent n'a rien proposé. Essaie un prompt plus précis."
   },
   chat: {
     dropToAnalyze: 'Déposer pour analyser et intégrer',
@@ -565,7 +660,10 @@ const fr: T = {
     graphTitleFromFrontmatter: 'frontmatter',
     graphTitleFromH1: 'titre H1',
     graphTitleFromFilename: 'nom du fichier',
-    titleUpdatedWithLinks: (n) => n > 0 ? `Titre mis à jour · ${n} lien${n > 1 ? 's' : ''} mis à jour` : 'Titre mis à jour'
+    titleUpdatedWithLinks: (n) => n > 0 ? `Titre mis à jour · ${n} lien${n > 1 ? 's' : ''} mis à jour` : 'Titre mis à jour',
+    implicitBacklinksTitle: 'Peut-être lié à',
+    implicitBacklinksEmpty: 'Aucune note similaire détectée.',
+    implicitBacklinksScore: 'similarité'
   },
   graph: {
     zoomIn: 'Zoom +',
@@ -735,12 +833,58 @@ const en: T = {
     graph: 'Graph',
     tags: 'Tags',
     library: 'Library',
+    canvas: 'Canvas',
     disableIdle: 'Disable Idle mode',
     enableIdle: 'Enable Idle mode — agent meditates on the graph',
     idle: 'Idle',
     newFile: 'Create a new card',
     newShort: 'New',
     searchPlaceholder: 'Search the base...'
+  },
+  canvas: {
+    sidebarTitle: 'My canvases',
+    newCanvas: 'New canvas',
+    newPlaceholder: 'Canvas name...',
+    emptyList: 'No canvas yet. Create one to begin.',
+    rename: 'Rename',
+    delete: 'Delete',
+    confirmDelete: 'Delete?',
+    yes: 'Yes',
+    no: 'No',
+    tilesShort: 'tiles',
+    edgesShort: 'edges',
+    collapseSidebar: 'Collapse',
+    expandSidebar: 'Expand',
+    currentCanvas: 'Active canvas',
+    addEntity: 'Add entity',
+    addNote: 'Note',
+    agentButton: 'Agent',
+    saving: 'Saving...',
+    saved: 'Saved',
+    unsaved: 'Unsaved changes',
+    upToDate: 'Up to date',
+    emptyCanvasTitle: 'Empty canvas',
+    emptyCanvasHint: 'Add entities from your base or let the agent help you build.',
+    emptyTitle: 'Spatial canvas',
+    emptyDescription: 'Visually arrange entities, notes and links. Organize your thinking on an infinite plane.',
+    yourCanvases: 'Your recent canvases',
+    createFirst: 'Create my first canvas',
+    defaultName: 'New canvas',
+    pickerPlaceholder: 'Search an entity...',
+    pickerEmpty: 'No result.',
+    pickerResults: 'results',
+    pickerClose: 'to close',
+    agentTitle: 'Agent — suggest tiles',
+    agentPromptLabel: 'Describe what you want to explore',
+    agentPromptPlaceholder: 'E.g.: Map of my aerospace network with related projects...',
+    agentRun: 'Suggest',
+    agentThinking: 'Thinking...',
+    agentPreview: 'Proposed tiles',
+    agentApply: 'Add to canvas',
+    agentCancel: 'Cancel',
+    agentRetry: 'Retry',
+    agentLinks: 'suggested links',
+    agentError: 'The agent found nothing. Try a more specific prompt.'
   },
   chat: {
     dropToAnalyze: 'Drop to analyze and integrate',
@@ -897,7 +1041,10 @@ const en: T = {
     graphTitleFromFrontmatter: 'frontmatter',
     graphTitleFromH1: 'H1 heading',
     graphTitleFromFilename: 'filename',
-    titleUpdatedWithLinks: (n) => n > 0 ? `Title updated · ${n} link${n > 1 ? 's' : ''} updated` : 'Title updated'
+    titleUpdatedWithLinks: (n) => n > 0 ? `Title updated · ${n} link${n > 1 ? 's' : ''} updated` : 'Title updated',
+    implicitBacklinksTitle: 'Maybe related to',
+    implicitBacklinksEmpty: 'No similar notes detected.',
+    implicitBacklinksScore: 'similarity'
   },
   graph: {
     zoomIn: 'Zoom in',

@@ -8,7 +8,9 @@ const api: CortxAPI = {
     getRelations: () => ipcRenderer.invoke('db:getRelations'),
     search: (query: string) => ipcRenderer.invoke('db:search', query),
     getGraphData: () => ipcRenderer.invoke('db:getGraphData'),
-    getTags: () => ipcRenderer.invoke('db:getTags')
+    getTags: () => ipcRenderer.invoke('db:getTags'),
+    getImplicitBacklinks: (filePath: string, limit?: number, threshold?: number) =>
+      ipcRenderer.invoke('db:getImplicitBacklinks', filePath, limit, threshold)
   },
   files: {
     read: (path: string) => ipcRenderer.invoke('files:read', path),
@@ -75,6 +77,16 @@ const api: CortxAPI = {
     reindexAll: () => ipcRenderer.invoke('library:reindexAll'),
     getStatus: () => ipcRenderer.invoke('library:getStatus'),
     openImportDialog: () => ipcRenderer.invoke('library:openImportDialog')
+  },
+  canvas: {
+    list: () => ipcRenderer.invoke('canvas:list'),
+    load: (id: string) => ipcRenderer.invoke('canvas:load', id),
+    save: (config: unknown) => ipcRenderer.invoke('canvas:save', config),
+    create: (name: string) => ipcRenderer.invoke('canvas:create', name),
+    delete: (id: string) => ipcRenderer.invoke('canvas:delete', id),
+    rename: (id: string, newName: string) => ipcRenderer.invoke('canvas:rename', id, newName),
+    agentSuggest: (canvasId: string, prompt: string) =>
+      ipcRenderer.invoke('canvas:agentSuggest', canvasId, prompt)
   },
   idle: {
     start: () => ipcRenderer.invoke('idle:start'),

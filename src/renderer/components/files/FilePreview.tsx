@@ -5,7 +5,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useGraphStore } from '../../stores/graphStore'
 import { useFileStore } from '../../stores/fileStore'
 import { useT } from '../../i18n'
-import type { FileContent, CortxFile } from '../../../shared/types'
+import type { FileContent, CortxFile, ImplicitBacklink } from '../../../shared/types'
 
 type TitleSource = 'frontmatter' | 'h1' | 'filename'
 
@@ -61,6 +61,9 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
   const [wikilinkIndex, setWikilinkIndex] = useState(0)
   const editorRef = useRef<HTMLTextAreaElement>(null)
   const wikilinkDropRef = useRef<HTMLUListElement>(null)
+  // --- Implicit backlinks ---
+  const [implicitBacklinks, setImplicitBacklinks] = useState<ImplicitBacklink[]>([])
+  const [backlinksLoading, setBacklinksLoading] = useState(false)
 
   const addToast = useUIStore((s) => s.addToast)
   const reloadGraph = useGraphStore((s) => s.loadGraph)
@@ -144,7 +147,21 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
   useEffect(() => {
     loadFile()
     setIsEditing(false)
+    setImplicitBacklinks([])
   }, [loadFile])
+
+  // Load implicit backlinks after file is loaded
+  useEffect(() => {
+    if (!path || path.startsWith('library:')) return
+    let cancelled = false
+    setBacklinksLoading(true)
+    window.cortx.db.getImplicitBacklinks(path, 5).then((results) => {
+      if (!cancelled) setImplicitBacklinks(results)
+    }).catch(() => {}).finally(() => {
+      if (!cancelled) setBacklinksLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [path])
 
   // Close on Escape (only when not editing — Escape in edit mode cancels edit)
   useEffect(() => {
@@ -242,9 +259,8 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
       const result = await window.cortx.files.updateTitle(path, editedTitle)
       addToast(t.filePreview.titleUpdatedWithLinks(result.updatedLinks), 'success')
       await loadFile()
+      await Promise.all([reloadGraph(), reloadFiles()])
       setIsTitleEditing(false)
-      reloadGraph()
-      reloadFiles()
     } catch (err) {
       console.error('[FilePreview] title update failed', err)
       addToast(t.filePreview.titleError, 'error')
@@ -599,6 +615,45 @@ export function FilePreview({ path, onClose }: FilePreviewProps): React.JSX.Elem
                     return source
                   })()}
                 />
+                {!isLibraryFile && (
+                  <div className="mt-6 pt-4 border-t border-cortx-border">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xs font-medium text-cortx-text-secondary uppercase tracking-wide">
+                        {t.filePreview.implicitBacklinksTitle}
+                      </span>
+                      {backlinksLoading && (
+                        <span className="w-3 h-3 rounded-full border border-cortx-text-secondary/30 border-t-cortx-accent animate-spin" />
+                      )}
+                    </div>
+                    {!backlinksLoading && implicitBacklinks.length === 0 ? (
+                      <p className="text-xs text-cortx-text-secondary/60 italic">
+                        {t.filePreview.implicitBacklinksEmpty}
+                      </p>
+                    ) : (
+                      <div className="flex flex-col gap-1.5">
+                        {implicitBacklinks.map((link) => (
+                          <button
+                            key={link.path}
+                            onClick={() => useUIStore.getState().openFilePreview(link.path)}
+                            className="flex items-center justify-between w-full text-left px-3 py-2 rounded-md bg-cortx-surface hover:bg-cortx-elevated transition-colors group"
+                          >
+                            <span className="flex items-center gap-2 min-w-0">
+                              <span className="text-2xs px-1.5 py-0.5 rounded bg-cortx-accent/10 text-cortx-accent capitalize shrink-0">
+                                {link.type}
+                              </span>
+                              <span className="text-sm text-cortx-text-primary truncate group-hover:text-cortx-accent transition-colors">
+                                {link.title}
+                              </span>
+                            </span>
+                            <span className="text-2xs text-cortx-text-secondary/60 shrink-0 ml-2">
+                              {Math.round(link.score * 100)}% {t.filePreview.implicitBacklinksScore}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )
           ) : (

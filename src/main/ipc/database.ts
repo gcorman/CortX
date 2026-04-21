@@ -8,4 +8,7 @@ export function registerDatabaseHandlers(getDb: () => DatabaseService): void {
   ipcMain.handle('db:search', (_event, query: string) => getDb().search(query))
   ipcMain.handle('db:getGraphData', () => getDb().getGraphData())
   ipcMain.handle('db:getTags', () => getDb().getTags())
+  ipcMain.handle('db:getImplicitBacklinks', (_event, filePath: string, limit?: number, threshold?: number) =>
+    getDb().getImplicitBacklinks(filePath, limit, threshold)
+  )
 }

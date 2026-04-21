@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron'
-import { join } from 'path'
+import { join, resolve, parse, isAbsolute } from 'path'
 import * as fs from 'fs'
 import { registerDatabaseHandlers } from './ipc/database'
 import { registerFileHandlers } from './ipc/files'
@@ -8,12 +8,14 @@ import { registerGitHandlers } from './ipc/git'
 import { registerAgentHandlers, setIdleServiceForAgent } from './ipc/agent'
 import { registerLibraryHandlers } from './ipc/library'
 import { registerIdleHandlers } from './ipc/idle'
+import { registerCanvasHandlers } from './ipc/canvas'
 import { DatabaseService } from './services/DatabaseService'
 import { FileService } from './services/FileService'
 import { GitService } from './services/GitService'
 import { LLMService } from './services/LLMService'
 import { AgentPipeline } from './services/AgentPipeline'
 import { IdleService } from './services/IdleService'
+import { CanvasService } from './services/CanvasService'
 import { libraryService } from './services/LibraryService'
 import { pythonSidecar } from './services/PythonSidecar'
 import type { AppConfig } from '../shared/types'
@@ -24,6 +26,40 @@ let mainWindow: BrowserWindow | null = null
 
 const configPath = join(app.getPath('userData'), 'cortx-config.json')
 const defaultBasePath = join(app.getPath('documents'), 'CortX-Base')
+
+function isDriveRootPath(input: string): boolean {
+  return /^[A-Za-z]:[\\/]?$/.test(input.trim())
+}
+
+function normalizeBasePath(input: string): string {
+  const trimmed = input.trim()
+  if (!trimmed) {
+    throw new Error('Le dossier de la base de connaissances ne peut pas être vide.')
+  }
+  if (!isAbsolute(trimmed) || isDriveRootPath(trimmed)) {
+    throw new Error('Choisissez un dossier précis, pas la racine du disque.')
+  }
+
+  const normalized = resolve(trimmed)
+  if (normalized === parse(normalized).root) {
+    throw new Error('Choisissez un dossier précis, pas la racine du disque.')
+  }
+
+  return normalized
+}
+
+function resolveConfiguredBasePath(basePath: string | undefined, fallback: string): string {
+  if (!basePath?.trim()) {
+    return fallback
+  }
+
+  try {
+    return normalizeBasePath(basePath)
+  } catch (err) {
+    console.warn('[Config] Invalid basePath, falling back to default:', err)
+    return fallback
+  }
+}
 
 function loadConfig(): AppConfig {
   const defaults: AppConfig = {
@@ -42,7 +78,7 @@ function loadConfig(): AppConfig {
       const raw = fs.readFileSync(configPath, 'utf-8')
       const saved = JSON.parse(raw) as Partial<AppConfig>
       return {
-        basePath: saved.basePath || defaults.basePath,
+        basePath: resolveConfiguredBasePath(saved.basePath, defaults.basePath),
         llm: {
           provider: saved.llm?.provider || defaults.llm.provider,
           apiKey: saved.llm?.apiKey || defaults.llm.apiKey,
@@ -77,6 +113,7 @@ let gitService: GitService
 let llmService: LLMService
 let agentPipeline: AgentPipeline
 let idleService: IdleService
+let canvasService: CanvasService
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -108,6 +145,8 @@ function createWindow(): void {
 }
 
 async function initializeServices(): Promise<void> {
+  config.basePath = normalizeBasePath(config.basePath)
+
   fileService = new FileService(config.basePath)
   await fileService.ensureBaseStructure()
 
@@ -134,6 +173,9 @@ async function initializeServices(): Promise<void> {
 
   // Initialise idle service
   idleService = new IdleService(dbService, fileService, llmService, config.basePath)
+
+  // Canvas service (spatial canvas persistence + agent-suggest)
+  canvasService = new CanvasService(config.basePath, dbService, llmService)
 
   // Index existing files
   await indexAllFiles()
@@ -195,17 +237,18 @@ function registerAppHandlers(): void {
   ipcMain.handle('app:getBasePath', () => config.basePath)
 
   ipcMain.handle('app:setBasePath', async (_event, path: string) => {
-    config.basePath = path
+    const normalizedPath = normalizeBasePath(path)
+    config.basePath = normalizedPath
     saveConfig(config)
-    fileService = new FileService(path)
+    fileService = new FileService(normalizedPath)
     await fileService.ensureBaseStructure()
-    dbService = new DatabaseService(join(path, '_System', 'cortx.db'))
+    dbService = new DatabaseService(join(normalizedPath, '_System', 'cortx.db'))
     dbService.initialize()
-    gitService = new GitService(path)
+    gitService = new GitService(normalizedPath)
     await gitService.initialize()
-    agentPipeline = new AgentPipeline(fileService, dbService, gitService, llmService, path, config.language)
+    agentPipeline = new AgentPipeline(fileService, dbService, gitService, llmService, normalizedPath, config.language)
     await indexAllFiles()
-    startFileWatcher(path)
+    startFileWatcher(normalizedPath)
   })
 
   ipcMain.handle('app:openDirectoryDialog', async () => {
@@ -226,7 +269,7 @@ function registerAppHandlers(): void {
   }))
 
   ipcMain.handle('app:resetBase', async () => {
-    const basePath = config.basePath
+    const basePath = normalizeBasePath(config.basePath)
     const dbPath = join(basePath, '_System', 'cortx.db')
 
     // Close DB before wiping it
@@ -294,6 +337,7 @@ app.whenReady().then(async () => {
   registerAgentHandlers(() => agentPipeline)
   registerLibraryHandlers(() => libraryService, () => mainWindow)
   registerIdleHandlers(() => idleService, () => agentPipeline)
+  registerCanvasHandlers(() => canvasService)
   setIdleServiceForAgent(idleService)
 
   createWindow()

@@ -283,6 +283,92 @@ export interface IdleConfig {
   confidenceThreshold: number
 }
 
+// --- Implicit backlinks ---
+
+export interface ImplicitBacklink {
+  path: string
+  title: string
+  type: string
+  score: number
+}
+
+// --- Spatial Canvas ---
+
+export type CanvasNodeKind = 'entity' | 'note' | 'group'
+export type CanvasEdgeKind = 'relation' | 'freeform'
+export type StickyColor = 'teal' | 'orange' | 'purple' | 'blue' | 'pink' | 'neutral'
+
+export interface CanvasNode {
+  id: string
+  kind: CanvasNodeKind
+  position: { x: number; y: number }
+  width?: number
+  height?: number
+  data: {
+    /** Entity nodes: KB file path */
+    filePath?: string
+    /** Entity nodes: resolved title */
+    title?: string
+    /** Entity nodes: entity type (personne/entreprise/domaine/projet/note/journal) */
+    entityType?: string
+    /** Entity nodes: tags snapshot */
+    tags?: string[]
+    /** Note/group nodes: body text */
+    text?: string
+    /** Note/group nodes: pastel color key */
+    color?: StickyColor
+  }
+}
+
+export type CanvasLineStyle = 'solid' | 'dashed' | 'dotted'
+export type CanvasArrow    = 'forward' | 'backward' | 'both' | 'none'
+
+export interface CanvasEdge {
+  id: string
+  source: string
+  target: string
+  sourceHandle?: string | null
+  targetHandle?: string | null
+  label?: string
+  kind?: CanvasEdgeKind
+  lineStyle?: CanvasLineStyle
+  arrow?: CanvasArrow
+}
+
+export interface CanvasViewport {
+  x: number
+  y: number
+  zoom: number
+}
+
+export interface CanvasConfig {
+  id: string
+  name: string
+  description?: string
+  created: string
+  modified: string
+  nodes: CanvasNode[]
+  edges: CanvasEdge[]
+  viewport?: CanvasViewport
+}
+
+export interface CanvasSummary {
+  id: string
+  name: string
+  description?: string
+  created: string
+  modified: string
+  nodeCount: number
+  edgeCount: number
+}
+
+export interface AgentCanvasSuggestion {
+  nodes: CanvasNode[]
+  edges: CanvasEdge[]
+  /** Short text shown to user explaining the suggestion */
+  summary: string
+}
+
 // --- IPC API surface ---
 
 export interface CortxAPI {
@@ -293,6 +379,16 @@ export interface CortxAPI {
     search(query: string): Promise<CortxFile[]>
     getGraphData(): Promise<GraphData>
     getTags(): Promise<Array<{ tag: string; count: number }>>
+    getImplicitBacklinks(filePath: string, limit?: number, threshold?: number): Promise<ImplicitBacklink[]>
+  }
+  canvas: {
+    list(): Promise<CanvasSummary[]>
+    load(id: string): Promise<CanvasConfig | null>
+    save(config: CanvasConfig): Promise<void>
+    create(name: string): Promise<CanvasConfig>
+    delete(id: string): Promise<void>
+    rename(id: string, newName: string): Promise<void>
+    agentSuggest(canvasId: string, prompt: string): Promise<AgentCanvasSuggestion>
   }
   files: {
     read(path: string): Promise<FileContent>

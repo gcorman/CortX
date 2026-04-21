@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { EntityType, AppLanguage } from '../../shared/types'
 
-export type CenterView = 'graph' | 'tags' | 'files' | 'library'
+export type CenterView = 'graph' | 'tags' | 'files' | 'library' | 'canvas'
 export type Theme = 'dark' | 'light'
 
 interface UIState {

@@ -531,6 +531,54 @@ export class DatabaseService {
   }
 
   /**
+   * Return files semantically similar to `filePath` (implicit backlinks).
+   * Excludes the file itself and files already explicitly wikilinked to/from it.
+   * Only returns results above `threshold` (default 0.65).
+   */
+  getImplicitBacklinks(
+    filePath: string,
+    limit = 5,
+    threshold = 0.65
+  ): Array<{ path: string; title: string; type: string; score: number }> {
+    type EmbRow = { file_path: string; vector: Buffer }
+    const rows = this.db.prepare(
+      'SELECT ke.file_path, ke.vector FROM kb_embeddings ke JOIN files f ON f.path = ke.file_path'
+    ).all() as EmbRow[]
+
+    const target = rows.find((r) => r.file_path === filePath)
+    if (!target) return []
+
+    const targetVec = JSON.parse(target.vector.toString('utf8')) as number[]
+
+    // Collect explicit wikilink neighbours (both directions) to exclude
+    const explicitPaths = new Set([
+      filePath,
+      ...this.getKbFilesLinkedFrom(filePath),
+      ...this.getKbFilesLinkingTo(filePath)
+    ])
+
+    type FileRow = { path: string; title: string; type: string }
+    const fileMeta = new Map<string, FileRow>()
+    ;(this.db.prepare('SELECT path, title, type FROM files').all() as FileRow[]).forEach((r) =>
+      fileMeta.set(r.path, r)
+    )
+
+    return rows
+      .filter((r) => !explicitPaths.has(r.file_path))
+      .map((r) => ({
+        path: r.file_path,
+        score: kbCosineSim(targetVec, JSON.parse(r.vector.toString('utf8')) as number[])
+      }))
+      .filter((r) => r.score >= threshold)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map((r) => {
+        const meta = fileMeta.get(r.path)
+        return { path: r.path, title: meta?.title ?? r.path, type: meta?.type ?? '', score: r.score }
+      })
+  }
+
+  /**
    * Build an FTS5 OR query from a natural language string.
    * Raw AND-match fails for questions like "Quelles connexions entre X et Y?" because
    * no single file contains all words.  Keeping only significant tokens (length ≥ 3,
