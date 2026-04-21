@@ -1,6 +1,6 @@
 {
   "name": "cortx",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Un second cerveau piloté par IA. Du vibe coding au vibe learning.",
   "main": "./out/main/index.js",
   "scripts": {
