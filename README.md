@@ -1,6 +1,6 @@
 
 # CortX
-<img width="400" height="350" alt="CortX_logo" src="https://github.com/user-attachments/assets/111a3923-a2d0-47ea-8e2f-50ff7c3aaa50" />
+<img width="350" height="350" alt="CortX_logo" src="https://github.com/user-attachments/assets/111a3923-a2d0-47ea-8e2f-50ff7c3aaa50" />
 
 ### From vibe coding to vibe learning.
 > A second brain powered by AI. You speak, the AI organizes. You search, the AI connects. You forget, the AI remembers.
