@@ -122,6 +122,7 @@ export interface T {
     agentRetry: string
     agentLinks: string
     agentError: string
+    agentUseInternet: string
   }
   chat: {
     dropToAnalyze: string
@@ -503,7 +504,8 @@ const fr: T = {
     agentCancel: 'Annuler',
     agentRetry: 'Recommencer',
     agentLinks: 'liens suggérés',
-    agentError: "L'agent n'a rien proposé. Essaie un prompt plus précis."
+    agentError: "L'agent n'a rien proposé. Essaie un prompt plus précis.",
+    agentUseInternet: 'Recherche internet'
   },
   chat: {
     dropToAnalyze: 'Déposer pour analyser et intégrer',
@@ -884,7 +886,8 @@ const en: T = {
     agentCancel: 'Cancel',
     agentRetry: 'Retry',
     agentLinks: 'suggested links',
-    agentError: 'The agent found nothing. Try a more specific prompt.'
+    agentError: 'The agent found nothing. Try a more specific prompt.',
+    agentUseInternet: 'Internet search'
   },
   chat: {
     dropToAnalyze: 'Drop to analyze and integrate',

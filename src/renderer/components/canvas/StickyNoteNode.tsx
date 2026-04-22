@@ -1,6 +1,6 @@
 import { memo, useState, useRef, useEffect } from 'react'
 import { Handle, NodeResizer, Position, useReactFlow, type NodeProps } from '@xyflow/react'
-import { Palette, X } from 'lucide-react'
+import { Palette, X, BookPlus, Loader2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useCanvasStore } from '../../stores/canvasStore'
@@ -36,10 +36,30 @@ function StickyNoteNodeBase({ id, data, selected, width, height }: NodeProps): R
   const [editing,    setEditing]    = useState(false)
   const [draft,      setDraft]      = useState(d.text || '')
   const [showPicker, setShowPicker] = useState(false)
+  const [converting, setConverting] = useState(false)
 
-  const markDirty = useCanvasStore((s) => s.markDirty)
+  const markDirty  = useCanvasStore((s) => s.markDirty)
+  const updateNode = useCanvasStore((s) => s.updateNode)
   const { updateNodeData, deleteElements } = useReactFlow()
   const taRef = useRef<HTMLTextAreaElement>(null)
+
+  /** Create a KB file from this note, then replace the note with an entity tile */
+  const convertToKB = async (): Promise<void> => {
+    const title = (d.text || '').split('\n')[0].slice(0, 80).trim()
+    if (!title) return
+    setConverting(true)
+    try {
+      const result = await window.cortx.files.create('note', title)
+      if (result?.path) {
+        updateNode(id, { kind: 'entity', data: { filePath: result.path, title, entityType: 'note' } })
+        markDirty()
+      }
+    } catch (err) {
+      console.error('[StickyNoteNode] convertToKB failed:', err)
+    } finally {
+      setConverting(false)
+    }
+  }
 
   const explicitW = width  && width  > 0 ? width  : undefined
   const explicitH = height && height > 0 ? height : undefined
@@ -106,6 +126,17 @@ function StickyNoteNodeBase({ id, data, selected, width, height }: NodeProps): R
         >
           <Palette size={10} />
         </button>
+        {selected && (
+          <button
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); void convertToKB() }}
+            disabled={converting}
+            className="p-1 rounded-full bg-teal-500/20 hover:bg-teal-500/50 text-teal-300 hover:text-teal-100 transition-colors cursor-pointer disabled:opacity-50"
+            title="Créer dans la KB"
+          >
+            {converting ? <Loader2 size={10} className="animate-spin" /> : <BookPlus size={10} />}
+          </button>
+        )}
         {selected && (
           <button
             onMouseDown={(e) => e.stopPropagation()}

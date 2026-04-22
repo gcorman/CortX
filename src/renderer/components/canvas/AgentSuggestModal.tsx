@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Sparkles, X, Loader2, Check, RotateCcw } from 'lucide-react'
+import { Sparkles, X, Loader2, Check, RotateCcw, Globe } from 'lucide-react'
 import type { AgentCanvasSuggestion, CanvasNode } from '../../../shared/types'
 import { useCanvasStore } from '../../stores/canvasStore'
 import { colorForType, STICKY_COLORS } from './nodeColors'
@@ -12,9 +12,10 @@ interface Props {
 
 export function AgentSuggestModal({ onClose, onApplied }: Props): React.JSX.Element {
   const [prompt, setPrompt] = useState('')
+  const [useInternet, setUseInternet] = useState(false)
   const [suggestion, setSuggestion] = useState<AgentCanvasSuggestion | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const agentBusy   = useCanvasStore((s) => s.agentBusy)
+  const agentBusy    = useCanvasStore((s) => s.agentBusy)
   const agentSuggest = useCanvasStore((s) => s.agentSuggest)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const t = useT()
@@ -31,9 +32,9 @@ export function AgentSuggestModal({ onClose, onApplied }: Props): React.JSX.Elem
     if (!prompt.trim()) return
     setError(null)
     setSuggestion(null)
-    const result = await agentSuggest(prompt.trim())
+    const result = await agentSuggest(prompt.trim(), useInternet)
     if (!result || (result.nodes.length === 0 && result.edges.length === 0)) {
-      setError(t.canvas.agentError)
+      setError(result?._debug ? `${t.canvas.agentError}\n\nDEBUG: ${result._debug}` : t.canvas.agentError)
       return
     }
     setSuggestion(result)
@@ -92,6 +93,22 @@ export function AgentSuggestModal({ onClose, onApplied }: Props): React.JSX.Elem
             />
           </div>
 
+          {/* Internet toggle */}
+          <button
+            onClick={() => setUseInternet((v) => !v)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer border ${
+              useInternet
+                ? 'border-blue-500/50 bg-blue-500/10 text-blue-400'
+                : 'border-white/10 bg-white/5 text-cortx-text-secondary hover:text-cortx-text-primary'
+            }`}
+          >
+            <Globe size={12} className={useInternet ? 'text-blue-400' : ''} />
+            {t.canvas.agentUseInternet ?? 'Recherche internet'}
+            <span className={`ml-1 w-7 h-4 rounded-full transition-colors flex items-center px-0.5 ${useInternet ? 'bg-blue-500' : 'bg-white/20'}`}>
+              <span className={`w-3 h-3 rounded-full bg-white transition-transform ${useInternet ? 'translate-x-3' : 'translate-x-0'}`} />
+            </span>
+          </button>
+
           {/* Run button */}
           {!suggestion && (
             <button
@@ -115,7 +132,7 @@ export function AgentSuggestModal({ onClose, onApplied }: Props): React.JSX.Elem
           )}
 
           {error && (
-            <div className="text-xs text-cortx-error bg-cortx-error/10 border border-cortx-error/30 rounded-lg px-3 py-2">
+            <div className="text-xs text-cortx-error bg-cortx-error/10 border border-cortx-error/30 rounded-lg px-3 py-2 whitespace-pre-wrap font-mono leading-relaxed">
               {error}
             </div>
           )}

@@ -85,8 +85,8 @@ const api: CortxAPI = {
     create: (name: string) => ipcRenderer.invoke('canvas:create', name),
     delete: (id: string) => ipcRenderer.invoke('canvas:delete', id),
     rename: (id: string, newName: string) => ipcRenderer.invoke('canvas:rename', id, newName),
-    agentSuggest: (canvasId: string, prompt: string) =>
-      ipcRenderer.invoke('canvas:agentSuggest', canvasId, prompt)
+    agentSuggest: (canvasId: string, prompt: string, useInternet?: boolean) =>
+      ipcRenderer.invoke('canvas:agentSuggest', canvasId, prompt, useInternet ?? false)
   },
   idle: {
     start: () => ipcRenderer.invoke('idle:start'),

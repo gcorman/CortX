@@ -367,6 +367,8 @@ export interface AgentCanvasSuggestion {
   edges: CanvasEdge[]
   /** Short text shown to user explaining the suggestion */
   summary: string
+  /** Diagnostic info shown when nodes is empty — helps debug without DevTools */
+  _debug?: string
 }
 
 // --- IPC API surface ---
@@ -388,7 +390,7 @@ export interface CortxAPI {
     create(name: string): Promise<CanvasConfig>
     delete(id: string): Promise<void>
     rename(id: string, newName: string): Promise<void>
-    agentSuggest(canvasId: string, prompt: string): Promise<AgentCanvasSuggestion>
+    agentSuggest(canvasId: string, prompt: string, useInternet?: boolean): Promise<AgentCanvasSuggestion>
   }
   files: {
     read(path: string): Promise<FileContent>

@@ -35,7 +35,7 @@ interface CanvasState {
   removeEdge: (id: string) => void
 
   markDirty: () => void
-  agentSuggest: (prompt: string) => Promise<AgentCanvasSuggestion | null>
+  agentSuggest: (prompt: string, useInternet?: boolean) => Promise<AgentCanvasSuggestion | null>
   closeActive: () => void
 }
 
@@ -170,12 +170,12 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({ active: { ...active, edges }, isDirty: true })
   },
 
-  agentSuggest: async (prompt) => {
+  agentSuggest: async (prompt, useInternet = false) => {
     const { active } = get()
     if (!active) return null
     set({ agentBusy: true })
     try {
-      const result = await window.cortx.canvas.agentSuggest(active.id, prompt)
+      const result = await window.cortx.canvas.agentSuggest(active.id, prompt, useInternet)
       set({ agentBusy: false })
       return result
     } catch {

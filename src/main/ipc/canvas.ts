@@ -11,7 +11,7 @@ export function registerCanvasHandlers(getService: () => CanvasService): void {
   ipcMain.handle('canvas:rename', (_e, id: string, newName: string) =>
     getService().rename(id, newName)
   )
-  ipcMain.handle('canvas:agentSuggest', (_e, canvasId: string, prompt: string) =>
-    getService().agentSuggest(canvasId, prompt)
+  ipcMain.handle('canvas:agentSuggest', (_e, canvasId: string, prompt: string, useInternet = false) =>
+    getService().agentSuggest(canvasId, prompt, useInternet)
   )
 }
