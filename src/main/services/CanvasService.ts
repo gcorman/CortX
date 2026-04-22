@@ -397,43 +397,73 @@ JSON UNIQUEMENT:`
     }
 
     // ── Strategy C: loose Gemini-reasoning format ──────────────────────────
-    // Matches: `*Note 1 (Context - Teal):* "text"` and `[26] DGA (desc)` anywhere in text.
+    // Sub-patterns handled:
+    //   C1: `*Node N (Entity):* [kbIdx] Name`      — explicit numbered entity
+    //   C2: `*Node N (Note - Color):* "text"`       — explicit numbered note
+    //   C3: `*Note N (Context - Color):* "text"`    — standalone note (earlier format)
+    //   C4: `[N] Name (desc)` inline fallback       — deduped by KB idx
     if (rawNodes.length === 0) {
-      let nodePos = 0
       const validColors = ['teal', 'orange', 'purple', 'blue', 'pink', 'neutral'] as const
       const colorMap: Record<string, typeof validColors[number]> = {
         teal: 'teal', orange: 'orange', purple: 'purple', blue: 'blue', pink: 'pink', neutral: 'neutral',
         rose: 'pink', rouge: 'orange', bleu: 'blue', violet: 'purple', vert: 'teal', jaune: 'orange'
       }
-
-      // Notes — `*Note 1 (Context - Teal):* Market share. "text"` or `Note 1 (Teal): text`
-      const noteRxLoose = /\*?\s*Note\s+(\d+)\s*\(([^)]*?(teal|orange|purple|blue|pink|neutral|rose|rouge|bleu|violet|vert|jaune)[^)]*)\)\s*:\s*\*?([^\n]{5,400})/gi
       const seenNoteNum = new Set<number>()
+      const seenKbIdx = new Set<number>()
+
+      // C1: `*Node 1 (Entity):* [43] DARPA (description)`
+      const entityNodeRx = /\*?\s*Node\s+(\d+)\s*\(Entity[^)]*\)\s*:\s*\*?\s*\[(\d+)\]\s+([A-Za-zÀ-ÿ][^(\n,\[]{1,60}?)(?=\s*[(.:\n,\[]|$)/gi
+      while ((m = entityNodeRx.exec(raw)) !== null) {
+        const kbIdx = parseInt(m[2], 10)
+        if (seenKbIdx.has(kbIdx)) continue
+        seenKbIdx.add(kbIdx)
+        rawNodes.push({
+          kind: 'entity', idx: kbIdx,
+          _nodePos: parseInt(m[1], 10) - 1,
+          _name: m[3].trim().replace(/[\s.,]+$/, '')
+        })
+      }
+
+      // C2: `*Node 4 (Note - Teal):* "USA: 70% of notable AI models..."`
+      const noteNodeRx = /\*?\s*Node\s+(\d+)\s*\(Note[^)]*?(teal|orange|purple|blue|pink|neutral|rose|rouge|bleu|violet)[^)]*\)\s*:\s*\*?\s*([^\n]{5,400})/gi
+      while ((m = noteNodeRx.exec(raw)) !== null) {
+        const noteNum = parseInt(m[1], 10)
+        if (seenNoteNum.has(noteNum)) continue
+        seenNoteNum.add(noteNum)
+        const color = colorMap[m[2].toLowerCase()] ?? 'neutral'
+        const line = m[3].trim()
+        const quoted = line.match(/"([^"]{8,300})"/)
+        const text = (quoted?.[1] ?? line).replace(/\s*\(Source[^)]*\)\s*$/i, '').trim().slice(0, 300)
+        if (text.length >= 6) {
+          rawNodes.push({ kind: 'note', text, color, _nodePos: noteNum - 1, _name: text.slice(0, 40) })
+        }
+      }
+
+      // C3: `*Note 1 (Context - Teal):* "text"` — standalone note (earlier Gemini format)
+      const noteRxLoose = /\*?\s*Note\s+(\d+)\s*\(([^)]*?(teal|orange|purple|blue|pink|neutral|rose|rouge|bleu|violet|vert|jaune)[^)]*)\)\s*:\s*\*?([^\n]{5,400})/gi
       while ((m = noteRxLoose.exec(raw)) !== null) {
         const noteNum = parseInt(m[1], 10)
         if (seenNoteNum.has(noteNum)) continue
         seenNoteNum.add(noteNum)
         const color = colorMap[m[3].toLowerCase()] ?? 'neutral'
-        // Prefer quoted text if present in the line
         const line = m[4].trim()
         const quoted = line.match(/"([^"]{8,300})"/)
         const text = (quoted?.[1] ?? line).replace(/\s*\(Source[^)]*\)\s*$/i, '').trim().slice(0, 300)
         if (text.length >= 6) {
-          rawNodes.push({ kind: 'note', text, color, _nodePos: nodePos++, _name: text.slice(0, 40) })
+          rawNodes.push({ kind: 'note', text, color, _nodePos: noteNum + 100, _name: text.slice(0, 40) })
         }
       }
 
-      // Entities — `[N] Name (desc)` or `[N] Name,` — dedupe by KB idx
-      // Also accepts `[N] "Name"` with quotes
-      const seenKbIdx = new Set<number>()
+      // C4: `[N] Name (desc)` or `[N] "Name"` — inline entity fallback, deduped
       const entityRxLoose = /\[(\d+)\]\s+(?:"([^"]+)"|([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9\s\-'&.]{1,50}?))(?=\s*[,.(:\n\[]|$)/g
+      let c4Pos = 500
       while ((m = entityRxLoose.exec(raw)) !== null) {
         const kbIdx = parseInt(m[1], 10)
         if (seenKbIdx.has(kbIdx)) continue
         seenKbIdx.add(kbIdx)
         const name = (m[2] ?? m[3] ?? '').trim().replace(/[\s.,]+$/, '')
         if (name.length < 2) continue
-        rawNodes.push({ kind: 'entity', idx: kbIdx, _nodePos: nodePos++, _name: name })
+        rawNodes.push({ kind: 'entity', idx: kbIdx, _nodePos: c4Pos++, _name: name })
       }
     }
 
@@ -663,6 +693,16 @@ JSON UNIQUEMENT:`
         return { id: randomId('e'), source, target, label: e.label ? String(e.label).slice(0, 40) : undefined, kind: 'freeform' as const }
       })
       .filter((e): e is CanvasEdge => e !== null)
+
+    // Auto-synthesize hub-and-spoke edges when model omitted them.
+    // Without edges the layout degrades to a single vertical column — always worse than radial.
+    if (edges.length === 0 && nodes.length >= 3) {
+      const hub = nodes[0]  // first proposed node = most important per model ordering
+      for (let i = 1; i < nodes.length; i++) {
+        edges.push({ id: randomId('e'), source: hub.id, target: nodes[i].id, kind: 'freeform' as const })
+      }
+      console.log(`[CanvasService] auto-synthesized ${edges.length} edges from hub node[0]`)
+    }
 
     // Layout: radial for hub-and-spoke, hierarchical otherwise
     if (nodes.every((n) => n.position.x === 0 && n.position.y === 0)) {
