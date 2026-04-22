@@ -1,6 +1,6 @@
 
 # CortX
-<img width="300" height="400" alt="CortX_logo" src="https://github.com/user-attachments/assets/111a3923-a2d0-47ea-8e2f-50ff7c3aaa50" />
+<img width="400" height="350" alt="CortX_logo" src="https://github.com/user-attachments/assets/111a3923-a2d0-47ea-8e2f-50ff7c3aaa50" />
 
 ### From vibe coding to vibe learning.
 > A second brain powered by AI. You speak, the AI organizes. You search, the AI connects. You forget, the AI remembers.
@@ -9,7 +9,7 @@ CortX is a desktop application that applies the **Claude Code** paradigm to pers
 
 Everything runs **locally** with an open-source model (Ollama, llama.cpp, LM Studio), or via an **API** (Claude, OpenAI) for more power. Your data stays on your machine.
 
-![CortX main UI — chat, knowledge graph and agent activity in a single resizable window](docs/screenshots/01-main-ui.svg)
+![CortX main UI — chat, knowledge graph and agent activity in a single resizable window](docs/screenshots/01-main-ui.png)
 
 ---
 ## Features
