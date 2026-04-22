@@ -1,0 +1,156 @@
+/* CortX landing — custom styles layered on top of Tailwind CDN */
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-feature-settings: "ss01", "cv01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Aurora gradient blobs behind hero */
+.aurora {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  opacity: 0.35;
+  mix-blend-mode: screen;
+  animation: drift 22s ease-in-out infinite;
+}
+.aurora-1 {
+  width: 520px; height: 520px;
+  background: radial-gradient(circle, #14b8a6 0%, transparent 65%);
+  top: -120px; left: 8%;
+}
+.aurora-2 {
+  width: 640px; height: 640px;
+  background: radial-gradient(circle, #0d9488 0%, transparent 65%);
+  top: 10%; right: -160px;
+  animation-delay: -8s;
+}
+.aurora-3 {
+  width: 480px; height: 480px;
+  background: radial-gradient(circle, #2dd4bf 0%, transparent 65%);
+  top: 40%; left: 40%;
+  animation-delay: -14s;
+  opacity: 0.22;
+}
+@keyframes drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(40px, -30px) scale(1.08); }
+  66%      { transform: translate(-30px, 20px) scale(0.96); }
+}
+
+/* Subtle grid over the bg */
+.grid-bg {
+  background-image:
+    linear-gradient(to right, #334155 1px, transparent 1px),
+    linear-gradient(to bottom, #334155 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at center, black 40%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse at center, black 40%, transparent 75%);
+}
+
+/* Fade-up on load */
+.fade-up {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: fadeUp 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.fade-up-delay-1 { animation-delay: 0.1s; }
+.fade-up-delay-2 { animation-delay: 0.25s; }
+.fade-up-delay-3 { animation-delay: 0.4s; }
+.fade-up-delay-4 { animation-delay: 0.55s; }
+@keyframes fadeUp {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Feature cards */
+.feature-card {
+  position: relative;
+  padding: 1.75rem;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.4) 100%);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  backdrop-filter: blur(8px);
+  transition: border-color 0.25s ease, transform 0.25s ease, background 0.25s ease;
+  overflow: hidden;
+}
+.feature-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, transparent 0%, rgba(20, 184, 166, 0.4) 50%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.feature-card:hover {
+  border-color: rgba(20, 184, 166, 0.4);
+  transform: translateY(-2px);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.5) 100%);
+}
+.feature-card:hover::before { opacity: 1; }
+
+.feature-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(20, 184, 166, 0.1);
+  color: #2dd4bf;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(20, 184, 166, 0.2);
+}
+.feature-icon svg { width: 22px; height: 22px; }
+
+.feature-title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.01em;
+}
+.feature-desc {
+  color: #94a3b8;
+  font-size: 0.925rem;
+  line-height: 1.55;
+}
+
+.tag-inline {
+  background: rgba(20, 184, 166, 0.12);
+  color: #5eead4;
+  padding: 0.08rem 0.4rem;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82em;
+  border: 1px solid rgba(20, 184, 166, 0.2);
+}
+
+/* Mode cards (local / api) */
+.mode-card {
+  padding: 2rem;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.5), rgba(15, 23, 42, 0.4));
+  border: 1px solid rgba(51, 65, 85, 0.6);
+  transition: border-color 0.3s ease, transform 0.3s ease;
+}
+.mode-card:hover {
+  border-color: rgba(20, 184, 166, 0.35);
+  transform: translateY(-2px);
+}
+
+/* Prevent horizontal overflow from background blobs */
+body { overflow-x: hidden; }
+
+/* Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  .aurora, .fade-up { animation: none; }
+  .fade-up { opacity: 1; transform: none; }
+  * { transition: none !important; }
+}

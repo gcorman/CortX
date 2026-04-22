@@ -6,6 +6,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["vite", "--port", "5173"],
       "port": 5173
+    },
+    {
+      "name": "cortx-landing",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "serve", "docs", "-l", "4321", "--no-clipboard"],
+      "port": 4321
     }
   ]
 }

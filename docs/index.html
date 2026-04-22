@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="CortX — An AI-powered second brain. You speak, the agent structures. Local-first, open-source, Markdown." />
+<meta name="theme-color" content="#0f172a" />
+<meta property="og:title" content="CortX — From vibe coding to vibe learning" />
+<meta property="og:description" content="An AI agent that writes and organizes your knowledge base. Local-first, Markdown, Git-versioned." />
+<meta property="og:type" content="website" />
+<title>CortX — AI-powered second brain</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          bg: '#0a0f1c',
+          surface: '#0f172a',
+          elevated: '#1e293b',
+          border: '#334155',
+          accent: { DEFAULT: '#14b8a6', dark: '#0d9488', light: '#2dd4bf' },
+        },
+        fontFamily: {
+          sans: ['Inter', 'system-ui', 'sans-serif'],
+          mono: ['JetBrains Mono', 'monospace'],
+        },
+      }
+    }
+  }
+</script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-bg text-slate-100 font-sans antialiased selection:bg-accent/30 selection:text-accent-light">
+
+<!-- Aurora background -->
+<div class="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+  <div class="aurora aurora-1"></div>
+  <div class="aurora aurora-2"></div>
+  <div class="aurora aurora-3"></div>
+  <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(20,184,166,0.08),transparent_60%)]"></div>
+  <div class="absolute inset-0 grid-bg opacity-[0.07]"></div>
+</div>
+
+<!-- Nav -->
+<nav class="fixed top-0 inset-x-0 z-50 backdrop-blur-lg bg-bg/60 border-b border-border/40">
+  <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="#" class="flex items-center gap-2.5 group">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-accent-dark flex items-center justify-center font-bold text-bg shadow-lg shadow-accent/20 group-hover:shadow-accent/40 transition-shadow">C</div>
+      <span class="font-bold text-lg tracking-tight">CortX</span>
+      <span class="text-[10px] font-mono text-slate-500 bg-elevated px-1.5 py-0.5 rounded border border-border/60 hidden sm:inline">v1.2</span>
+    </a>
+    <div class="flex items-center gap-2 sm:gap-6">
+      <a href="#features" class="text-sm text-slate-400 hover:text-white transition-colors hidden md:inline">Features</a>
+      <a href="#demo" class="text-sm text-slate-400 hover:text-white transition-colors hidden md:inline">Demo</a>
+      <a href="#install" class="text-sm text-slate-400 hover:text-white transition-colors hidden md:inline">Install</a>
+      <a href="https://github.com/gcorman/CortX" target="_blank" rel="noopener" class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-elevated hover:bg-border border border-border/60 text-sm font-medium transition-colors">
+        <svg viewBox="0 0 24 24" class="w-4 h-4 fill-current" aria-hidden="true"><path d="M12 .5C5.6.5.5 5.6.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-1.9c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.5-.3-5.2-1.3-5.2-5.7 0-1.3.4-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2.9-.3 1.9-.4 2.9-.4s2 .1 2.9.4c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.7.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.4-5.2 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.5 4.6-1.5 7.9-5.9 7.9-10.9C23.5 5.6 18.4.5 12 .5z"/></svg>
+        <span class="hidden sm:inline">GitHub</span>
+      </a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="relative pt-40 pb-24 px-6">
+  <div class="max-w-6xl mx-auto text-center">
+    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-accent/30 bg-accent/5 text-accent-light text-xs font-medium mb-8 fade-up">
+      <span class="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></span>
+      Propose-then-execute · 100% local possible · open-source
+    </div>
+    <h1 class="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.05] fade-up fade-up-delay-1">
+      You speak.<br>
+      <span class="bg-gradient-to-r from-accent-light via-accent to-accent-dark bg-clip-text text-transparent">The agent structures.</span>
+    </h1>
+    <p class="mt-8 text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed fade-up fade-up-delay-2">
+      An AI-powered second brain that writes your knowledge base for you. Drop a raw thought — CortX identifies entities, creates Markdown files, weaves wikilinks. Git commits everything automatically.
+    </p>
+    <div class="mt-10 flex flex-col sm:flex-row gap-3 justify-center fade-up fade-up-delay-3">
+      <a href="https://github.com/gcorman/CortX/releases" target="_blank" rel="noopener" class="group inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-accent hover:bg-accent-light text-bg font-semibold shadow-lg shadow-accent/25 hover:shadow-accent/40 transition-all">
+        Download for Windows
+        <svg class="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
+      </a>
+      <a href="#install" class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-elevated hover:bg-border border border-border/60 font-semibold transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        Build from source
+      </a>
+    </div>
+    <div class="mt-6 text-xs text-slate-500 fade-up fade-up-delay-3">
+      macOS &amp; Linux coming soon · free · open-source (ISC)
+    </div>
+  </div>
+
+  <!-- Hero screenshot -->
+  <div class="max-w-6xl mx-auto mt-20 fade-up fade-up-delay-4">
+    <div class="relative">
+      <div class="absolute -inset-4 bg-gradient-to-r from-accent/20 via-transparent to-accent/20 blur-3xl -z-10"></div>
+      <div class="rounded-2xl overflow-hidden border border-border/60 shadow-2xl shadow-black/50 bg-surface">
+        <img src="screenshots/01-main-ui.svg" alt="CortX main UI — chat, knowledge graph, and agent activity in a single resizable window" class="w-full h-auto block" loading="eager">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Problem / Promise -->
+<section class="py-24 px-6 border-t border-border/30">
+  <div class="max-w-5xl mx-auto">
+    <div class="grid md:grid-cols-2 gap-8 items-center">
+      <div>
+        <div class="text-xs font-mono text-accent mb-3">// THE PROBLEM</div>
+        <h2 class="text-3xl sm:text-4xl font-bold tracking-tight leading-tight">
+          Obsidian, Notion, Logseq — they all assume <span class="text-slate-400 italic">you</span> will structure your own thinking.
+        </h2>
+      </div>
+      <div class="space-y-4 text-slate-400 text-lg leading-relaxed">
+        <p>The #1 barrier to a real "second brain" isn't the tool. It's the <span class="text-white font-semibold">cognitive overhead of maintenance</span>: naming, tagging, linking, filing.</p>
+        <p class="text-accent-light font-medium">CortX brings that cost to zero. You type raw text. The agent does the rest.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features grid -->
+<section id="features" class="py-24 px-6 border-t border-border/30">
+  <div class="max-w-7xl mx-auto">
+    <div class="text-center mb-16">
+      <div class="text-xs font-mono text-accent mb-3">// FEATURES</div>
+      <h2 class="text-4xl sm:text-5xl font-bold tracking-tight">Everything a second brain should do</h2>
+      <p class="mt-4 text-slate-400 text-lg max-w-2xl mx-auto">An agent that <em>writes</em> your files — not a chatbot that just talks.</p>
+    </div>
+
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+      <article class="feature-card">
+        <div class="feature-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/></svg>
+        </div>
+        <h3 class="feature-title">Structuring Agent</h3>
+        <p class="feature-desc">Type raw text — the agent identifies entities (people, companies, concepts), creates or updates Markdown files, and adds cross-links automatically.</p>
+      </article>
+
+      <article class="feature-card">
+        <div class="feature-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="5" cy="12" r="3"/><circle cx="19" cy="5" r="3"/><circle cx="19" cy="19" r="3"/><path d="M7.5 10.5L16.5 6m-9 7l9 4.5"/></svg>
+        </div>
+        <h3 class="feature-title">Interactive Knowledge Graph</h3>
+        <p class="feature-desc">Real-time Cytoscape · cose-bilkent graph. Nodes colored by type (person, company, domain, project) with filtering, search, and double-click exploration.</p>
+      </article>
+
+      <article class="feature-card">
+        <div class="feature-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M15.75 15.75l-2.489-2.489m0 0a3.375 3.375 0 10-4.773-4.773 3.375 3.375 0 004.774 4.774zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <h3 class="feature-title">Hybrid Search (RAG)</h3>
+        <p class="feature-desc">FTS5 full-text + semantic embeddings. The agent retrieves relevant files before every response, with multi-hop expansion across wikilinks.</p>
+      </article>
+
+      <article class="feature-card">
+        <div class="feature-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+        </div>
+        <h3 class="feature-title">Document Library</h3>
+        <p class="feature-desc">Import PDF, DOCX, XLSX, PPTX. Text extracted via docling, chunked, vectorized. Auto-linked to entities via <code class="tag-inline">[[wikilinks]]</code>.</p>
+      </article>
+
+      <article class="feature-card">
+        <div class="feature-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18"/></svg>
+        </div>
+        <h3 class="feature-title">Idle Mode — Passive Insights</h3>
+        <p class="feature-desc">In the background, the agent explores your knowledge base: hidden connections, contradictions, gaps, recurring patterns. Archive any insight as a note in one click.</p>
+      </article>
+
+      <article class="feature-card">
+        <div class="feature-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/></svg>
+        </div>
+        <h3 class="feature-title">Web &amp; Wikipedia</h3>
+        <p class="feature-desc"><code class="tag-inline">/wiki</code> imports a Wikipedia article, <code class="tag-inline">/internet</code> fetches a URL or runs a DuckDuckGo search — all injected into the agent's context window.</p>
+      </article>
+
+      <article class="feature-card">
+        <div class="feature-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <h3 class="feature-title">Automatic Git Versioning</h3>
+        <p class="feature-desc">Every accepted action = a Git commit. Full history, one-click undo (<code class="tag-inline">git revert</code>), and a built-in audit log for every agent action.</p>
+      </article>
+
+      <article class="feature-card">
+        <div class="feature-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 3h18v18H3zM3 12h18M12 3v18"/></svg>
+        </div>
+        <h3 class="feature-title">Propose-then-Execute</h3>
+        <p class="feature-desc">Every action is previewable (before/after diff) and requires your explicit approval. Nothing is ever written to disk without your sign-off.</p>
+      </article>
+
+      <article class="feature-card">
+        <div class="feature-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zM3.6 9h16.8M3.6 15h16.8M11.5 3a17 17 0 000 18M12.5 3a17 17 0 010 18"/></svg>
+        </div>
+        <h3 class="feature-title">EN / FR Bilingual</h3>
+        <p class="feature-desc">Full interface in English and French. Web search and Wikipedia fetch run in the active language with automatic English fallback.</p>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- Demo -->
+<section id="demo" class="py-24 px-6 border-t border-border/30">
+  <div class="max-w-6xl mx-auto">
+    <div class="text-center mb-16">
+      <div class="text-xs font-mono text-accent mb-3">// DEMO</div>
+      <h2 class="text-4xl sm:text-5xl font-bold tracking-tight">One raw note → 3 files updated</h2>
+      <p class="mt-4 text-slate-400 text-lg max-w-2xl mx-auto">The agent understands context, decomposes entities, proposes changes. You approve.</p>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6">
+      <!-- User input -->
+      <div class="rounded-2xl bg-elevated/40 border border-border/60 p-6 backdrop-blur">
+        <div class="flex items-center gap-2 mb-4">
+          <div class="w-2 h-2 rounded-full bg-accent"></div>
+          <span class="text-xs font-mono text-slate-500 uppercase tracking-wider">Your input</span>
+        </div>
+        <p class="text-slate-200 text-lg leading-relaxed">
+          "Coffee with <span class="text-accent-light font-medium">Sarah Kim</span>. She left <span class="text-accent-light font-medium">OpenAI</span> to co-found <span class="text-accent-light font-medium">Redline</span>, an AI safety startup. Mentioned that <span class="text-accent-light font-medium">Anthropic</span>'s Constitutional AI V2 paper drops Q3 — apparently it addresses the scalable oversight problem directly."
+        </p>
+      </div>
+
+      <!-- Agent response -->
+      <div class="rounded-2xl bg-surface border border-accent/30 p-6 font-mono text-sm leading-relaxed shadow-lg shadow-accent/5">
+        <div class="flex items-center gap-2 mb-4">
+          <div class="w-2 h-2 rounded-full bg-accent animate-pulse"></div>
+          <span class="text-xs text-slate-500 uppercase tracking-wider">Agent proposal</span>
+        </div>
+        <div class="space-y-2">
+          <div class="text-slate-400">~ <span class="text-white">Network/Sarah_Kim.md</span></div>
+          <div class="pl-4 text-slate-400">  <span class="text-amber-400">✏️</span> Status: OpenAI → Redline (co-founder)</div>
+          <div class="pl-4 text-slate-400">  <span class="text-emerald-400">➕</span> Interaction: coffee 04/22/2026</div>
+          <div class="text-slate-400 mt-3">+ <span class="text-white">Companies/Redline.md</span> <span class="text-accent text-xs">[NEW]</span></div>
+          <div class="pl-4 text-slate-400">  <span class="text-emerald-400">📄</span> AI safety startup · contact Sarah Kim</div>
+          <div class="text-slate-400 mt-3">~ <span class="text-white">Domains/AI_Safety.md</span></div>
+          <div class="pl-4 text-slate-400">  <span class="text-emerald-400">➕</span> News: Constitutional AI V2 paper Q3</div>
+          <div class="pl-4 text-slate-400">  <span class="text-emerald-400">➕</span> [[Anthropic]] · scalable oversight</div>
+          <div class="flex gap-2 mt-5 not-italic">
+            <button class="px-3 py-1.5 rounded-md bg-accent text-bg font-semibold text-xs">✓ Accept</button>
+            <button class="px-3 py-1.5 rounded-md bg-elevated border border-border/60 text-slate-300 font-semibold text-xs">↩ Reject</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="mt-8 text-center text-slate-500 text-sm max-w-2xl mx-auto">
+      From a single raw note, the agent identifies <strong class="text-white">3 people, 3 companies, 1 domain</strong>, modifies <strong class="text-white">2 files</strong>, creates <strong class="text-white">1 new file</strong>, and maintains all cross-links — in under 3 seconds.
+    </p>
+  </div>
+</section>
+
+<!-- Screenshots gallery -->
+<section class="py-24 px-6 border-t border-border/30">
+  <div class="max-w-7xl mx-auto">
+    <div class="text-center mb-16">
+      <div class="text-xs font-mono text-accent mb-3">// SCREENSHOTS</div>
+      <h2 class="text-4xl sm:text-5xl font-bold tracking-tight">A closer look</h2>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6">
+      <figure class="group rounded-xl overflow-hidden border border-border/60 bg-surface hover:border-accent/40 transition-colors">
+        <img src="screenshots/02-agent-proposal.svg" alt="Agent proposal — before/after diff" class="w-full h-auto">
+        <figcaption class="p-4 text-sm text-slate-400 border-t border-border/40">
+          <span class="text-white font-semibold">Diff preview</span> — every file change is visible before you approve it.
+        </figcaption>
+      </figure>
+
+      <figure class="group rounded-xl overflow-hidden border border-border/60 bg-surface hover:border-accent/40 transition-colors">
+        <img src="screenshots/03-graph.svg" alt="Interactive knowledge graph" class="w-full h-auto">
+        <figcaption class="p-4 text-sm text-slate-400 border-t border-border/40">
+          <span class="text-white font-semibold">Knowledge graph</span> — real-time visual exploration of entity relationships.
+        </figcaption>
+      </figure>
+
+      <figure class="md:col-span-2 group rounded-xl overflow-hidden border border-border/60 bg-surface hover:border-accent/40 transition-colors">
+        <img src="screenshots/04-library-insights.svg" alt="Library and Idle Mode insights" class="w-full h-auto">
+        <figcaption class="p-4 text-sm text-slate-400 border-t border-border/40">
+          <span class="text-white font-semibold">Library &amp; Idle Mode</span> — PDF/DOCX/XLSX/PPTX imports alongside background-generated insights.
+        </figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- Local vs API -->
+<section class="py-24 px-6 border-t border-border/30">
+  <div class="max-w-6xl mx-auto">
+    <div class="text-center mb-16">
+      <div class="text-xs font-mono text-accent mb-3">// YOUR DATA, YOUR MODEL</div>
+      <h2 class="text-4xl sm:text-5xl font-bold tracking-tight">Run local or in the cloud</h2>
+      <p class="mt-4 text-slate-400 text-lg max-w-2xl mx-auto">Plug in a local LLM for full privacy, or an API key for maximum reasoning power.</p>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6">
+      <div class="mode-card">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center text-accent">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/></svg>
+          </div>
+          <h3 class="text-xl font-bold">100% Local</h3>
+        </div>
+        <p class="text-slate-400 mb-4">Ollama · llama.cpp · LM Studio. Zero data leaves your machine. No account, no subscription.</p>
+        <ul class="space-y-2 text-sm text-slate-300">
+          <li class="flex gap-2"><span class="text-accent">✓</span> Complete privacy — air-gapped capable</li>
+          <li class="flex gap-2"><span class="text-accent">✓</span> No API key required</li>
+          <li class="flex gap-2"><span class="text-accent">✓</span> Free, unlimited usage</li>
+          <li class="flex gap-2"><span class="text-accent">✓</span> Works fully offline</li>
+        </ul>
+        <div class="mt-5 pt-4 border-t border-border/40 text-xs text-slate-500 font-mono">
+          Recommended: Qwen3 14B · Gemma3 12B · Mistral Small 24B
+        </div>
+      </div>
+
+      <div class="mode-card">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center text-accent">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          </div>
+          <h3 class="text-xl font-bold">Cloud API</h3>
+        </div>
+        <p class="text-slate-400 mb-4">Claude (Anthropic) or OpenAI-compatible. Best reasoning quality for complex knowledge graphs.</p>
+        <ul class="space-y-2 text-sm text-slate-300">
+          <li class="flex gap-2"><span class="text-accent">✓</span> Claude Opus 4.7 / Sonnet 4.6</li>
+          <li class="flex gap-2"><span class="text-accent">✓</span> Real-time streaming</li>
+          <li class="flex gap-2"><span class="text-accent">✓</span> Extended reasoning on complex notes</li>
+          <li class="flex gap-2"><span class="text-accent">✓</span> Key stored locally, never uploaded</li>
+        </ul>
+        <div class="mt-5 pt-4 border-t border-border/40 text-xs text-slate-500 font-mono">
+          Compatible: Anthropic · OpenAI · any /v1/chat/completions endpoint
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Comparison -->
+<section class="py-24 px-6 border-t border-border/30">
+  <div class="max-w-5xl mx-auto">
+    <div class="text-center mb-16">
+      <div class="text-xs font-mono text-accent mb-3">// WHY NOT OBSIDIAN?</div>
+      <h2 class="text-4xl sm:text-5xl font-bold tracking-tight">How CortX is different</h2>
+    </div>
+    <div class="rounded-2xl border border-border/60 bg-surface/50 backdrop-blur overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-border/60 bg-elevated/40">
+              <th class="text-left p-4 font-semibold"></th>
+              <th class="p-4 font-medium text-slate-400">Mem.ai</th>
+              <th class="p-4 font-medium text-slate-400">Khoj</th>
+              <th class="p-4 font-medium text-slate-400">Obsidian + AI</th>
+              <th class="p-4 font-bold text-accent-light bg-accent/5">CortX</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="border-b border-border/40"><td class="p-4 text-slate-300">Agent <em>writes</em> the files</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-accent bg-accent/5">✓</td></tr>
+            <tr class="border-b border-border/40"><td class="p-4 text-slate-300">Local Markdown files</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-accent">✓</td><td class="p-4 text-center text-accent bg-accent/5">✓</td></tr>
+            <tr class="border-b border-border/40"><td class="p-4 text-slate-300">100% local LLM possible</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-accent">✓</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-accent bg-accent/5">✓</td></tr>
+            <tr class="border-b border-border/40"><td class="p-4 text-slate-300">Knowledge graph built-in</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-accent">✓ (plugin)</td><td class="p-4 text-center text-accent bg-accent/5">✓</td></tr>
+            <tr class="border-b border-border/40"><td class="p-4 text-slate-300">Propose-then-execute</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-accent bg-accent/5">✓</td></tr>
+            <tr><td class="p-4 text-slate-300">Git versioning + undo</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-accent bg-accent/5">✓</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Install -->
+<section id="install" class="py-24 px-6 border-t border-border/30">
+  <div class="max-w-5xl mx-auto">
+    <div class="text-center mb-16">
+      <div class="text-xs font-mono text-accent mb-3">// INSTALL</div>
+      <h2 class="text-4xl sm:text-5xl font-bold tracking-tight">Up in 3 commands</h2>
+      <p class="mt-4 text-slate-400 text-lg">Node.js 20+ · Git · a local or cloud LLM</p>
+    </div>
+
+    <div class="rounded-2xl border border-border/60 bg-surface overflow-hidden shadow-2xl shadow-black/40">
+      <div class="flex items-center gap-2 px-4 py-3 bg-elevated/50 border-b border-border/40">
+        <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
+        <div class="w-3 h-3 rounded-full bg-amber-500/80"></div>
+        <div class="w-3 h-3 rounded-full bg-emerald-500/80"></div>
+        <span class="ml-4 text-xs font-mono text-slate-500">terminal</span>
+      </div>
+      <pre class="p-6 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="text-slate-500"># clone</span>
+<span class="text-accent-light">git clone</span> https://github.com/gcorman/CortX.git &amp;&amp; <span class="text-accent-light">cd</span> CortX
+
+<span class="text-slate-500"># install</span>
+<span class="text-accent-light">npm install</span>
+
+<span class="text-slate-500"># run</span>
+<span class="text-accent-light">npm run dev</span>       <span class="text-slate-500"># dev mode with HMR</span>
+<span class="text-accent-light">npm run dist</span>      <span class="text-slate-500"># build Windows installer (NSIS)</span></code></pre>
+    </div>
+
+    <div class="grid sm:grid-cols-3 gap-4 mt-8">
+      <div class="p-5 rounded-xl border border-border/60 bg-surface/40">
+        <div class="text-xs font-mono text-accent mb-2">STEP 1</div>
+        <div class="font-semibold mb-1">Set base folder</div>
+        <p class="text-sm text-slate-400">Pick where Markdown files live (default: <code class="tag-inline">~/Documents/CortX-Base/</code>).</p>
+      </div>
+      <div class="p-5 rounded-xl border border-border/60 bg-surface/40">
+        <div class="text-xs font-mono text-accent mb-2">STEP 2</div>
+        <div class="font-semibold mb-1">Pick a LLM</div>
+        <p class="text-sm text-slate-400">Ollama / llama.cpp (local, no key) or Anthropic / OpenAI (API key).</p>
+      </div>
+      <div class="p-5 rounded-xl border border-border/60 bg-surface/40">
+        <div class="text-xs font-mono text-accent mb-2">STEP 3</div>
+        <div class="font-semibold mb-1">Start typing</div>
+        <p class="text-sm text-slate-400">Drop raw text. The agent proposes. You approve. Git commits.</p>
+      </div>
+    </div>
+
+    <div class="mt-6 p-4 rounded-lg bg-elevated/40 border border-border/40 text-sm text-slate-400">
+      <span class="text-slate-300 font-semibold">Note:</span> If <code class="tag-inline">better-sqlite3</code> fails to load after install, run <code class="tag-inline">npm run rebuild</code> to recompile native bindings against your Electron version.
+    </div>
+  </div>
+</section>
+
+<!-- CTA final -->
+<section class="py-24 px-6 border-t border-border/30">
+  <div class="max-w-3xl mx-auto text-center">
+    <h2 class="text-4xl sm:text-5xl font-bold tracking-tight">Ready to stop filing?</h2>
+    <p class="mt-4 text-slate-400 text-lg">You speak. The agent structures. Git versions. Everything stays on your machine.</p>
+    <div class="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+      <a href="https://github.com/gcorman/CortX" target="_blank" rel="noopener" class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-accent hover:bg-accent-light text-bg font-semibold shadow-lg shadow-accent/25 hover:shadow-accent/40 transition-all">
+        <svg viewBox="0 0 24 24" class="w-5 h-5 fill-current"><path d="M12 .5C5.6.5.5 5.6.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-1.9c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.5-.3-5.2-1.3-5.2-5.7 0-1.3.4-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2.9-.3 1.9-.4 2.9-.4s2 .1 2.9.4c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.7.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.4-5.2 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.5 4.6-1.5 7.9-5.9 7.9-10.9C23.5 5.6 18.4.5 12 .5z"/></svg>
+        View on GitHub
+      </a>
+      <a href="https://github.com/gcorman/CortX/issues" target="_blank" rel="noopener" class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-elevated hover:bg-border border border-border/60 font-semibold transition-colors">
+        Report a bug
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="py-12 px-6 border-t border-border/30">
+  <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
+    <div class="flex items-center gap-3">
+      <div class="w-6 h-6 rounded-md bg-gradient-to-br from-accent to-accent-dark flex items-center justify-center font-bold text-bg text-xs">C</div>
+      <span>CortX · <em>From vibe coding to vibe learning.</em></span>
+    </div>
+    <div class="flex items-center gap-5">
+      <a href="https://github.com/gcorman/CortX" target="_blank" rel="noopener" class="hover:text-white transition-colors">GitHub</a>
+      <a href="https://github.com/gcorman/CortX/blob/main/README.md" target="_blank" rel="noopener" class="hover:text-white transition-colors">README</a>
+      <a href="https://github.com/gcorman/CortX/issues" target="_blank" rel="noopener" class="hover:text-white transition-colors">Issues</a>
+      <span class="text-slate-600">ISC</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+      const id = a.getAttribute('href');
+      if (id.length > 1) {
+        const el = document.querySelector(id);
+        if (el) { e.preventDefault(); el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      }
+    });
+  });
+</script>
+</body>
+</html>
