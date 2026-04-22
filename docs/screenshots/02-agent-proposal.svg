@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" font-family="Inter, system-ui, sans-serif">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <pattern id="grid2" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.3"/>
+    </pattern>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg2)"/>
+  <rect width="1600" height="900" fill="url(#grid2)"/>
+  <rect x="200" y="80" width="1200" height="740" fill="#1e293b" stroke="#334155" stroke-width="2" rx="12"/>
+  <text x="240" y="130" fill="#14b8a6" font-size="14" font-weight="600">PROPOSAL · awaiting validation</text>
+  <text x="240" y="170" fill="#e2e8f0" font-size="18" font-weight="600">Reseau/Sophie_Martin.md</text>
+  <text x="240" y="195" fill="#94a3b8" font-size="13">update · position + interaction</text>
+  <rect x="240" y="220" width="550" height="380" fill="#0f172a" stroke="#334155" rx="8"/>
+  <text x="260" y="245" fill="#64748b" font-size="11" font-weight="600">BEFORE</text>
+  <rect x="260" y="270" width="510" height="18" fill="#1e293b" rx="3"/>
+  <rect x="260" y="295" width="420" height="18" fill="#1e293b" rx="3"/>
+  <rect x="260" y="320" width="480" height="18" fill="#7f1d1d" opacity="0.5" rx="3"/>
+  <text x="270" y="334" fill="#fca5a5" font-size="11" font-family="monospace">- position: Thales</text>
+  <rect x="260" y="345" width="380" height="18" fill="#1e293b" rx="3"/>
+  <rect x="260" y="370" width="460" height="18" fill="#1e293b" rx="3"/>
+  <rect x="810" y="220" width="550" height="380" fill="#0f172a" stroke="#334155" rx="8"/>
+  <text x="830" y="245" fill="#64748b" font-size="11" font-weight="600">AFTER</text>
+  <rect x="830" y="270" width="510" height="18" fill="#1e293b" rx="3"/>
+  <rect x="830" y="295" width="420" height="18" fill="#1e293b" rx="3"/>
+  <rect x="830" y="320" width="480" height="18" fill="#14532d" opacity="0.5" rx="3"/>
+  <text x="840" y="334" fill="#86efac" font-size="11" font-family="monospace">+ position: Dassault Aviation</text>
+  <rect x="830" y="345" width="380" height="18" fill="#1e293b" rx="3"/>
+  <rect x="830" y="370" width="460" height="18" fill="#1e293b" rx="3"/>
+  <rect x="830" y="405" width="500" height="18" fill="#14532d" opacity="0.5" rx="3"/>
+  <text x="840" y="419" fill="#86efac" font-size="11" font-family="monospace">+ interaction: lunch 06/04/2026</text>
+  <rect x="830" y="430" width="420" height="18" fill="#14532d" opacity="0.5" rx="3"/>
+  <text x="840" y="444" fill="#86efac" font-size="11" font-family="monospace">+ [[Dassault Aviation]]</text>
+  <text x="240" y="660" fill="#94a3b8" font-size="13">+ Entreprises/Dassault_Aviation.md  [NEW]</text>
+  <text x="240" y="685" fill="#94a3b8" font-size="13">~ Domaines/Aerospatial.md · news block</text>
+  <rect x="1020" y="720" width="160" height="48" fill="#334155" rx="8"/>
+  <text x="1100" y="750" fill="#e2e8f0" font-size="14" text-anchor="middle">↩ Reject</text>
+  <rect x="1200" y="720" width="160" height="48" fill="#0d9488" rx="8"/>
+  <text x="1280" y="750" fill="#ffffff" font-size="14" font-weight="600" text-anchor="middle">✓ Approve</text>
+  <text x="800" y="420" fill="#475569" font-size="28" font-weight="700" text-anchor="middle" opacity="0.25">[ Screenshot · Proposal diff ]</text>
+</svg>

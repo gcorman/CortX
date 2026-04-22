@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" font-family="Inter, system-ui, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.3"/>
+    </pattern>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0d9488"/>
+      <stop offset="100%" stop-color="#14b8a6"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <rect width="1600" height="900" fill="url(#grid)"/>
+  <rect x="0" y="0" width="1600" height="48" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+  <circle cx="24" cy="24" r="6" fill="#ef4444"/>
+  <circle cx="48" cy="24" r="6" fill="#f59e0b"/>
+  <circle cx="72" cy="24" r="6" fill="#22c55e"/>
+  <text x="800" y="30" fill="#94a3b8" font-size="13" text-anchor="middle">CortX — Second Brain</text>
+  <rect x="40" y="88" width="420" height="772" fill="#1e293b" stroke="#334155" rx="12"/>
+  <text x="60" y="120" fill="#14b8a6" font-size="13" font-weight="600">CHAT</text>
+  <rect x="60" y="140" width="380" height="70" fill="#0f172a" rx="8"/>
+  <rect x="60" y="225" width="380" height="110" fill="#0f172a" rx="8"/>
+  <rect x="60" y="350" width="380" height="90" fill="#0f172a" rx="8"/>
+  <rect x="60" y="780" width="380" height="60" fill="#0f172a" stroke="url(#accent)" stroke-width="1" rx="8"/>
+  <text x="75" y="815" fill="#64748b" font-size="13">Type your thought…</text>
+  <rect x="480" y="88" width="640" height="772" fill="#1e293b" stroke="#334155" rx="12"/>
+  <text x="500" y="120" fill="#14b8a6" font-size="13" font-weight="600">KNOWLEDGE GRAPH</text>
+  <circle cx="800" cy="450" r="28" fill="#14b8a6"/>
+  <circle cx="680" cy="340" r="22" fill="#f59e0b"/>
+  <circle cx="920" cy="340" r="22" fill="#3b82f6"/>
+  <circle cx="680" cy="560" r="22" fill="#a855f7"/>
+  <circle cx="920" cy="560" r="22" fill="#ef4444"/>
+  <circle cx="560" cy="450" r="18" fill="#64748b"/>
+  <circle cx="1040" cy="450" r="18" fill="#64748b"/>
+  <line x1="800" y1="450" x2="680" y2="340" stroke="#475569" stroke-width="2"/>
+  <line x1="800" y1="450" x2="920" y2="340" stroke="#475569" stroke-width="2"/>
+  <line x1="800" y1="450" x2="680" y2="560" stroke="#475569" stroke-width="2"/>
+  <line x1="800" y1="450" x2="920" y2="560" stroke="#475569" stroke-width="2"/>
+  <line x1="800" y1="450" x2="560" y2="450" stroke="#475569" stroke-width="2"/>
+  <line x1="800" y1="450" x2="1040" y2="450" stroke="#475569" stroke-width="2"/>
+  <line x1="680" y1="340" x2="560" y2="450" stroke="#334155" stroke-width="1.5"/>
+  <line x1="920" y1="340" x2="1040" y2="450" stroke="#334155" stroke-width="1.5"/>
+  <rect x="1140" y="88" width="420" height="772" fill="#1e293b" stroke="#334155" rx="12"/>
+  <text x="1160" y="120" fill="#14b8a6" font-size="13" font-weight="600">AGENT ACTIVITY</text>
+  <rect x="1160" y="140" width="380" height="100" fill="#0f172a" rx="8"/>
+  <rect x="1160" y="255" width="380" height="100" fill="#0f172a" rx="8"/>
+  <rect x="1160" y="370" width="380" height="100" fill="#0f172a" rx="8"/>
+  <rect x="0" y="875" width="1600" height="25" fill="#0f172a"/>
+  <text x="800" y="500" fill="#475569" font-size="32" font-weight="700" text-anchor="middle" opacity="0.3">[ Screenshot · Main UI ]</text>
+  <text x="800" y="540" fill="#475569" font-size="16" text-anchor="middle" opacity="0.3">Chat · Graph · Activity panels</text>
+</svg>

@@ -9,6 +9,8 @@ CortX is a desktop application that applies the **Claude Code** paradigm to pers
 
 Everything runs **locally** with an open-source model (Ollama, llama.cpp, LM Studio), or via an **API** (Claude, OpenAI) for more power. Your data stays on your machine.
 
+![CortX main UI — chat, knowledge graph and agent activity in a single resizable window](docs/screenshots/01-main-ui.svg)
+
 ---
 ## Features
 
@@ -23,8 +25,12 @@ The agent doesn’t just answer — it **writes and modifies** the files in your
 
 Every action proposed by the agent is previewable (diff before/after) and requires your explicit approval. Nothing is written without your consent.
 
+![Proposal view — before/after diff of each file the agent wants to touch, with Approve/Reject](docs/screenshots/02-agent-proposal.svg)
+
 ### Interactive Knowledge Graph
 Real-time visualization of relationships between all entities in the base. Nodes are colored by type (person, company, domain, project), with filtering, search, and exploration via double-click.
+
+![Interactive knowledge graph rendered with Cytoscape · cose-bilkent layout](docs/screenshots/03-graph.svg)
 
 ### Hybrid Search (RAG)
 Search combining full-text indexing (FTS5) and semantic search via embeddings. The agent retrieves relevant files before every response.
@@ -44,6 +50,8 @@ Every accepted action = a Git commit. Full history, one-click undo (`git revert`
 
 ### Idle Mode — Passive Insights
 In the background, the agent explores the base and generates insights: hidden connections, contradictions, gaps, and patterns.
+
+![Library pane with imported PDF/DOCX/XLSX/PPTX and Idle Mode insights panel](docs/screenshots/04-library-insights.svg)
 
 ### Bilingual Interface
 Full interface available in French and English.

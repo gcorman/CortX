@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" font-family="Inter, system-ui, sans-serif">
+  <defs>
+    <radialGradient id="bg3" cx="0.5" cy="0.5" r="0.8">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </radialGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg3)"/>
+  <rect x="40" y="40" width="1520" height="820" fill="#0f172a" stroke="#334155" stroke-width="1" rx="12" opacity="0.6"/>
+  <g stroke="#334155" stroke-width="1.5" opacity="0.6">
+    <line x1="800" y1="450" x2="500" y2="280"/>
+    <line x1="800" y1="450" x2="1100" y2="280"/>
+    <line x1="800" y1="450" x2="500" y2="620"/>
+    <line x1="800" y1="450" x2="1100" y2="620"/>
+    <line x1="800" y1="450" x2="350" y2="450"/>
+    <line x1="800" y1="450" x2="1250" y2="450"/>
+    <line x1="500" y1="280" x2="350" y2="450"/>
+    <line x1="500" y1="280" x2="1100" y2="280"/>
+    <line x1="1100" y1="280" x2="1250" y2="450"/>
+    <line x1="1100" y1="620" x2="1250" y2="450"/>
+    <line x1="500" y1="620" x2="350" y2="450"/>
+    <line x1="350" y1="450" x2="220" y2="350"/>
+    <line x1="350" y1="450" x2="220" y2="550"/>
+    <line x1="1250" y1="450" x2="1380" y2="350"/>
+    <line x1="1250" y1="450" x2="1380" y2="550"/>
+    <line x1="500" y1="280" x2="350" y2="180"/>
+    <line x1="1100" y1="280" x2="1250" y2="180"/>
+    <line x1="500" y1="620" x2="350" y2="720"/>
+    <line x1="1100" y1="620" x2="1250" y2="720"/>
+  </g>
+  <g filter="url(#glow)">
+    <circle cx="800" cy="450" r="36" fill="#14b8a6"/>
+    <circle cx="500" cy="280" r="26" fill="#f59e0b"/>
+    <circle cx="1100" cy="280" r="26" fill="#3b82f6"/>
+    <circle cx="500" cy="620" r="26" fill="#a855f7"/>
+    <circle cx="1100" cy="620" r="26" fill="#ef4444"/>
+    <circle cx="350" cy="450" r="20" fill="#64748b"/>
+    <circle cx="1250" cy="450" r="20" fill="#64748b"/>
+    <circle cx="220" cy="350" r="14" fill="#f59e0b"/>
+    <circle cx="220" cy="550" r="14" fill="#a855f7"/>
+    <circle cx="1380" cy="350" r="14" fill="#3b82f6"/>
+    <circle cx="1380" cy="550" r="14" fill="#ef4444"/>
+    <circle cx="350" cy="180" r="14" fill="#14b8a6"/>
+    <circle cx="1250" cy="180" r="14" fill="#14b8a6"/>
+    <circle cx="350" cy="720" r="14" fill="#14b8a6"/>
+    <circle cx="1250" cy="720" r="14" fill="#14b8a6"/>
+  </g>
+  <text x="800" y="455" fill="#0f172a" font-size="11" font-weight="700" text-anchor="middle">Projet</text>
+  <text x="500" y="285" fill="#0f172a" font-size="10" font-weight="700" text-anchor="middle">Pers.</text>
+  <text x="1100" y="285" fill="#0f172a" font-size="10" font-weight="700" text-anchor="middle">Entr.</text>
+  <text x="500" y="625" fill="#0f172a" font-size="10" font-weight="700" text-anchor="middle">Dom.</text>
+  <text x="1100" y="625" fill="#0f172a" font-size="10" font-weight="700" text-anchor="middle">Doc.</text>
+  <rect x="60" y="60" width="220" height="180" fill="#1e293b" stroke="#334155" rx="8" opacity="0.9"/>
+  <text x="80" y="85" fill="#14b8a6" font-size="11" font-weight="600">FILTERS</text>
+  <circle cx="90" cy="110" r="5" fill="#f59e0b"/><text x="105" y="114" fill="#94a3b8" font-size="12">Personne</text>
+  <circle cx="90" cy="135" r="5" fill="#3b82f6"/><text x="105" y="139" fill="#94a3b8" font-size="12">Entreprise</text>
+  <circle cx="90" cy="160" r="5" fill="#a855f7"/><text x="105" y="164" fill="#94a3b8" font-size="12">Domaine</text>
+  <circle cx="90" cy="185" r="5" fill="#14b8a6"/><text x="105" y="189" fill="#94a3b8" font-size="12">Projet</text>
+  <circle cx="90" cy="210" r="5" fill="#ef4444"/><text x="105" y="214" fill="#94a3b8" font-size="12">Document</text>
+  <text x="800" y="820" fill="#475569" font-size="24" font-weight="700" text-anchor="middle" opacity="0.3">[ Screenshot · Knowledge Graph ]</text>
+</svg>
