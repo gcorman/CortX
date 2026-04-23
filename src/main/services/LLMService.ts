@@ -26,7 +26,8 @@ export class LLMService {
   async sendMessage(
     messages: Array<{ role: string; content: string }>,
     systemPrompt?: string,
-    onDelta?: (delta: string) => void
+    onDelta?: (delta: string) => void,
+    signal?: AbortSignal
   ): Promise<string> {
     if (this.config.provider === 'anthropic' && !this.config.apiKey) {
       throw new Error('Cle API non configuree. Va dans Settings pour ajouter ta cle.')
@@ -36,18 +37,19 @@ export class LLMService {
     }
 
     if (this.config.provider === 'anthropic') {
-      return this.sendAnthropic(messages, systemPrompt, onDelta)
+      return this.sendAnthropic(messages, systemPrompt, onDelta, signal)
     } else if (this.config.provider === 'google-ai') {
-      return this.sendGoogleAI(messages, systemPrompt, onDelta)
+      return this.sendGoogleAI(messages, systemPrompt, onDelta, signal)
     } else {
-      return this.sendOpenAICompatible(messages, systemPrompt, onDelta)
+      return this.sendOpenAICompatible(messages, systemPrompt, onDelta, signal)
     }
   }
 
   private async sendAnthropic(
     messages: Array<{ role: string; content: string }>,
     systemPrompt?: string,
-    onDelta?: (delta: string) => void
+    onDelta?: (delta: string) => void,
+    signal?: AbortSignal
   ): Promise<string> {
     if (!this.anthropicClient) {
       this.initClient()
@@ -56,17 +58,20 @@ export class LLMService {
       }
     }
 
+    const reqParams = {
+      model: this.config.model,
+      max_tokens: 8192,
+      system: systemPrompt || undefined,
+      messages: messages.map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content
+      }))
+    }
+    const reqOpts = signal ? { signal } : undefined
+
     if (onDelta) {
       let full = ''
-      const stream = this.anthropicClient.messages.stream({
-        model: this.config.model,
-        max_tokens: 8192,
-        system: systemPrompt || undefined,
-        messages: messages.map((m) => ({
-          role: m.role as 'user' | 'assistant',
-          content: m.content
-        }))
-      })
+      const stream = this.anthropicClient.messages.stream(reqParams, reqOpts)
 
       stream.on('text', (delta) => {
         if (!delta) return
@@ -78,15 +83,7 @@ export class LLMService {
       return full
     }
 
-    const response = await this.anthropicClient.messages.create({
-      model: this.config.model,
-      max_tokens: 8192,
-      system: systemPrompt || undefined,
-      messages: messages.map((m) => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content
-      }))
-    })
+    const response = await this.anthropicClient.messages.create(reqParams, reqOpts)
 
     const textBlock = response.content.find((b) => b.type === 'text')
     return textBlock ? textBlock.text : ''
@@ -95,7 +92,8 @@ export class LLMService {
   private async sendOpenAICompatible(
     messages: Array<{ role: string; content: string }>,
     systemPrompt?: string,
-    onDelta?: (delta: string) => void
+    onDelta?: (delta: string) => void,
+    signal?: AbortSignal
   ): Promise<string> {
     const baseUrl = this.config.baseUrl || 'http://localhost:11434/v1'
 
@@ -116,7 +114,8 @@ export class LLMService {
         max_tokens: 8192,
         temperature: 0.3,
         ...(onDelta ? { stream: true } : {})
-      })
+      }),
+      signal
     })
 
     if (!response.ok) {
@@ -227,7 +226,8 @@ export class LLMService {
   private async sendGoogleAI(
     messages: Array<{ role: string; content: string }>,
     systemPrompt?: string,
-    onDelta?: (delta: string) => void
+    onDelta?: (delta: string) => void,
+    signal?: AbortSignal
   ): Promise<string> {
     const model = this.config.model || 'gemini-2.0-flash-lite'
     const apiKey = this.config.apiKey
@@ -258,7 +258,8 @@ export class LLMService {
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        signal
       })
 
       if (!response.ok) {
@@ -308,7 +309,8 @@ export class LLMService {
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal
     })
 
     if (!response.ok) {

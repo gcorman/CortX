@@ -265,6 +265,15 @@ export interface IdleAttempt {
   webEnriched?: boolean   // true if DuckDuckGo search was used
 }
 
+export interface IdleDraft {
+  id: string
+  content: string
+  confidence: number
+  category: IdleInsight['category']
+  entityNames: string[]
+  entityIds: string[]
+}
+
 export interface IdleExplorationEvent {
   phase: 'selecting' | 'examining' | 'thinking' | 'insight' | 'resting'
   activeNodeIds: string[]
@@ -458,8 +467,10 @@ export interface CortxAPI {
     pause(): Promise<void>
     resume(): Promise<void>
     getInsights(): Promise<IdleInsight[]>
+    getDraftInsights(): Promise<IdleDraft[]>
     dismissInsight(id: string): Promise<void>
     saveInsightAsFiche(id: string): Promise<string>
+    promoteDraft(id: string): Promise<IdleInsight | null>
     getConfig(): Promise<IdleConfig>
     setConfig(config: Partial<IdleConfig>): Promise<void>
   }

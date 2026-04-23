@@ -5,7 +5,7 @@ import { TagBrowser } from '../tags/TagBrowser'
 import { FilePreview } from '../files/FilePreview'
 import { LibraryPanel } from '../library/LibraryPanel'
 import { CanvasView } from '../canvas/CanvasView'
-import { Network, Hash, Search, Library, Brain, Plus, Sparkles } from 'lucide-react'
+import { Network, Hash, Search, X, Library, Brain, Plus, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { useT } from '../../i18n'
 
@@ -90,15 +90,23 @@ export function CenterPanel(): React.JSX.Element {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t.centerPanel.searchPlaceholder}
-              className="w-full bg-cortx-surface border border-cortx-border rounded-input pl-9 pr-3 py-1.5 text-xs text-cortx-text-primary placeholder:text-cortx-text-secondary/50 focus:outline-none focus:border-cortx-accent transition-colors"
+              className="w-full bg-cortx-surface border border-cortx-border rounded-input pl-9 pr-8 py-1.5 text-xs text-cortx-text-primary placeholder:text-cortx-text-secondary/50 focus:outline-none focus:border-cortx-accent transition-colors"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-cortx-text-secondary/50 hover:text-cortx-text-primary transition-colors cursor-pointer"
+              >
+                <X size={13} />
+              </button>
+            )}
           </div>
         )}
       </div>
 
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        {activeCenterView === 'graph' && <GraphView searchQuery={searchQuery} />}
+        {activeCenterView === 'graph' && <GraphView searchQuery={searchQuery} onClearSearch={() => setSearchQuery('')} />}
         {activeCenterView === 'canvas' && <CanvasView />}
         {activeCenterView === 'tags' && <TagBrowser />}
         {activeCenterView === 'library' && <LibraryPanel />}

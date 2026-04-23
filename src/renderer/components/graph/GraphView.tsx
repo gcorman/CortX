@@ -625,7 +625,7 @@ function makeSettleLayout(): cytoscape.LayoutOptions {
   } as unknown as cytoscape.LayoutOptions
 }
 
-export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React.JSX.Element {
+export function GraphView({ searchQuery = '', onClearSearch }: { searchQuery?: string; onClearSearch?: () => void }): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const cyRef = useRef<cytoscape.Core | null>(null)
   const layoutRanOnce = useRef(false)
@@ -681,6 +681,9 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
   const animStartRef = useRef<number>(0)
   const searchQueryRef = useRef(searchQuery)
   useEffect(() => { searchQueryRef.current = searchQuery }, [searchQuery])
+  const onClearSearchRef = useRef(onClearSearch)
+  useEffect(() => { onClearSearchRef.current = onClearSearch }, [onClearSearch])
+  const searchViewportRef = useRef<{ zoom: number; pan: { x: number; y: number } } | null>(null)
   // Refs so rAF callback always reads latest values without stale closures
   const idlePhaseRef = useRef(idlePhase)
   const idleNodeIdsRef = useRef(idleNodeIds)
@@ -1367,11 +1370,61 @@ export function GraphView({ searchQuery = '' }: { searchQuery?: string }): React
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
 
-  // Apply search highlight when query changes
+  // Apply search highlight + zoom + clear-on-click when query changes
   useEffect(() => {
     const cy = cyRef.current
     if (!cy) return
     applySearchClasses(cy, searchQuery)
+
+    const q = searchQuery.trim().toLowerCase()
+
+    if (q) {
+      // Store viewport before first search zoom so we can restore it on clear
+      if (!searchViewportRef.current) {
+        searchViewportRef.current = { zoom: cy.zoom(), pan: { ...cy.pan() } }
+      }
+
+      // Zoom to matching nodes
+      const matchingNodes = cy.nodes().filter((n) =>
+        (n.data('label') as string).toLowerCase().includes(q)
+      )
+      if (matchingNodes.length > 0) {
+        cy.stop(true, true)
+        cy.animate({
+          fit: { eles: matchingNodes, padding: 80 },
+          duration: 300,
+          easing: 'ease-in-out-cubic'
+        } as Parameters<typeof cy.animate>[0])
+      }
+
+      // Clear search when tapping outside matching nodes
+      function handleBgTap(e: cytoscape.EventObject): void {
+        if ((e.target as unknown) === cy) onClearSearchRef.current?.()
+      }
+      function handleNodeTap(evt: cytoscape.EventObjectNode): void {
+        const node = evt.target as cytoscape.NodeSingular
+        if (!node.hasClass('search-match')) onClearSearchRef.current?.()
+      }
+      cy.on('tap', handleBgTap)
+      cy.on('tap', 'node', handleNodeTap)
+      return () => {
+        cy.off('tap', handleBgTap)
+        cy.off('tap', 'node', handleNodeTap)
+      }
+    } else {
+      // Restore viewport when search is cleared
+      const saved = searchViewportRef.current
+      if (saved) {
+        searchViewportRef.current = null
+        cy.stop(true, true)
+        cy.animate({
+          zoom: saved.zoom,
+          pan: saved.pan,
+          duration: 300,
+          easing: 'ease-in-out-cubic'
+        } as Parameters<typeof cy.animate>[0])
+      }
+    }
   }, [searchQuery]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Resize overlay canvas to match container

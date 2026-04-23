@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import { join, resolve, parse, isAbsolute } from 'path'
 import * as fs from 'fs'
 import { registerDatabaseHandlers } from './ipc/database'
@@ -139,6 +139,13 @@ function createWindow(): void {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      shell.openExternal(url)
+    }
+    return { action: 'deny' }
+  })
+
   mainWindow.on('closed', () => {
     mainWindow = null
   })
@@ -172,7 +179,7 @@ async function initializeServices(): Promise<void> {
   libraryService.initialize(dbService.getDb(), config.basePath)
 
   // Initialise idle service
-  idleService = new IdleService(dbService, fileService, llmService, config.basePath)
+  idleService = new IdleService(dbService, fileService, llmService, config.basePath, config.language)
 
   // Canvas service (spatial canvas persistence + agent-suggest)
   canvasService = new CanvasService(config.basePath, dbService, llmService)
@@ -322,6 +329,7 @@ function registerAppHandlers(): void {
     if (partial.language) {
       config.language = partial.language
       agentPipeline.setLanguage(config.language)
+      idleService.setLanguage(config.language)
     }
     saveConfig(config)
   })

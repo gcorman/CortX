@@ -78,7 +78,7 @@ export const useIdleStore = create<IdleState>((set, get) => ({
         i.id === id ? { ...i, status: 'saved' as const } : i
       )
     }))
-    void useFicheStore.getState().loadFiches()
+    await useFicheStore.getState().loadFiches()
     void useGraphStore.getState().loadGraph()
     return path
   },

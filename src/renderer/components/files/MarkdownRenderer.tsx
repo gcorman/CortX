@@ -32,6 +32,15 @@ export function MarkdownRenderer({ content, graphTitleSource }: MarkdownRenderer
     <div className="max-w-none text-sm text-cortx-text-primary/90">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        urlTransform={(url: string) => {
+          if (url.startsWith('cortx://link/')) return url
+          try {
+            const parsed = new URL(url)
+            return ['http:', 'https:', 'mailto:', 'tel:'].includes(parsed.protocol) ? url : ''
+          } catch {
+            return url
+          }
+        }}
         components={{
           h1: ({ children }) => {
             const isGraphH1 = graphTitleSource === 'h1' && !firstH1Done
