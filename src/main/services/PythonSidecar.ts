@@ -145,7 +145,8 @@ export class PythonSidecar extends EventEmitter {
     const resourcesPath = app.isPackaged
       ? process.resourcesPath
       : path.join(app.getAppPath(), 'resources')
-    return path.join(resourcesPath, 'python-sidecar', 'cortx-extractor.exe')
+    const binaryName = process.platform === 'win32' ? 'cortx-extractor.exe' : 'cortx-extractor'
+    return path.join(resourcesPath, 'python-sidecar', binaryName)
   }
 
   private async _start(): Promise<void> {

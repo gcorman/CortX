@@ -132,3 +132,116 @@ jobs:
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos:
+    name: Build sidecar (macOS arm64)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('python-sidecar/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Cache embedding model
+        uses: actions/cache@v4
+        with:
+          path: python-sidecar/model-cache
+          key: e5-small-multilingual-v1-macos
+
+      - name: Create venv and install dependencies
+        working-directory: python-sidecar
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build with PyInstaller
+        working-directory: python-sidecar
+        run: |
+          source .venv/bin/activate
+          pyinstaller \
+            --onedir \
+            --name cortx-extractor \
+            --distpath dist \
+            --workpath build \
+            --specpath . \
+            --noconfirm \
+            --clean \
+            --collect-all docling \
+            --collect-all docling_core \
+            --collect-all docling_parse \
+            --collect-all docling_ibm_models \
+            --collect-all sentence_transformers \
+            --collect-all transformers \
+            --collect-all tokenizers \
+            --collect-all huggingface_hub \
+            --collect-all safetensors \
+            --collect-all torch \
+            --collect-all rapidocr \
+            --collect-all onnxruntime \
+            --collect-all omegaconf \
+            --hidden-import docling.models.plugins \
+            --hidden-import docling.backend \
+            --hidden-import docling.pipeline \
+            --hidden-import PIL \
+            --hidden-import cv2 \
+            --hidden-import easyocr \
+            --hidden-import rtree \
+            cortx_extractor.py
+
+      - name: Download embedding model
+        working-directory: python-sidecar
+        env:
+          SENTENCE_TRANSFORMERS_HOME: ${{ github.workspace }}/python-sidecar/model-cache
+        run: |
+          source .venv/bin/activate
+          python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('intfloat/multilingual-e5-small'); print('Model ready.')"
+
+      - name: Copy model into dist
+        working-directory: python-sidecar
+        run: |
+          mkdir -p dist/cortx-extractor/_internal/sentence_transformers_cache
+          if [ -d model-cache ]; then
+            cp -r model-cache/. dist/cortx-extractor/_internal/sentence_transformers_cache/
+            echo "Model copied to dist."
+          else
+            echo "Warning: model-cache not found — users will download model on first extraction."
+          fi
+
+      - name: Create zip archive
+        working-directory: python-sidecar/dist/cortx-extractor
+        run: |
+          zip -r ../../cortx-extractor-darwin-arm64.zip .
+          size=$(du -sh ../../cortx-extractor-darwin-arm64.zip | cut -f1)
+          echo "Archive size: $size"
+
+      - name: Determine release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "name=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          files: python-sidecar/cortx-extractor-darwin-arm64.zip
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
