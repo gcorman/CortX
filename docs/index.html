@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="description" content="CortX — An AI-powered second brain. You speak, the agent structures. Local-first, open-source, Markdown." />
+<meta name="description" content="CortX — An AI-powered second brain. You speak, the agent structures. Local-first, open-source, Markdown. Available for Windows and macOS." />
 <meta name="theme-color" content="#0f172a" />
 <meta property="og:title" content="CortX — From vibe coding to vibe learning" />
-<meta property="og:description" content="An AI agent that writes and organizes your knowledge base. Local-first, Markdown, Git-versioned." />
+<meta property="og:description" content="An AI agent that writes and organizes your knowledge base. Local-first, Markdown, Git-versioned. Windows + macOS." />
 <meta property="og:type" content="website" />
 <title>CortX — AI-powered second brain</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   tailwind.config = {
@@ -55,8 +55,9 @@
     </a>
     <div class="flex items-center gap-2 sm:gap-6">
       <a href="#features" class="text-sm text-slate-400 hover:text-white transition-colors hidden md:inline">Features</a>
-      <a href="#demo" class="text-sm text-slate-400 hover:text-white transition-colors hidden md:inline">Demo</a>
-      <a href="#install" class="text-sm text-slate-400 hover:text-white transition-colors hidden md:inline">Install</a>
+      <a href="#interact" class="text-sm text-slate-400 hover:text-white transition-colors hidden md:inline">Interact</a>
+      <a href="#setup" class="text-sm text-slate-400 hover:text-white transition-colors hidden md:inline">Setup</a>
+      <a href="#daily" class="text-sm text-slate-400 hover:text-white transition-colors hidden md:inline">Daily value</a>
       <a href="https://github.com/gcorman/CortX" target="_blank" rel="noopener" class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-elevated hover:bg-border border border-border/60 text-sm font-medium transition-colors">
         <svg viewBox="0 0 24 24" class="w-4 h-4 fill-current" aria-hidden="true"><path d="M12 .5C5.6.5.5 5.6.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-1.9c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.5-.3-5.2-1.3-5.2-5.7 0-1.3.4-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2.9-.3 1.9-.4 2.9-.4s2 .1 2.9.4c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.7.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.4-5.2 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.5 4.6-1.5 7.9-5.9 7.9-10.9C23.5 5.6 18.4.5 12 .5z"/></svg>
         <span class="hidden sm:inline">GitHub</span>
@@ -81,16 +82,20 @@
     </p>
     <div class="mt-10 flex flex-col sm:flex-row gap-3 justify-center fade-up fade-up-delay-3">
       <a href="https://github.com/gcorman/CortX/releases" target="_blank" rel="noopener" class="group inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-accent hover:bg-accent-light text-bg font-semibold shadow-lg shadow-accent/25 hover:shadow-accent/40 transition-all">
+        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
         Download for Windows
-        <svg class="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
       </a>
-      <a href="#install" class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-elevated hover:bg-border border border-border/60 font-semibold transition-colors">
+      <a href="https://github.com/gcorman/CortX/releases" target="_blank" rel="noopener" class="group inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-elevated hover:bg-border border border-border/60 font-semibold transition-colors">
+        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+        Download for macOS
+      </a>
+      <a href="#setup" class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-transparent hover:bg-elevated border border-border/40 font-semibold transition-colors">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
         Build from source
       </a>
     </div>
     <div class="mt-6 text-xs text-slate-500 fade-up fade-up-delay-3">
-      macOS &amp; Linux coming soon · free · open-source (ISC)
+      Windows (NSIS) · macOS (DMG) available · Linux coming soon · free · open-source (ISC)
     </div>
   </div>
 
@@ -123,6 +128,270 @@
   </div>
 </section>
 
+<!-- DAILY VALUE -->
+<section id="daily" class="py-24 px-6 border-t border-border/30">
+  <div class="max-w-7xl mx-auto">
+    <div class="text-center mb-16">
+      <div class="text-xs font-mono text-accent mb-3">// EVERYDAY VALUE</div>
+      <h2 class="text-4xl sm:text-5xl font-bold tracking-tight">What changes in your daily life</h2>
+      <p class="mt-4 text-slate-400 text-lg max-w-2xl mx-auto">Five concrete moments where CortX removes the friction of remembering.</p>
+    </div>
+
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="value-card">
+        <div class="value-emoji">☕</div>
+        <h3 class="value-title">After a coffee</h3>
+        <p class="value-desc">Type 3 lines about who you saw, what they're working on, what they said. The agent updates their profile, links to their company, logs the interaction with today's date — automatically.</p>
+      </div>
+      <div class="value-card">
+        <div class="value-emoji">📚</div>
+        <h3 class="value-title">Reading a paper</h3>
+        <p class="value-desc">Drop the PDF into the library. docling extracts clean text + tables. The agent finds which of your existing topics it touches, suggests new connections, and you can ask questions directly against the contents.</p>
+      </div>
+      <div class="value-card">
+        <div class="value-emoji">🎙️</div>
+        <h3 class="value-title">After a meeting</h3>
+        <p class="value-desc">Paste your raw notes. The agent extracts decisions, action items, mentioned projects, attendees — proposes the diff. You hit Approve. Done in 5 seconds.</p>
+      </div>
+      <div class="value-card">
+        <div class="value-emoji">🤔</div>
+        <h3 class="value-title">"What did I know about…"</h3>
+        <p class="value-desc">Ask the chat. The hybrid RAG retrieval pulls the right files, follows wikilinks for context, and the agent answers <em>citing your own notes</em>. No more hunting through folders.</p>
+      </div>
+      <div class="value-card">
+        <div class="value-emoji">💡</div>
+        <h3 class="value-title">In the background</h3>
+        <p class="value-desc">Idle Mode quietly explores your graph and surfaces patterns: contradictions between two notes, missing relationships, recurring themes across projects. Promote any insight to a permanent fiche.</p>
+      </div>
+      <div class="value-card">
+        <div class="value-emoji">🌐</div>
+        <h3 class="value-title">Need fresh context</h3>
+        <p class="value-desc">Type <code class="tag-inline">/wiki Notion</code> or <code class="tag-inline">/internet latest SCAF news</code>. Wikipedia + a live DuckDuckGo search are pulled in, summarized, woven into your existing notes — proposed for review.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INTERACT -->
+<section id="interact" class="py-24 px-6 border-t border-border/30">
+  <div class="max-w-7xl mx-auto">
+    <div class="text-center mb-16">
+      <div class="text-xs font-mono text-accent mb-3">// 5 WAYS TO INTERACT</div>
+      <h2 class="text-4xl sm:text-5xl font-bold tracking-tight">One base, many entry points</h2>
+      <p class="mt-4 text-slate-400 text-lg max-w-2xl mx-auto">Markdown stays the source of truth. Pick how you want to talk to it today.</p>
+    </div>
+
+    <div class="tabs">
+      <div class="tabs-nav" role="tablist">
+        <button class="tab-btn active" data-tab="chat" role="tab">💬 Chat with the agent</button>
+        <button class="tab-btn" data-tab="edit" role="tab">✏️ Edit Markdown directly</button>
+        <button class="tab-btn" data-tab="graph" role="tab">🕸️ Explore the graph</button>
+        <button class="tab-btn" data-tab="library" role="tab">📚 Drop in documents</button>
+        <button class="tab-btn" data-tab="web" role="tab">🌐 Pull from the web</button>
+      </div>
+
+      <div class="tabs-panels">
+
+        <div class="tab-panel active" data-panel="chat">
+          <div class="grid md:grid-cols-2 gap-6 items-start">
+            <div>
+              <h3 class="text-2xl font-bold mb-3">Natural-language input → structured edits</h3>
+              <p class="text-slate-400 mb-5">Type a thought, paste meeting notes, drop a quote. The agent reads context from your base (RAG + multi-hop), figures out which entities are involved, and proposes a diff. Streaming token-by-token, abortable mid-generation.</p>
+              <ul class="space-y-2 text-slate-300 text-sm">
+                <li class="flex gap-2"><span class="text-accent">›</span> <code class="tag-inline">/ask</code> — read-only Q&amp;A with citations</li>
+                <li class="flex gap-2"><span class="text-accent">›</span> <code class="tag-inline">/brief topic</code> — generate a structured fiche</li>
+                <li class="flex gap-2"><span class="text-accent">›</span> <code class="tag-inline">/synthese</code> — synthesize across multiple notes</li>
+                <li class="flex gap-2"><span class="text-accent">›</span> <code class="tag-inline">/digest</code> — daily/weekly recap from your journal</li>
+              </ul>
+            </div>
+            <div class="mock-window">
+              <div class="mock-bar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span><span class="ml-3 text-xs text-slate-500 font-mono">CortX · chat</span></div>
+              <div class="mock-body">
+                <div class="msg user">Lunch with Sophie Martin. Leaving Thales for Dassault Aviation as Tech Director. Said the SCAF program slipped 6 months.</div>
+                <div class="msg agent">
+                  <span class="text-xs text-slate-500 font-mono">▸ proposing 3 changes</span>
+                  <div class="diff-line">~ <strong>Reseau/Sophie_Martin.md</strong> — position updated</div>
+                  <div class="diff-line">+ <strong>Entreprises/Dassault_Aviation.md</strong> <span class="text-accent text-xs">[NEW]</span></div>
+                  <div class="diff-line">~ <strong>Domaines/Aerospace.md</strong> — SCAF delay note</div>
+                  <div class="flex gap-2 mt-3">
+                    <button class="btn-mini btn-mini-accent">✓ Accept</button>
+                    <button class="btn-mini">↩ Reject</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-panel" data-panel="edit">
+          <div class="grid md:grid-cols-2 gap-6 items-start">
+            <div>
+              <h3 class="text-2xl font-bold mb-3">Open any Markdown file. Edit. Save.</h3>
+              <p class="text-slate-400 mb-5">CortX never locks your files. Open the preview pane, switch to edit mode, type freely. <code class="tag-inline">Ctrl+S</code> commits your changes through Git and reindexes everything.</p>
+              <ul class="space-y-2 text-slate-300 text-sm">
+                <li class="flex gap-2"><span class="text-accent">›</span> Live indicator shows which element drives the graph node label (frontmatter <code class="tag-inline">title</code> · first H1 · filename)</li>
+                <li class="flex gap-2"><span class="text-accent">›</span> Rename a title once → all <code class="tag-inline">[[oldTitle]]</code> across the entire base get rewritten automatically</li>
+                <li class="flex gap-2"><span class="text-accent">›</span> Delete from the UI → file removed from disk, entities, relations, FTS, then committed</li>
+                <li class="flex gap-2"><span class="text-accent">›</span> Files stay plain <code class="tag-inline">.md</code> — Obsidian, VS Code, any editor still works</li>
+              </ul>
+            </div>
+            <div class="mock-window">
+              <div class="mock-bar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span><span class="ml-3 text-xs text-slate-500 font-mono">Sophie_Martin.md · edit</span></div>
+              <div class="mock-body font-mono text-xs">
+<div class="text-slate-500">---</div>
+<div><span class="text-fuchsia-300">type:</span> <span class="text-amber-300">personne</span></div>
+<div><span class="text-fuchsia-300">title:</span> <span class="text-amber-300">Sophie Martin</span> <span class="text-accent text-[10px]">⬡ graph label</span></div>
+<div><span class="text-fuchsia-300">company:</span> <span class="text-amber-300">[[Dassault Aviation]]</span></div>
+<div class="text-slate-500">---</div>
+<div class="mt-2"><span class="text-slate-200"># Sophie Martin</span></div>
+<div class="text-slate-300">Tech Director at <span class="bg-accent/15 text-accent-light px-1 rounded">[[Dassault Aviation]]</span> since 04/2026.</div>
+<div class="text-slate-300">Worked on <span class="bg-accent/15 text-accent-light px-1 rounded">[[SCAF]]</span> program.<span class="text-slate-500"> ⬤</span></div>
+<div class="mt-3 text-[10px] text-slate-500">Ctrl+S → commit + reindex</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-panel" data-panel="graph">
+          <div class="grid md:grid-cols-2 gap-6 items-start">
+            <div>
+              <h3 class="text-2xl font-bold mb-3">See your knowledge as a living graph</h3>
+              <p class="text-slate-400 mb-5">Cytoscape · cose-bilkent renders every entity and relation in real time. Filter by type, search by name, double-click to expand neighborhoods. Library documents appear as nodes too — bidirectional auto-linking shows mentions both ways.</p>
+              <ul class="space-y-2 text-slate-300 text-sm">
+                <li class="flex gap-2"><span class="text-accent">›</span> 7 entity types · 19 inferred relation kinds</li>
+                <li class="flex gap-2"><span class="text-accent">›</span> Idle Mode highlights the nodes &amp; edges currently being explored</li>
+                <li class="flex gap-2"><span class="text-accent">›</span> Click a node → preview the file, then jump to edit</li>
+              </ul>
+            </div>
+            <div class="mock-window aspect-square">
+              <div class="mock-bar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span><span class="ml-3 text-xs text-slate-500 font-mono">graph</span></div>
+              <svg viewBox="0 0 400 320" class="w-full h-full p-4">
+                <defs>
+                  <radialGradient id="nodeGrad" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#2dd4bf" stop-opacity="0.9"/>
+                    <stop offset="100%" stop-color="#14b8a6" stop-opacity="0.4"/>
+                  </radialGradient>
+                </defs>
+                <line x1="200" y1="160" x2="100" y2="80" stroke="#334155" stroke-width="1"/>
+                <line x1="200" y1="160" x2="320" y2="80" stroke="#334155" stroke-width="1"/>
+                <line x1="200" y1="160" x2="120" y2="240" stroke="#334155" stroke-width="1"/>
+                <line x1="200" y1="160" x2="300" y2="250" stroke="#14b8a6" stroke-width="1.5" class="edge-pulse"/>
+                <line x1="100" y1="80" x2="320" y2="80" stroke="#334155" stroke-width="1" stroke-dasharray="3 3"/>
+                <line x1="120" y1="240" x2="300" y2="250" stroke="#334155" stroke-width="1" stroke-dasharray="3 3"/>
+                <circle cx="100" cy="80" r="14" fill="url(#nodeGrad)"/><text x="100" y="60" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">Sophie</text>
+                <circle cx="320" cy="80" r="14" fill="#0d9488"/><text x="320" y="60" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">Dassault</text>
+                <circle cx="200" cy="160" r="20" fill="url(#nodeGrad)" class="node-pulse"/><text x="200" y="195" text-anchor="middle" fill="#5eead4" font-size="11" font-family="Inter" font-weight="600">SCAF</text>
+                <circle cx="120" cy="240" r="12" fill="#475569"/><text x="120" y="265" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">Aerospace</text>
+                <circle cx="300" cy="250" r="12" fill="#475569"/><text x="300" y="275" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="Inter">PDF: Brief</text>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-panel" data-panel="library">
+          <div class="grid md:grid-cols-2 gap-6 items-start">
+            <div>
+              <h3 class="text-2xl font-bold mb-3">Drop a PDF. Ask it questions.</h3>
+              <p class="text-slate-400 mb-5">PDF, DOCX, PPTX, XLSX, HTML, TXT, MD — all extracted by the docling Python sidecar, chunked, vectorized with e5-small embeddings. The library becomes part of the same RAG context as your notes.</p>
+              <ul class="space-y-2 text-slate-300 text-sm">
+                <li class="flex gap-2"><span class="text-accent">›</span> <strong>3 search modes</strong> — lexical (FTS5), semantic (cosine), hybrid</li>
+                <li class="flex gap-2"><span class="text-accent">›</span> Auto-link both ways — <code class="tag-inline">[[DocTitle]]</code> in your notes binds to library docs; library docs mentioning your entities create reverse links</li>
+                <li class="flex gap-2"><span class="text-accent">›</span> Tables, headings, page numbers preserved by docling</li>
+                <li class="flex gap-2"><span class="text-accent">›</span> Cache + embeddings persisted — pay extraction cost once</li>
+              </ul>
+            </div>
+            <div class="mock-window">
+              <div class="mock-bar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span><span class="ml-3 text-xs text-slate-500 font-mono">library</span></div>
+              <div class="mock-body">
+                <div class="lib-row"><span class="lib-icon pdf">PDF</span> <span>SCAF_Program_Brief_2026.pdf</span> <span class="lib-meta">42 chunks · 1.2 MB</span></div>
+                <div class="lib-row"><span class="lib-icon docx">DOCX</span> <span>Q1_Strategy_Memo.docx</span> <span class="lib-meta">8 chunks</span></div>
+                <div class="lib-row"><span class="lib-icon xlsx">XLSX</span> <span>Aerospace_Vendors_2026.xlsx</span> <span class="lib-meta">14 chunks · 3 sheets</span></div>
+                <div class="lib-row"><span class="lib-icon pptx">PPTX</span> <span>Onboarding_Deck.pptx</span> <span class="lib-meta">22 slides</span></div>
+                <div class="mt-3 px-3 py-2 rounded-md bg-accent/10 border border-accent/20 text-xs text-accent-light">
+                  ↳ Indexed via <strong>docling</strong> + e5-small embeddings (384d)
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-panel" data-panel="web">
+          <div class="grid md:grid-cols-2 gap-6 items-start">
+            <div>
+              <h3 class="text-2xl font-bold mb-3">Wikipedia + the open web — no API key</h3>
+              <p class="text-slate-400 mb-5">Two directives, three modes. Web content is fetched, cleaned (main content extracted, nav/footer stripped), language-aware (FR/EN with English fallback) and injected into the agent's context window <em>before</em> it proposes any change.</p>
+              <ul class="space-y-2 text-slate-300 text-sm">
+                <li class="flex gap-2"><span class="text-accent">›</span> <code class="tag-inline">/wiki Notion</code> — full Wikipedia article → proposed <code class="tag-inline">.md</code> file</li>
+                <li class="flex gap-2"><span class="text-accent">›</span> <code class="tag-inline">/internet https://...</code> — single URL, readable main content only</li>
+                <li class="flex gap-2"><span class="text-accent">›</span> <code class="tag-inline">/internet &lt;query&gt;</code> — DuckDuckGo HTML SERP → top ~4 pages fetched in parallel</li>
+                <li class="flex gap-2"><span class="text-accent">›</span> <code class="tag-inline">/internet</code> alone — uses the rest of your sentence as the query</li>
+              </ul>
+            </div>
+            <div class="mock-window">
+              <div class="mock-bar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span><span class="ml-3 text-xs text-slate-500 font-mono">/internet</span></div>
+              <div class="mock-body font-mono text-xs space-y-2">
+                <div><span class="text-accent">$</span> Update @SCAF with the latest news /internet</div>
+                <div class="text-slate-500">▸ DuckDuckGo SERP: 4 pages fetched in parallel</div>
+                <div class="text-slate-300 pl-3 border-l border-accent/30">[1] aerospace-news.example/scaf-2026 ✓</div>
+                <div class="text-slate-300 pl-3 border-l border-accent/30">[2] defense-blog.example/scaf-delay ✓</div>
+                <div class="text-slate-300 pl-3 border-l border-accent/30">[3] ministry-of-defense.example/q2 ✓</div>
+                <div class="text-slate-300 pl-3 border-l border-accent/30">[4] industrial-press.example/dassault ✓</div>
+                <div class="text-slate-500 mt-2">▸ proposing patch to <strong class="text-white">Domaines/SCAF.md</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DOCLING -->
+<section class="py-24 px-6 border-t border-border/30">
+  <div class="max-w-6xl mx-auto">
+    <div class="grid md:grid-cols-5 gap-8 items-center">
+      <div class="md:col-span-2">
+        <div class="text-xs font-mono text-accent mb-3">// THE DOCLING ADVANTAGE</div>
+        <h2 class="text-3xl sm:text-4xl font-bold tracking-tight leading-tight mb-4">Documents that <span class="text-accent-light">actually</span> get understood.</h2>
+        <p class="text-slate-400 leading-relaxed">Most "PDF chat" tools dump raw text and lose half the meaning. CortX uses <strong class="text-white">docling</strong>, IBM's open-source document parser — preserving tables as tables, headings as structure, page numbers as anchors, equations and lists faithfully. The result: the agent quotes the right page, your graph links to the right document.</p>
+      </div>
+      <div class="md:col-span-3 grid sm:grid-cols-3 gap-3">
+        <div class="docling-card">
+          <div class="text-2xl mb-2">📊</div>
+          <div class="font-bold mb-1">Tables → tables</div>
+          <p class="text-xs text-slate-400">Spreadsheet-style data stays queryable, not flattened into prose.</p>
+        </div>
+        <div class="docling-card">
+          <div class="text-2xl mb-2">📑</div>
+          <div class="font-bold mb-1">Headings preserved</div>
+          <p class="text-xs text-slate-400">Section structure feeds chunk metadata for accurate retrieval.</p>
+        </div>
+        <div class="docling-card">
+          <div class="text-2xl mb-2">📍</div>
+          <div class="font-bold mb-1">Page anchors</div>
+          <p class="text-xs text-slate-400">Citations point to a real page range, not a vague excerpt.</p>
+        </div>
+        <div class="docling-card">
+          <div class="text-2xl mb-2">🔢</div>
+          <div class="font-bold mb-1">Math &amp; lists</div>
+          <p class="text-xs text-slate-400">Equations, ordered lists, code blocks survive the round trip.</p>
+        </div>
+        <div class="docling-card">
+          <div class="text-2xl mb-2">🔗</div>
+          <div class="font-bold mb-1">Bidirectional auto-linking</div>
+          <p class="text-xs text-slate-400">Library docs ↔ KB entities cross-link without a single tag.</p>
+        </div>
+        <div class="docling-card">
+          <div class="text-2xl mb-2">🧠</div>
+          <div class="font-bold mb-1">e5-small embeddings</div>
+          <p class="text-xs text-slate-400">384-dim vectors per chunk, cached locally. Fast hybrid search.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- Features grid -->
 <section id="features" class="py-24 px-6 border-t border-border/30">
   <div class="max-w-7xl mx-auto">
@@ -138,40 +407,48 @@
         <div class="feature-icon">
           <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/></svg>
         </div>
-        <h3 class="feature-title">Structuring Agent</h3>
-        <p class="feature-desc">Type raw text — the agent identifies entities (people, companies, concepts), creates or updates Markdown files, and adds cross-links automatically.</p>
+        <h3 class="feature-title">Structuring agent</h3>
+        <p class="feature-desc">Type raw text — the agent identifies entities (people, companies, domains, projects, journal entries), creates or updates Markdown files, adds <code class="tag-inline">[[wikilinks]]</code> automatically.</p>
+      </article>
+
+      <article class="feature-card">
+        <div class="feature-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 3h18v18H3zM3 12h18M12 3v18"/></svg>
+        </div>
+        <h3 class="feature-title">Propose-then-execute</h3>
+        <p class="feature-desc">Every action is previewable (before/after diff) and requires explicit approval. Nothing is written to disk without your sign-off.</p>
       </article>
 
       <article class="feature-card">
         <div class="feature-icon">
           <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="5" cy="12" r="3"/><circle cx="19" cy="5" r="3"/><circle cx="19" cy="19" r="3"/><path d="M7.5 10.5L16.5 6m-9 7l9 4.5"/></svg>
         </div>
-        <h3 class="feature-title">Interactive Knowledge Graph</h3>
-        <p class="feature-desc">Real-time Cytoscape · cose-bilkent graph. Nodes colored by type (person, company, domain, project) with filtering, search, and double-click exploration.</p>
+        <h3 class="feature-title">Interactive knowledge graph</h3>
+        <p class="feature-desc">Real-time Cytoscape · cose-bilkent. 7 entity types, 19 inferred relation kinds. Library docs as nodes. Idle Mode highlights live exploration.</p>
       </article>
 
       <article class="feature-card">
         <div class="feature-icon">
           <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M15.75 15.75l-2.489-2.489m0 0a3.375 3.375 0 10-4.773-4.773 3.375 3.375 0 004.774 4.774zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         </div>
-        <h3 class="feature-title">Hybrid Search (RAG)</h3>
-        <p class="feature-desc">FTS5 full-text + semantic embeddings. The agent retrieves relevant files before every response, with multi-hop expansion across wikilinks.</p>
+        <h3 class="feature-title">Hybrid search + multi-hop</h3>
+        <p class="feature-desc">FTS5 full-text + semantic embeddings. After initial retrieval, multi-hop expansion follows wikilinks &amp; library chunk references for cross-file context.</p>
       </article>
 
       <article class="feature-card">
         <div class="feature-icon">
           <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
         </div>
-        <h3 class="feature-title">Document Library</h3>
-        <p class="feature-desc">Import PDF, DOCX, XLSX, PPTX. Text extracted via docling, chunked, vectorized. Auto-linked to entities via <code class="tag-inline">[[wikilinks]]</code>.</p>
+        <h3 class="feature-title">Document library (docling)</h3>
+        <p class="feature-desc">Import PDF, DOCX, XLSX, PPTX, HTML, TXT. docling extracts clean structure; e5-small embeddings power lexical / semantic / hybrid search.</p>
       </article>
 
       <article class="feature-card">
         <div class="feature-icon">
           <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18"/></svg>
         </div>
-        <h3 class="feature-title">Idle Mode — Passive Insights</h3>
-        <p class="feature-desc">In the background, the agent explores your knowledge base: hidden connections, contradictions, gaps, recurring patterns. Archive any insight as a note in one click.</p>
+        <h3 class="feature-title">Idle Mode + draft promotion</h3>
+        <p class="feature-desc">Background loop explores your graph: contradictions, gaps, recurring patterns. Review the draft queue, dismiss, or promote insights to permanent fiches.</p>
       </article>
 
       <article class="feature-card">
@@ -179,38 +456,54 @@
           <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/></svg>
         </div>
         <h3 class="feature-title">Web &amp; Wikipedia</h3>
-        <p class="feature-desc"><code class="tag-inline">/wiki</code> imports a Wikipedia article, <code class="tag-inline">/internet</code> fetches a URL or runs a DuckDuckGo search — all injected into the agent's context window.</p>
+        <p class="feature-desc"><code class="tag-inline">/wiki</code> imports an article, <code class="tag-inline">/internet</code> fetches a URL or runs a DuckDuckGo search. No API key, no account, language-aware.</p>
       </article>
 
       <article class="feature-card">
         <div class="feature-icon">
           <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         </div>
-        <h3 class="feature-title">Automatic Git Versioning</h3>
-        <p class="feature-desc">Every accepted action = a Git commit. Full history, one-click undo (<code class="tag-inline">git revert</code>), and a built-in audit log for every agent action.</p>
+        <h3 class="feature-title">Automatic Git versioning</h3>
+        <p class="feature-desc">Every accepted action = a commit (isomorphic-git). Full history, one-click undo (<code class="tag-inline">git revert</code>), built-in <code class="tag-inline">agent_log</code> audit table.</p>
       </article>
 
       <article class="feature-card">
         <div class="feature-icon">
-          <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 3h18v18H3zM3 12h18M12 3v18"/></svg>
+          <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zM19.5 19.5h-15"/></svg>
         </div>
-        <h3 class="feature-title">Propose-then-Execute</h3>
-        <p class="feature-desc">Every action is previewable (before/after diff) and requires your explicit approval. Nothing is ever written to disk without your sign-off.</p>
+        <h3 class="feature-title">Manual edit + Ctrl+S</h3>
+        <p class="feature-desc">Edit any file in-app. Save commits + reindexes. Live indicator shows which element drives the graph node label (frontmatter / H1 / filename).</p>
+      </article>
+
+      <article class="feature-card">
+        <div class="feature-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
+        </div>
+        <h3 class="feature-title">Title rename → wikilink rewrite</h3>
+        <p class="feature-desc">Change a title once. CortX rewrites <code class="tag-inline">[[oldTitle]]</code> across the entire base in one pass. Toast tells you how many links updated.</p>
+      </article>
+
+      <article class="feature-card">
+        <div class="feature-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+        </div>
+        <h3 class="feature-title">Streaming + abortable LLM</h3>
+        <p class="feature-desc">Watch the agent think token-by-token. Cancel mid-generation if the direction is wrong. Works on Anthropic and any OpenAI-compatible endpoint.</p>
       </article>
 
       <article class="feature-card">
         <div class="feature-icon">
           <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zM3.6 9h16.8M3.6 15h16.8M11.5 3a17 17 0 000 18M12.5 3a17 17 0 010 18"/></svg>
         </div>
-        <h3 class="feature-title">EN / FR Bilingual</h3>
-        <p class="feature-desc">Full interface in English and French. Web search and Wikipedia fetch run in the active language with automatic English fallback.</p>
+        <h3 class="feature-title">EN / FR bilingual</h3>
+        <p class="feature-desc">Full UI in English and French. Web search and Wikipedia run in the active language with English fallback. Idle insights generated in your language.</p>
       </article>
 
     </div>
   </div>
 </section>
 
-<!-- Demo -->
+<!-- DEMO -->
 <section id="demo" class="py-24 px-6 border-t border-border/30">
   <div class="max-w-6xl mx-auto">
     <div class="text-center mb-16">
@@ -238,12 +531,12 @@
           <span class="text-xs text-slate-500 uppercase tracking-wider">Agent proposal</span>
         </div>
         <div class="space-y-2">
-          <div class="text-slate-400">~ <span class="text-white">Network/Sarah_Kim.md</span></div>
+          <div class="text-slate-400">~ <span class="text-white">Reseau/Sarah_Kim.md</span></div>
           <div class="pl-4 text-slate-400">  <span class="text-amber-400">✏️</span> Status: OpenAI → Redline (co-founder)</div>
-          <div class="pl-4 text-slate-400">  <span class="text-emerald-400">➕</span> Interaction: coffee 04/22/2026</div>
-          <div class="text-slate-400 mt-3">+ <span class="text-white">Companies/Redline.md</span> <span class="text-accent text-xs">[NEW]</span></div>
+          <div class="pl-4 text-slate-400">  <span class="text-emerald-400">➕</span> Interaction: coffee 04/26/2026</div>
+          <div class="text-slate-400 mt-3">+ <span class="text-white">Entreprises/Redline.md</span> <span class="text-accent text-xs">[NEW]</span></div>
           <div class="pl-4 text-slate-400">  <span class="text-emerald-400">📄</span> AI safety startup · contact Sarah Kim</div>
-          <div class="text-slate-400 mt-3">~ <span class="text-white">Domains/AI_Safety.md</span></div>
+          <div class="text-slate-400 mt-3">~ <span class="text-white">Domaines/AI_Safety.md</span></div>
           <div class="pl-4 text-slate-400">  <span class="text-emerald-400">➕</span> News: Constitutional AI V2 paper Q3</div>
           <div class="pl-4 text-slate-400">  <span class="text-emerald-400">➕</span> [[Anthropic]] · scalable oversight</div>
           <div class="flex gap-2 mt-5 not-italic">
@@ -257,39 +550,6 @@
     <p class="mt-8 text-center text-slate-500 text-sm max-w-2xl mx-auto">
       From a single raw note, the agent identifies <strong class="text-white">3 people, 3 companies, 1 domain</strong>, modifies <strong class="text-white">2 files</strong>, creates <strong class="text-white">1 new file</strong>, and maintains all cross-links — in under 3 seconds.
     </p>
-  </div>
-</section>
-
-<!-- Screenshots gallery -->
-<section class="py-24 px-6 border-t border-border/30">
-  <div class="max-w-7xl mx-auto">
-    <div class="text-center mb-16">
-      <div class="text-xs font-mono text-accent mb-3">// SCREENSHOTS</div>
-      <h2 class="text-4xl sm:text-5xl font-bold tracking-tight">A closer look</h2>
-    </div>
-
-    <div class="grid md:grid-cols-2 gap-6">
-      <figure class="group rounded-xl overflow-hidden border border-border/60 bg-surface hover:border-accent/40 transition-colors">
-        <img src="screenshots/02-agent-proposal.svg" alt="Agent proposal — before/after diff" class="w-full h-auto">
-        <figcaption class="p-4 text-sm text-slate-400 border-t border-border/40">
-          <span class="text-white font-semibold">Diff preview</span> — every file change is visible before you approve it.
-        </figcaption>
-      </figure>
-
-      <figure class="group rounded-xl overflow-hidden border border-border/60 bg-surface hover:border-accent/40 transition-colors">
-        <img src="screenshots/03-graph.svg" alt="Interactive knowledge graph" class="w-full h-auto">
-        <figcaption class="p-4 text-sm text-slate-400 border-t border-border/40">
-          <span class="text-white font-semibold">Knowledge graph</span> — real-time visual exploration of entity relationships.
-        </figcaption>
-      </figure>
-
-      <figure class="md:col-span-2 group rounded-xl overflow-hidden border border-border/60 bg-surface hover:border-accent/40 transition-colors">
-        <img src="screenshots/04-library-insights.svg" alt="Library and Idle Mode insights" class="w-full h-auto">
-        <figcaption class="p-4 text-sm text-slate-400 border-t border-border/40">
-          <span class="text-white font-semibold">Library &amp; Idle Mode</span> — PDF/DOCX/XLSX/PPTX imports alongside background-generated insights.
-        </figcaption>
-      </figure>
-    </div>
   </div>
 </section>
 
@@ -310,7 +570,7 @@
           </div>
           <h3 class="text-xl font-bold">100% Local</h3>
         </div>
-        <p class="text-slate-400 mb-4">Ollama · llama.cpp · LM Studio. Zero data leaves your machine. No account, no subscription.</p>
+        <p class="text-slate-400 mb-4">Ollama · llama.cpp · LM Studio. Zero data leaves your machine. No account, no subscription, no key check.</p>
         <ul class="space-y-2 text-sm text-slate-300">
           <li class="flex gap-2"><span class="text-accent">✓</span> Complete privacy — air-gapped capable</li>
           <li class="flex gap-2"><span class="text-accent">✓</span> No API key required</li>
@@ -329,18 +589,90 @@
           </div>
           <h3 class="text-xl font-bold">Cloud API</h3>
         </div>
-        <p class="text-slate-400 mb-4">Claude (Anthropic) or OpenAI-compatible. Best reasoning quality for complex knowledge graphs.</p>
+        <p class="text-slate-400 mb-4">Claude (Anthropic) or any OpenAI-compatible <code class="tag-inline">/v1/chat/completions</code> endpoint. Best reasoning quality.</p>
         <ul class="space-y-2 text-sm text-slate-300">
           <li class="flex gap-2"><span class="text-accent">✓</span> Claude Opus 4.7 / Sonnet 4.6</li>
-          <li class="flex gap-2"><span class="text-accent">✓</span> Real-time streaming</li>
+          <li class="flex gap-2"><span class="text-accent">✓</span> Real-time streaming + abortable</li>
           <li class="flex gap-2"><span class="text-accent">✓</span> Extended reasoning on complex notes</li>
-          <li class="flex gap-2"><span class="text-accent">✓</span> Key stored locally, never uploaded</li>
+          <li class="flex gap-2"><span class="text-accent">✓</span> Key stored locally, masked in UI, never re-uploaded</li>
         </ul>
         <div class="mt-5 pt-4 border-t border-border/40 text-xs text-slate-500 font-mono">
           Compatible: Anthropic · OpenAI · any /v1/chat/completions endpoint
         </div>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- SETUP -->
+<section id="setup" class="py-24 px-6 border-t border-border/30">
+  <div class="max-w-5xl mx-auto">
+    <div class="text-center mb-16">
+      <div class="text-xs font-mono text-accent mb-3">// FIRST-TIME SETUP</div>
+      <h2 class="text-4xl sm:text-5xl font-bold tracking-tight">From download to first note in 5 steps</h2>
+      <p class="mt-4 text-slate-400 text-lg">Most people are productive within 10 minutes — including LLM setup.</p>
+    </div>
+
+    <ol class="setup-timeline">
+      <li class="setup-step">
+        <div class="setup-num">1</div>
+        <div class="setup-content">
+          <h3 class="setup-title">Install</h3>
+          <p>Grab the latest release for your OS:</p>
+          <ul class="text-sm text-slate-400 mt-2 space-y-1">
+            <li>› <strong class="text-white">Windows</strong> — <code class="tag-inline">CortX-Setup-x.y.z.exe</code> (NSIS)</li>
+            <li>› <strong class="text-white">macOS</strong> — <code class="tag-inline">CortX-x.y.z.dmg</code> (universal)</li>
+            <li>› Or build from source — see Quickstart below</li>
+          </ul>
+        </div>
+      </li>
+
+      <li class="setup-step">
+        <div class="setup-num">2</div>
+        <div class="setup-content">
+          <h3 class="setup-title">Pick a base folder</h3>
+          <p>On first launch, Settings → <strong>Base path</strong>. The default is <code class="tag-inline">~/Documents/CortX-Base/</code> — change it if you want your notes living elsewhere (e.g. inside an iCloud / OneDrive folder).</p>
+          <p class="text-sm text-slate-500 mt-2">A Git repo is auto-initialized inside it. Every accepted action becomes a commit.</p>
+        </div>
+      </li>
+
+      <li class="setup-step">
+        <div class="setup-num">3</div>
+        <div class="setup-content">
+          <h3 class="setup-title">Choose a LLM</h3>
+          <p>Two paths — pick one:</p>
+          <div class="grid sm:grid-cols-2 gap-3 mt-3">
+            <div class="setup-mini">
+              <div class="font-semibold text-white mb-1">Local (private, free)</div>
+              <p class="text-xs text-slate-400">Install <a href="https://ollama.com" target="_blank" class="text-accent-light hover:underline">Ollama</a> or LM Studio. Pull a model (<code class="tag-inline">ollama pull qwen2.5:14b</code>). In Settings → Provider = <em>OpenAI-compatible</em>, endpoint = <code class="tag-inline">http://localhost:11434/v1</code>. No API key needed.</p>
+            </div>
+            <div class="setup-mini">
+              <div class="font-semibold text-white mb-1">Cloud (best quality)</div>
+              <p class="text-xs text-slate-400">Get a key from <a href="https://console.anthropic.com" target="_blank" class="text-accent-light hover:underline">Anthropic</a>. Paste it into Settings → Provider = <em>Anthropic</em>. Key stored locally, masked in the UI as <code class="tag-inline">***</code>.</p>
+            </div>
+          </div>
+        </div>
+      </li>
+
+      <li class="setup-step">
+        <div class="setup-num">4</div>
+        <div class="setup-content">
+          <h3 class="setup-title">(Optional) Enable the document library</h3>
+          <p>If you want to import PDF / DOCX / PPTX / XLSX, install Python 3.10+ then:</p>
+          <pre class="code-block"><code><span class="text-accent-light">pip install</span> docling sentence-transformers</code></pre>
+          <p class="text-sm text-slate-500 mt-2">First import bootstraps docling models (~10 min once). After that, indexing is fast and offline.</p>
+        </div>
+      </li>
+
+      <li class="setup-step">
+        <div class="setup-num">5</div>
+        <div class="setup-content">
+          <h3 class="setup-title">Type your first note</h3>
+          <p>Open the chat panel. Drop in a real thought — a person you met, a paper you read, a project you're starting. Within seconds the agent will propose a structured set of files. Hit Accept. Watch your graph come alive.</p>
+          <p class="text-sm text-accent-light mt-2">› That's it. Every accepted change is a Git commit. Every undo is one click.</p>
+        </div>
+      </li>
+    </ol>
   </div>
 </section>
 
@@ -369,7 +701,8 @@
             <tr class="border-b border-border/40"><td class="p-4 text-slate-300">100% local LLM possible</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-accent">✓</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-accent bg-accent/5">✓</td></tr>
             <tr class="border-b border-border/40"><td class="p-4 text-slate-300">Knowledge graph built-in</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-accent">✓ (plugin)</td><td class="p-4 text-center text-accent bg-accent/5">✓</td></tr>
             <tr class="border-b border-border/40"><td class="p-4 text-slate-300">Propose-then-execute</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-accent bg-accent/5">✓</td></tr>
-            <tr><td class="p-4 text-slate-300">Git versioning + undo</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-accent bg-accent/5">✓</td></tr>
+            <tr class="border-b border-border/40"><td class="p-4 text-slate-300">Git versioning + undo</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-accent bg-accent/5">✓</td></tr>
+            <tr><td class="p-4 text-slate-300">docling document import</td><td class="p-4 text-center text-slate-600">✕</td><td class="p-4 text-center text-slate-500">partial</td><td class="p-4 text-center text-slate-500">partial</td><td class="p-4 text-center text-accent bg-accent/5">✓</td></tr>
           </tbody>
         </table>
       </div>
@@ -377,21 +710,22 @@
   </div>
 </section>
 
-<!-- Install -->
+<!-- Quickstart -->
 <section id="install" class="py-24 px-6 border-t border-border/30">
   <div class="max-w-5xl mx-auto">
     <div class="text-center mb-16">
-      <div class="text-xs font-mono text-accent mb-3">// INSTALL</div>
-      <h2 class="text-4xl sm:text-5xl font-bold tracking-tight">Up in 3 commands</h2>
-      <p class="mt-4 text-slate-400 text-lg">Node.js 20+ · Git · a local or cloud LLM</p>
+      <div class="text-xs font-mono text-accent mb-3">// QUICKSTART (DEV)</div>
+      <h2 class="text-4xl sm:text-5xl font-bold tracking-tight">Build from source</h2>
+      <p class="mt-4 text-slate-400 text-lg">Node.js 20+ · Git · a local or cloud LLM · (optional) Python + docling</p>
     </div>
 
-    <div class="rounded-2xl border border-border/60 bg-surface overflow-hidden shadow-2xl shadow-black/40">
+    <div class="rounded-2xl border border-border/60 bg-surface overflow-hidden shadow-2xl shadow-black/40 relative">
       <div class="flex items-center gap-2 px-4 py-3 bg-elevated/50 border-b border-border/40">
         <div class="w-3 h-3 rounded-full bg-red-500/80"></div>
         <div class="w-3 h-3 rounded-full bg-amber-500/80"></div>
         <div class="w-3 h-3 rounded-full bg-emerald-500/80"></div>
         <span class="ml-4 text-xs font-mono text-slate-500">terminal</span>
+        <button class="ml-auto text-xs text-slate-400 hover:text-white px-2 py-1 rounded border border-border/40 hover:border-accent/40 transition-colors" data-copy="git clone https://github.com/gcorman/CortX.git && cd CortX && npm install && npm run dev">copy</button>
       </div>
       <pre class="p-6 text-sm font-mono leading-relaxed overflow-x-auto"><code><span class="text-slate-500"># clone</span>
 <span class="text-accent-light">git clone</span> https://github.com/gcorman/CortX.git &amp;&amp; <span class="text-accent-light">cd</span> CortX
@@ -401,29 +735,45 @@
 
 <span class="text-slate-500"># run</span>
 <span class="text-accent-light">npm run dev</span>       <span class="text-slate-500"># dev mode with HMR</span>
-<span class="text-accent-light">npm run dist</span>      <span class="text-slate-500"># build Windows installer (NSIS)</span></code></pre>
+<span class="text-accent-light">npm run dist</span>      <span class="text-slate-500"># build installer for current OS (Windows NSIS / macOS DMG)</span>
+<span class="text-accent-light">npm run rebuild</span>   <span class="text-slate-500"># if better-sqlite3 fails — recompiles native bindings</span></code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="py-24 px-6 border-t border-border/30">
+  <div class="max-w-3xl mx-auto">
+    <div class="text-center mb-12">
+      <div class="text-xs font-mono text-accent mb-3">// FAQ</div>
+      <h2 class="text-4xl sm:text-5xl font-bold tracking-tight">Common questions</h2>
     </div>
 
-    <div class="grid sm:grid-cols-3 gap-4 mt-8">
-      <div class="p-5 rounded-xl border border-border/60 bg-surface/40">
-        <div class="text-xs font-mono text-accent mb-2">STEP 1</div>
-        <div class="font-semibold mb-1">Set base folder</div>
-        <p class="text-sm text-slate-400">Pick where Markdown files live (default: <code class="tag-inline">~/Documents/CortX-Base/</code>).</p>
-      </div>
-      <div class="p-5 rounded-xl border border-border/60 bg-surface/40">
-        <div class="text-xs font-mono text-accent mb-2">STEP 2</div>
-        <div class="font-semibold mb-1">Pick a LLM</div>
-        <p class="text-sm text-slate-400">Ollama / llama.cpp (local, no key) or Anthropic / OpenAI (API key).</p>
-      </div>
-      <div class="p-5 rounded-xl border border-border/60 bg-surface/40">
-        <div class="text-xs font-mono text-accent mb-2">STEP 3</div>
-        <div class="font-semibold mb-1">Start typing</div>
-        <p class="text-sm text-slate-400">Drop raw text. The agent proposes. You approve. Git commits.</p>
-      </div>
-    </div>
-
-    <div class="mt-6 p-4 rounded-lg bg-elevated/40 border border-border/40 text-sm text-slate-400">
-      <span class="text-slate-300 font-semibold">Note:</span> If <code class="tag-inline">better-sqlite3</code> fails to load after install, run <code class="tag-inline">npm run rebuild</code> to recompile native bindings against your Electron version.
+    <div class="space-y-3">
+      <details class="faq">
+        <summary>Is my data uploaded anywhere?</summary>
+        <div class="faq-body">In local mode (Ollama / llama.cpp / LM Studio), nothing leaves your machine. Even with the Anthropic / OpenAI option, only the prompts you choose to send go to the API — your full base, your library files, your Git history all stay on disk.</div>
+      </details>
+      <details class="faq">
+        <summary>Can I still edit my notes in Obsidian or VS Code?</summary>
+        <div class="faq-body">Yes. The base folder is plain Markdown files plus a hidden <code class="tag-inline">_System/</code> directory. Use whatever editor you like. CortX polls the filesystem and reindexes when it sees changes.</div>
+      </details>
+      <details class="faq">
+        <summary>What happens if the agent makes a mistake?</summary>
+        <div class="faq-body">Every accepted action is a Git commit. The audit log lets you revert any single change with one click — no merge surgery, no lost data.</div>
+      </details>
+      <details class="faq">
+        <summary>Does it work offline?</summary>
+        <div class="faq-body">100% offline if you use a local LLM. Web fetch (<code class="tag-inline">/wiki</code>, <code class="tag-inline">/internet</code>) obviously needs a connection, but the rest — chat, graph, library, idle mode — runs without one.</div>
+      </details>
+      <details class="faq">
+        <summary>Do I need Python?</summary>
+        <div class="faq-body">Only if you want the document library (PDF / DOCX / PPTX / XLSX import). The rest of CortX runs without Python. If the sidecar is missing, library indexing fails gracefully — everything else keeps working.</div>
+      </details>
+      <details class="faq">
+        <summary>How big can the base get?</summary>
+        <div class="faq-body">SQLite + FTS5 handles millions of rows comfortably. Real-world bases of 5–10k Markdown files + a few hundred imported docs run smoothly on a laptop. The graph layout is the practical UI bottleneck, not the index.</div>
+      </details>
     </div>
   </div>
 </section>
@@ -434,12 +784,12 @@
     <h2 class="text-4xl sm:text-5xl font-bold tracking-tight">Ready to stop filing?</h2>
     <p class="mt-4 text-slate-400 text-lg">You speak. The agent structures. Git versions. Everything stays on your machine.</p>
     <div class="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-      <a href="https://github.com/gcorman/CortX" target="_blank" rel="noopener" class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-accent hover:bg-accent-light text-bg font-semibold shadow-lg shadow-accent/25 hover:shadow-accent/40 transition-all">
+      <a href="https://github.com/gcorman/CortX/releases" target="_blank" rel="noopener" class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-accent hover:bg-accent-light text-bg font-semibold shadow-lg shadow-accent/25 hover:shadow-accent/40 transition-all">
+        Download (Windows / macOS)
+      </a>
+      <a href="https://github.com/gcorman/CortX" target="_blank" rel="noopener" class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-elevated hover:bg-border border border-border/60 font-semibold transition-colors">
         <svg viewBox="0 0 24 24" class="w-5 h-5 fill-current"><path d="M12 .5C5.6.5.5 5.6.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-1.9c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.5-.3-5.2-1.3-5.2-5.7 0-1.3.4-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2.9-.3 1.9-.4 2.9-.4s2 .1 2.9.4c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.7.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.4-5.2 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.5 4.6-1.5 7.9-5.9 7.9-10.9C23.5 5.6 18.4.5 12 .5z"/></svg>
         View on GitHub
-      </a>
-      <a href="https://github.com/gcorman/CortX/issues" target="_blank" rel="noopener" class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-elevated hover:bg-border border border-border/60 font-semibold transition-colors">
-        Report a bug
       </a>
     </div>
   </div>
@@ -454,6 +804,7 @@
     </div>
     <div class="flex items-center gap-5">
       <a href="https://github.com/gcorman/CortX" target="_blank" rel="noopener" class="hover:text-white transition-colors">GitHub</a>
+      <a href="https://github.com/gcorman/CortX/releases" target="_blank" rel="noopener" class="hover:text-white transition-colors">Releases</a>
       <a href="https://github.com/gcorman/CortX/blob/main/README.md" target="_blank" rel="noopener" class="hover:text-white transition-colors">README</a>
       <a href="https://github.com/gcorman/CortX/issues" target="_blank" rel="noopener" class="hover:text-white transition-colors">Issues</a>
       <span class="text-slate-600">ISC</span>
@@ -462,6 +813,7 @@
 </footer>
 
 <script>
+  // Smooth anchor scroll
   document.querySelectorAll('a[href^="#"]').forEach(a => {
     a.addEventListener('click', e => {
       const id = a.getAttribute('href');
@@ -470,6 +822,42 @@
         if (el) { e.preventDefault(); el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
       }
     });
+  });
+
+  // Tabs
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.dataset.panel === tab));
+    });
+  });
+
+  // Copy to clipboard
+  document.querySelectorAll('[data-copy]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(btn.dataset.copy);
+        const orig = btn.textContent;
+        btn.textContent = '✓ copied';
+        btn.classList.add('text-accent-light');
+        setTimeout(() => { btn.textContent = orig; btn.classList.remove('text-accent-light'); }, 1400);
+      } catch {}
+    });
+  });
+
+  // Reveal on scroll
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('reveal-in');
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.15 });
+  document.querySelectorAll('.feature-card, .value-card, .docling-card, .setup-step, .mode-card, .faq').forEach(el => {
+    el.classList.add('reveal');
+    io.observe(el);
   });
 </script>
 </body>
