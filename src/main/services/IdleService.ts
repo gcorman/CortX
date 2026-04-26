@@ -18,6 +18,7 @@ interface ExplorationTarget {
 }
 
 interface DraftInsight {
+  id: string
   content: string
   confidence: number
   category: IdleInsight['category']
@@ -109,6 +110,8 @@ export class IdleService {
     this.prefetchedContext = null
     this.llmTargetQueue = []
     this.isSelectingTargets = false
+    this.draftInsights = []
+    this.emitDrafts()
     this.emit({ phase: 'resting', activeNodeIds: [], activeEdgeKeys: [] })
   }
 
@@ -357,6 +360,7 @@ ${wikilinkLines}
           if (this.phase === 'stopped') return
         } else if (conf >= DRAFT_MIN_CONF && !this.isInsightDuplicate(result.content, target.entityNames)) {
           this.draftInsights.push({
+            id: randomUUID(),
             content: result.content,
             confidence: result.confidence,
             category: result.category,
@@ -368,6 +372,7 @@ ${wikilinkLines}
             this.draftInsights.sort((a, b) => b.confidence - a.confidence)
             this.draftInsights = this.draftInsights.slice(0, DRAFT_POOL_MAX - 1)
           }
+          this.emitDrafts()
           cycleAttempt = { ...cycleAttempt, result: 'draft', category: result.category, snippet: result.content.slice(0, 70), fullContent: result.content }
         } else if (result.content) {
           // Below draft threshold but LLM did produce text — keep it for the activity log
@@ -500,11 +505,12 @@ Sinon (max 1) : {"promoted": [{"category": "opportunity|development|pattern|cont
       if (this.insights.length > 50) this.insights = this.insights.slice(0, 50)
       this.persistInsights()
     } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') { this.draftInsights = []; return }
+      if (err instanceof Error && err.name === 'AbortError') { this.draftInsights = []; this.emitDrafts(); return }
       console.error('[IdleService] Synthesis error:', err)
     }
 
     this.draftInsights = []
+    this.emitDrafts()
   }
 
   // ── Deduplication ─────────────────────────────────────────────────────────
@@ -1037,6 +1043,42 @@ OU
       category: result.category,
       status: 'new'
     }
+  }
+
+  getDraftInsights(): IdleDraft[] {
+    return this.draftInsights.map((d) => ({
+      id: d.id,
+      content: d.content,
+      confidence: d.confidence,
+      category: d.category,
+      entityNames: d.entityNames,
+      entityIds: d.entityIds
+    }))
+  }
+
+  promoteDraft(id: string): IdleInsight | null {
+    const idx = this.draftInsights.findIndex((d) => d.id === id)
+    if (idx === -1) return null
+
+    const draft = this.draftInsights[idx]
+    this.draftInsights.splice(idx, 1)
+
+    const insight = this.buildInsight(
+      { content: draft.content, confidence: draft.confidence, category: draft.category },
+      { entityNames: draft.entityNames, edgeKeys: draft.edgeKeys },
+      draft.entityIds
+    )
+    this.insights.unshift(insight)
+    if (this.insights.length > 50) this.insights = this.insights.slice(0, 50)
+    this.persistInsights()
+    this.emitDrafts()
+    this.mainWindow?.webContents.send('idle:insight', insight)
+    return insight
+  }
+
+  private emitDrafts(): void {
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) return
+    this.mainWindow.webContents.send('idle:drafts', this.getDraftInsights())
   }
 
   private emit(event: IdleExplorationEvent): void {

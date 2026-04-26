@@ -1,9 +1,9 @@
-import { ChevronDown, ChevronUp, Eye, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, Eye, X, TrendingUp } from 'lucide-react'
 import { useState } from 'react'
 import { useIdleStore } from '../../stores/idleStore'
 import { InsightCard } from './InsightCard'
 import { useT } from '../../i18n'
-import type { IdleAttempt } from '../../../shared/types'
+import type { IdleAttempt, IdleDraft } from '../../../shared/types'
 
 const DRAFT_POOL_MAX = 6
 const VISIBLE_MAX = 5
@@ -130,14 +130,70 @@ function AttemptRow({ attempt }: { attempt: IdleAttempt }): React.JSX.Element {
   )
 }
 
+// ── Draft card ───────────────────────────────────────────────────────────────
+
+function DraftCard({ draft }: { draft: IdleDraft }): React.JSX.Element {
+  const promoteDraft = useIdleStore((s) => s.promoteDraft)
+  const [promoting, setPromoting] = useState(false)
+  const t = useT()
+  const confPct = Math.round(draft.confidence * 100)
+
+  async function handlePromote(): Promise<void> {
+    setPromoting(true)
+    try {
+      await promoteDraft(draft.id)
+    } finally {
+      setPromoting(false)
+    }
+  }
+
+  return (
+    <div className="bg-cortx-bg border border-cortx-border/60 border-dashed rounded-card p-2.5 space-y-1.5">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-2xs text-cortx-accent/60 font-mono">
+          {draft.category} · {confPct}%
+        </span>
+        <div className="flex flex-wrap gap-1">
+          {draft.entityNames.slice(0, 3).map((name) => (
+            <span
+              key={name}
+              className="text-2xs px-1 py-0.5 bg-cortx-elevated rounded text-cortx-text-secondary/70 border border-cortx-border/50"
+            >
+              {name}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Full content — always visible */}
+      <p className="text-2xs text-cortx-text-primary/80 leading-relaxed">
+        {draft.content}
+      </p>
+
+      {/* Promote button */}
+      <button
+        onClick={() => void handlePromote()}
+        disabled={promoting}
+        className="flex items-center gap-1 text-2xs px-2 py-1 rounded bg-cortx-accent/10 text-cortx-accent hover:bg-cortx-accent/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        title={t.insightPanel.promoteTitle}
+      >
+        <TrendingUp size={10} />
+        {promoting ? '…' : t.insightPanel.promote}
+      </button>
+    </div>
+  )
+}
+
 // ── Main panel ──────────────────────────────────────────────────────────────
 
 export function InsightPanel(): React.JSX.Element | null {
-  const insights  = useIdleStore((s) => s.insights)
-  const isActive  = useIdleStore((s) => s.isActive)
-  const phase     = useIdleStore((s) => s.phase)
-  const draftCount = useIdleStore((s) => s.draftCount)
-  const attempts  = useIdleStore((s) => s.attempts)
+  const insights      = useIdleStore((s) => s.insights)
+  const isActive      = useIdleStore((s) => s.isActive)
+  const phase         = useIdleStore((s) => s.phase)
+  const draftCount    = useIdleStore((s) => s.draftCount)
+  const draftInsights = useIdleStore((s) => s.draftInsights)
+  const attempts      = useIdleStore((s) => s.attempts)
   const [collapsed, setCollapsed] = useState(false)
   const [showAll, setShowAll] = useState(false)
   const t = useT()
@@ -179,9 +235,9 @@ export function InsightPanel(): React.JSX.Element | null {
       </button>
 
       {!collapsed && (
-        <div className="px-3 pb-3 space-y-2 max-h-80 overflow-y-auto">
+        <div className="px-3 pb-3 space-y-2 max-h-[28rem] overflow-y-auto">
 
-          {/* ── Activity log (always shown when active) ─────────────── */}
+          {/* ── Activity log ─────────────────────────────────────────── */}
           {isActive && attempts.length > 0 && (
             <div className="bg-cortx-bg/60 rounded-card px-2 pt-1.5 pb-0.5 border border-cortx-border/40">
               <p className="text-2xs text-cortx-text-secondary/40 uppercase tracking-wider mb-1 font-mono">
@@ -190,15 +246,27 @@ export function InsightPanel(): React.JSX.Element | null {
               {attempts.map((a) => (
                 <AttemptRow key={a.id} attempt={a} />
               ))}
-              {draftCount > 0 && (
-                <p className="text-2xs text-cortx-accent/50 mt-1.5 pb-0.5">
-                  {draftCount} brouillon{draftCount > 1 ? 's' : ''} en mémoire — synthèse en cours…
-                </p>
-              )}
             </div>
           )}
 
-          {/* ── Insights list ────────────────────────────────────────── */}
+          {/* ── Draft insights ────────────────────────────────────────── */}
+          {draftInsights.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <p className="text-2xs text-cortx-text-secondary/40 uppercase tracking-wider font-mono">
+                  {t.insightPanel.draftSectionTitle}
+                </p>
+                <p className="text-2xs text-cortx-accent/40 italic">
+                  {t.insightPanel.draftLabel(draftInsights.length)}
+                </p>
+              </div>
+              {draftInsights.map((draft) => (
+                <DraftCard key={draft.id} draft={draft} />
+              ))}
+            </div>
+          )}
+
+          {/* ── Insights list ─────────────────────────────────────────── */}
           {newInsights.length === 0 ? (
             <div className="text-center py-3">
               {isActive ? (

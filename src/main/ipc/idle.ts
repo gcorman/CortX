@@ -26,8 +26,16 @@ export function registerIdleHandlers(
     return getIdleService().getInsights()
   })
 
+  ipcMain.handle('idle:getDraftInsights', () => {
+    return getIdleService().getDraftInsights()
+  })
+
   ipcMain.handle('idle:dismissInsight', (_event, id: string) => {
     getIdleService().dismissInsight(id)
+  })
+
+  ipcMain.handle('idle:promoteDraft', (_event, id: string) => {
+    return getIdleService().promoteDraft(id)
   })
 
   ipcMain.handle('idle:saveInsightAsFiche', async (_event, id: string) => {

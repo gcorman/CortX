@@ -224,6 +224,10 @@ export interface T {
     analyzing: string
     insightFound: string
     resting: string
+    draftSectionTitle: string
+    promote: string
+    promoteTitle: string
+    draftLabel: (count: number) => string
   }
   insightCard: {
     opportunity: string
@@ -599,13 +603,17 @@ const fr: T = {
     accumulating: "L'agent accumule des intuitions en silence…",
     draft: 'brouillon',
     drafts: 'brouillons',
-    synthesizing: 'en cours de synthèse',
+    synthesizing: 'synthèse auto toutes les 3 cycles',
     activateIdle: "Activez le mode Idle pour lancer l'exploration du graphe.",
     selecting: 'Sélection...',
     examining: 'Examen...',
     analyzing: 'Analyse...',
     insightFound: 'Insight trouvé !',
-    resting: 'En pause...'
+    resting: 'En pause...',
+    draftSectionTitle: 'Brouillons',
+    promote: 'Promouvoir',
+    promoteTitle: 'Convertir ce brouillon en insight',
+    draftLabel: (count) => `${count} brouillon${count > 1 ? 's' : ''} — synthèse auto toutes les 3 cycles`
   },
   insightCard: {
     opportunity: 'Opportunité',
@@ -981,13 +989,17 @@ const en: T = {
     accumulating: 'Agent quietly accumulating insights…',
     draft: 'draft',
     drafts: 'drafts',
-    synthesizing: 'being synthesized',
+    synthesizing: 'auto-synthesis every 3 cycles',
     activateIdle: 'Enable Idle mode to start graph exploration.',
     selecting: 'Selecting...',
     examining: 'Examining...',
     analyzing: 'Analyzing...',
     insightFound: 'Insight found!',
-    resting: 'Resting...'
+    resting: 'Resting...',
+    draftSectionTitle: 'Drafts',
+    promote: 'Promote',
+    promoteTitle: 'Promote this draft to an insight',
+    draftLabel: (count) => `${count} draft${count > 1 ? 's' : ''} — auto-synthesis every 3 cycles`
   },
   insightCard: {
     opportunity: 'Opportunity',
