@@ -4,6 +4,7 @@ import { CenterPanel } from './CenterPanel'
 import { RightPanel } from './RightPanel'
 import { StatusBar } from './StatusBar'
 import { Toast } from '../common/Toast'
+import { UpdateBanner } from '../common/UpdateBanner'
 import { SettingsDialog } from '../settings/SettingsDialog'
 import { CreateFileDialog } from '../dialogs/CreateFileDialog'
 import { PanelRightOpen } from 'lucide-react'
@@ -42,6 +43,9 @@ export function AppShell(): React.JSX.Element {
 
   return (
     <div className="flex flex-col h-screen bg-cortx-bg overflow-hidden">
+      {/* Update notification banner */}
+      <UpdateBanner />
+
       {/* Main content */}
       <div ref={containerRef} className="flex-1 flex min-h-0">
         {/* Left Panel */}

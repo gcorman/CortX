@@ -445,6 +445,7 @@ export interface CortxAPI {
     getConfig(): Promise<AppConfig>
     setConfig(config: Partial<AppConfig>): Promise<void>
     resetBase(): Promise<void>
+    openExternal(url: string): Promise<void>
   }
   library: {
     ingest(absolutePath: string): Promise<LibraryDocument>

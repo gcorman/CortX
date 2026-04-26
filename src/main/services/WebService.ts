@@ -116,7 +116,6 @@ export class WebService {
       )
       if (res.ok) {
         const html = await res.text()
-        console.log('[WebService] DDG Lite tail:', html.substring(html.length - 4000))
         const results = this.parseDuckDuckGoLiteHtml(html, limit)
         if (results.length > 0) return results
         console.warn('[WebService] DDG Lite returned 0 results, falling back to html endpoint')
@@ -149,7 +148,6 @@ export class WebService {
 
     if (!res.ok) throw new Error(`DuckDuckGo search failed: HTTP ${res.status}`)
     const html = await res.text()
-    console.log('[WebService] DDG HTML snippet:', html.substring(0, 800))
     return this.parseDuckDuckGoHtml(html, limit)
   }
 

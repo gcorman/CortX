@@ -13,6 +13,7 @@ import { normalizeActions } from '../utils/actionNormalize'
 import type { RawAction } from '../utils/actionNormalize'
 import {
   extractBalancedJson,
+  extractLastBalancedJson,
   closeUnclosedBraces,
   repairJson,
   toDisplayString,
@@ -242,11 +243,23 @@ export class AgentPipeline {
       onStreamDelta?.(delta)
     }
 
-    const rawResponse = await this.llmService.sendMessage(
-      [{ role: 'user', content: input }],
+    // For Anthropic: prefill the assistant turn with `{` to force JSON-only output.
+    // The model continues after `{` — we prepend it back to the response for parsing.
+    const provider = this.llmService.getConfig().provider
+    const usesPrefill = provider === 'anthropic'
+    const messages: Array<{ role: string; content: string }> = [
+      { role: 'user', content: input }
+    ]
+    if (usesPrefill) {
+      messages.push({ role: 'assistant', content: '{' })
+    }
+
+    const rawResponseStream = await this.llmService.sendMessage(
+      messages,
       systemPrompt,
       wrappedOnDelta
     )
+    const rawResponse = usesPrefill ? '{' + rawResponseStream : rawResponseStream
 
     emit({ kind: 'phase', phase: 'proposing' })
     console.log('[AgentPipeline] Raw LLM response length:', rawResponse.length)
@@ -906,9 +919,15 @@ export class AgentPipeline {
     const codeBlockMatch = trimmed.match(/```(?:json)?\s*\n?([\s\S]*?)```/i)
     if (codeBlockMatch) candidates.push(codeBlockMatch[1].trim())
 
-    // Prefer a balanced {...} slice — survives prose before/after the JSON.
+    // First balanced {...} slice — survives prose after JSON.
     const balanced = extractBalancedJson(trimmed)
     if (balanced) candidates.push(balanced)
+
+    // Last balanced {...} slice — survives reasoning prose BEFORE JSON.
+    // LLMs sometimes emit bullet-point analysis before the actual JSON object.
+    const lastBalanced = extractLastBalancedJson(trimmed)
+    if (lastBalanced && lastBalanced !== balanced) candidates.push(lastBalanced)
+
     const jsonMatch = trimmed.match(/\{[\s\S]*\}/)
     if (jsonMatch) candidates.push(jsonMatch[0].trim())
 
@@ -921,7 +940,7 @@ export class AgentPipeline {
 
     // Last-ditch: LLM truncated mid-object. Close open strings/brackets/braces
     // and try once more on the best candidate we have.
-    const bestCandidate = balanced ?? jsonMatch?.[0] ?? trimmed
+    const bestCandidate = lastBalanced ?? balanced ?? jsonMatch?.[0] ?? trimmed
     const closed = this.tryParseJson(repairJson(closeUnclosedBraces(bestCandidate)))
     if (closed) return this.normalizeParsed(closed)
 

@@ -385,6 +385,11 @@ export interface T {
   appShell: {
     openAgentPanel: string
   }
+  updateBanner: {
+    newVersion: string
+    download: string
+    dismiss: string
+  }
 }
 
 const fr: T = {
@@ -770,6 +775,11 @@ const fr: T = {
   },
   appShell: {
     openAgentPanel: 'Ouvrir le panneau agent'
+  },
+  updateBanner: {
+    newVersion: 'Nouvelle version disponible',
+    download: 'Télécharger',
+    dismiss: 'Ignorer'
   }
 }
 
@@ -1156,6 +1166,11 @@ const en: T = {
   },
   appShell: {
     openAgentPanel: 'Open agent panel'
+  },
+  updateBanner: {
+    newVersion: 'New version available',
+    download: 'Download',
+    dismiss: 'Dismiss'
   }
 }
 

@@ -319,6 +319,8 @@ CHECKLIST BEFORE EMITTING YOUR JSON RESPONSE:
 [ ] Each "create" has complete frontmatter with "type" consistent with the folder.
 [ ] For each entity mentioned that exists in context, I use "modify" not "create".
 [ ] My JSON is valid, no text before or after, no markdown block around it.
+
+MANDATORY START: The VERY FIRST character of your response must be \`{\`. No analysis, no reasoning, no bullet points — only the JSON.
 `
     return prompt
   }
@@ -399,6 +401,8 @@ CHECKLIST AVANT D'EMETTRE TA REPONSE JSON :
 [ ] Chaque "create" a un frontmatter complet avec "type" cohérent avec le dossier.
 [ ] Pour chaque entite mentionnee qui existe dans le contexte, j'utilise "modify" pas "create".
 [ ] Mon JSON est valide, sans texte avant ou apres, sans bloc markdown autour.
+
+DÉMARRAGE OBLIGATOIRE : Le TOUT PREMIER caractère de ta réponse doit être \`{\`. Aucune analyse, aucun raisonnement, aucune liste à puces — uniquement le JSON.
 `
 
   return prompt

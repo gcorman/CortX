@@ -786,7 +786,6 @@ Fournis un court motif pour chaque sélection (1 phrase).
 
       // Prepend to queue (fresh LLM picks take priority over stale ones)
       this.llmTargetQueue = [...newTargets, ...this.llmTargetQueue].slice(0, LLM_TARGET_BATCH * 2)
-      console.log(`[IdleService] LLM selected ${newTargets.length} targets`)
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return
       console.error('[IdleService] Target selection error:', err)

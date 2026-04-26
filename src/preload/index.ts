@@ -59,7 +59,8 @@ const api: CortxAPI = {
     openDirectoryDialog: () => ipcRenderer.invoke('app:openDirectoryDialog'),
     getConfig: () => ipcRenderer.invoke('app:getConfig'),
     setConfig: (config) => ipcRenderer.invoke('app:setConfig', config),
-    resetBase: () => ipcRenderer.invoke('app:resetBase')
+    resetBase: () => ipcRenderer.invoke('app:resetBase'),
+    openExternal: (url: string) => ipcRenderer.invoke('app:openExternal', url)
   },
   library: {
     ingest: (absolutePath: string) => ipcRenderer.invoke('library:ingest', absolutePath),

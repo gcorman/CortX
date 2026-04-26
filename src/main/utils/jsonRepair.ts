@@ -11,15 +11,11 @@
  */
 
 /**
- * Scan `text` and return the first balanced `{...}` slice, respecting string
- * literals and escapes. Returns null if no balanced object is found.
- * Preferred over a greedy `/\{[\s\S]*\}/` regex because it handles:
- *   - trailing prose after the JSON ("... and here are the actions.")
- *   - multiple `{...}` segments (picks the first complete one)
- *   - braces that appear inside string values
+ * Scan `text` and return the first balanced `{...}` slice starting at or after
+ * `startPos`, respecting string literals and escapes.
  */
-export function extractBalancedJson(text: string): string | null {
-  const start = text.indexOf('{')
+export function extractBalancedJson(text: string, startPos: number = 0): string | null {
+  const start = text.indexOf('{', startPos)
   if (start === -1) return null
 
   let depth = 0
@@ -43,6 +39,23 @@ export function extractBalancedJson(text: string): string | null {
   }
 
   return null
+}
+
+/**
+ * Return the LAST balanced `{...}` slice in `text`. Used when an LLM prepends
+ * reasoning prose before the JSON object — the real JSON is at the end.
+ */
+export function extractLastBalancedJson(text: string): string | null {
+  let last: string | null = null
+  let pos = 0
+  while (true) {
+    const idx = text.indexOf('{', pos)
+    if (idx === -1) break
+    const candidate = extractBalancedJson(text, idx)
+    if (candidate) last = candidate
+    pos = idx + 1
+  }
+  return last
 }
 
 /**

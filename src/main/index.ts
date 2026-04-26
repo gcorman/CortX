@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, net } from 'electron'
 import { join, resolve, parse, isAbsolute } from 'path'
 import * as fs from 'fs'
 import { registerDatabaseHandlers } from './ipc/database'
@@ -21,6 +21,35 @@ import { pythonSidecar } from './services/PythonSidecar'
 import type { AppConfig } from '../shared/types'
 
 let mainWindow: BrowserWindow | null = null
+
+// --- Update check ---
+
+function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  for (let i = 0; i < 3; i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0)
+    if (diff !== 0) return diff
+  }
+  return 0
+}
+
+async function checkForUpdates(): Promise<void> {
+  try {
+    const res = await net.fetch('https://api.github.com/repos/gcorman/CortX/releases/latest', {
+      headers: { 'User-Agent': 'CortX-App' }
+    })
+    if (!res.ok) return
+    const data = await res.json() as { tag_name: string; html_url: string }
+    const latest = data.tag_name.replace(/^v/, '')
+    const current = app.getVersion()
+    if (compareVersions(latest, current) > 0) {
+      mainWindow?.webContents.send('app:updateAvailable', { version: latest, url: data.html_url })
+    }
+  } catch {
+    // Network unavailable — silently skip
+  }
+}
 
 // --- Config persistence ---
 
@@ -314,6 +343,12 @@ function registerAppHandlers(): void {
     console.log('[Reset] Base de connaissances réinitialisée')
   })
 
+  ipcMain.handle('app:openExternal', (_event, url: string) => {
+    if (url.startsWith('https://') || url.startsWith('http://')) {
+      shell.openExternal(url)
+    }
+  })
+
   ipcMain.handle('app:setConfig', (_event, partial: Partial<AppConfig>) => {
     if (partial.llm) {
       // '***' = masked placeholder from renderer; '' = field left blank — both preserve existing key
@@ -353,6 +388,11 @@ app.whenReady().then(async () => {
   createWindow()
   // Give IdleService access to the main window for IPC events
   if (mainWindow) idleService.setWindow(mainWindow)
+
+  // Check for new GitHub release after window is ready
+  mainWindow?.webContents.once('did-finish-load', () => {
+    setTimeout(() => checkForUpdates(), 3000)
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
