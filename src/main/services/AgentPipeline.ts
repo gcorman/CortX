@@ -341,7 +341,7 @@ export class AgentPipeline {
       console.error('[AgentPipeline] Git commit failed:', err)
     }
 
-    await this.reindexAll()
+    await this.reindexFiles(execActions.map((a) => a.file))
 
     this.dbService.logAgentAction(
       summary,
@@ -442,7 +442,7 @@ export class AgentPipeline {
       console.error('[AgentPipeline] Git commit failed on saveBrief:', err)
     }
 
-    await this.reindexAll()
+    await this.reindexFiles([filePath])
 
     this.dbService.logAgentAction(
       `Fiche generee : ${subject}`,
@@ -544,7 +544,7 @@ export class AgentPipeline {
       console.error('[AgentPipeline] Git commit failed on rewriteFile:', err)
     }
 
-    await this.reindexAll()
+    await this.reindexFiles([filePath])
 
     this.dbService.logAgentAction(
       `Reecriture de ${filePath}`,
@@ -572,7 +572,9 @@ export class AgentPipeline {
     } catch (err) {
       console.error('[AgentPipeline] Git commit failed on deleteFile:', err)
     }
-    await this.reindexAll()
+    // removeFile already cleaned entities/relations/FTS — just notify renderer
+    this.updateKbEmbeddingsAsync().catch(() => {})
+    this.notifyRenderer?.()
   }
 
   /**
@@ -582,13 +584,14 @@ export class AgentPipeline {
     if (!filePath.startsWith('Fiches/')) {
       throw new Error('deleteFiche refuses any path outside Fiches/')
     }
+    this.dbService.removeFile(filePath)
     await this.fileService.deleteFile(filePath)
     try {
       await this.gitService.commitAll(`Delete fiche: ${filePath}`)
     } catch (err) {
       console.error('[AgentPipeline] Git commit failed on deleteFiche:', err)
     }
-    await this.reindexAll()
+    this.notifyRenderer?.()
   }
 
   /**
@@ -612,7 +615,7 @@ export class AgentPipeline {
     } catch (err) {
       console.error('[AgentPipeline] importRawMarkdown: git error', err)
     }
-    await this.reindexAll()
+    await this.reindexFiles([relPath])
     return { path: relPath }
   }
 
@@ -640,7 +643,13 @@ export class AgentPipeline {
       console.error('[AgentPipeline] Git commit failed on manual edit:', err)
     }
 
-    await this.reindexAll()
+    // Title rename updates wikilinks in all KB files → must full reindex.
+    // No rename → targeted reindex of the single edited file is sufficient.
+    if (oldTitle !== newTitle) {
+      await this.reindexAll()
+    } else {
+      await this.reindexFiles([filePath])
+    }
 
     this.dbService.logAgentAction(
       `Edition manuelle de ${filePath}`,
@@ -688,6 +697,34 @@ export class AgentPipeline {
 
     // Generate semantic embeddings for new/modified KB files (best-effort, non-blocking).
     // Runs after the sync indexing so it never delays the agent response.
+    this.updateKbEmbeddingsAsync().catch((err) =>
+      console.warn('[AgentPipeline] KB embedding update failed:', err)
+    )
+
+    this.notifyRenderer?.()
+  }
+
+  /**
+   * Incremental reindex: only process the given files rather than the full KB.
+   * Use for targeted operations (create/modify a few files). All entities from
+   * the rest of the KB are already in the DB, so two-pass within the subset is
+   * sufficient for wikilink resolution.
+   * Do NOT call this after deletions (use reindexAll or removeFile + notify).
+   */
+  private async reindexFiles(paths: string[]): Promise<void> {
+    const unique = [...new Set(paths)]
+    const contents = []
+    for (const filePath of unique) {
+      try {
+        const content = await this.fileService.readFile(filePath)
+        if (content) contents.push(content)
+      } catch (err) {
+        console.error('[AgentPipeline] reindexFiles: failed to read', filePath, err)
+      }
+    }
+    for (const content of contents) this.dbService.indexFileEntities(content)
+    for (const content of contents) this.dbService.indexFileRelations(content)
+
     this.updateKbEmbeddingsAsync().catch((err) =>
       console.warn('[AgentPipeline] KB embedding update failed:', err)
     )

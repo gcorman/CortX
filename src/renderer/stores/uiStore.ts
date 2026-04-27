@@ -21,6 +21,12 @@ interface UIState {
   // Title editing
   titleEditingPath: string | null
 
+  // Command palette
+  commandPaletteOpen: boolean
+  toggleCommandPalette: () => void
+  openCommandPalette: () => void
+  closeCommandPalette: () => void
+
   // .md import modal (drag-drop or + button)
   mdImportModal: { filename: string; content: string; absolutePath: string } | null
   showMdImportModal: (file: { filename: string; content: string; absolutePath: string }) => void
@@ -74,6 +80,12 @@ export const useUIStore = create<UIState>((set) => ({
 
   // Title editing
   titleEditingPath: null,
+
+  // Command palette
+  commandPaletteOpen: false,
+  toggleCommandPalette: () => set((s) => ({ commandPaletteOpen: !s.commandPaletteOpen })),
+  openCommandPalette: () => set({ commandPaletteOpen: true }),
+  closeCommandPalette: () => set({ commandPaletteOpen: false }),
 
   // .md import modal
   mdImportModal: null,

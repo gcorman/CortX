@@ -68,6 +68,8 @@ interface ChatState {
   streamPartialActions: PartialAction[]
   /** Set of suggestion texts the user has dismissed — hides them from chat AND right panel */
   dismissedSuggestions: Set<string>
+  /** Commit hash of the last successfully executed agent action — used for global Ctrl+Z undo. */
+  lastExecutedCommit: string | null
   sendMessage: (content: string) => Promise<void>
   /** Analyze a dropped/imported .md file and ask the agent how to integrate it. */
   importMarkdown: (filename: string, content: string) => Promise<void>
@@ -307,6 +309,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   streamWebFetches: [],
   streamPartialActions: [],
   dismissedSuggestions: new Set<string>(),
+  lastExecutedCommit: null,
 
   sendMessage: async (content: string) => {
     // Stop idle mode when user interacts — agent focuses on the conversation
@@ -620,6 +623,7 @@ input_type="information"`
         toAccept.map((a) => ({ id: a.id, status: 'validated' as const })),
         commitHash
       )
+      if (commitHash) set({ lastExecutedCommit: commitHash })
       useUIStore.getState().addToast(`${toAccept.length} action(s) appliquée(s)`, 'success')
       useGraphStore.getState().loadGraph()
       useFileStore.getState().loadFiles()

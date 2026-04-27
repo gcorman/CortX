@@ -41,31 +41,53 @@ export function registerAgentHandlers(getAgent: () => AgentPipeline): void {
     }
   })
 
-  ipcMain.handle('agent:execute', (_event, actions: AgentAction[], summary: string) =>
-    getAgent().execute(actions, summary)
-  )
+  ipcMain.handle('agent:execute', async (event, actions: AgentAction[], summary: string) => {
+    const result = await getAgent().execute(actions, summary)
+    event.sender.send('db:changed')
+    return result
+  })
 
   ipcMain.handle('agent:preview', (_event, action: AgentAction) =>
     getAgent().preview(action)
   )
 
-  ipcMain.handle('agent:undo', (_event, commitHash: string) => getAgent().undo(commitHash))
+  ipcMain.handle('agent:undo', async (event, commitHash: string) => {
+    const result = await getAgent().undo(commitHash)
+    event.sender.send('db:changed')
+    return result
+  })
 
-  ipcMain.handle('agent:saveManualEdit', (_event, filePath: string, content: string) =>
-    getAgent().saveManualEdit(filePath, content)
-  )
+  ipcMain.handle('agent:saveManualEdit', async (event, filePath: string, content: string) => {
+    const result = await getAgent().saveManualEdit(filePath, content)
+    event.sender.send('db:changed')
+    return result
+  })
 
-  ipcMain.handle('agent:saveBrief', (_event, subject: string, body: string, kind?: string) =>
-    getAgent().saveBrief(subject, body, kind)
-  )
+  ipcMain.handle('agent:saveBrief', async (event, subject: string, body: string, kind?: string) => {
+    const result = await getAgent().saveBrief(subject, body, kind)
+    event.sender.send('db:changed')
+    return result
+  })
 
   ipcMain.handle('agent:listFiches', () => getAgent().listFiches())
 
-  ipcMain.handle('agent:deleteFiche', (_event, filePath: string) => getAgent().deleteFiche(filePath))
+  ipcMain.handle('agent:deleteFiche', async (event, filePath: string) => {
+    const result = await getAgent().deleteFiche(filePath)
+    event.sender.send('db:changed')
+    return result
+  })
 
-  ipcMain.handle('agent:rewriteFile', (_event, filePath: string) => getAgent().rewriteFile(filePath))
+  ipcMain.handle('agent:rewriteFile', async (event, filePath: string) => {
+    const result = await getAgent().rewriteFile(filePath)
+    event.sender.send('db:changed')
+    return result
+  })
 
-  ipcMain.handle('agent:deleteFile', (_event, filePath: string) => getAgent().deleteFile(filePath))
+  ipcMain.handle('agent:deleteFile', async (event, filePath: string) => {
+    const result = await getAgent().deleteFile(filePath)
+    event.sender.send('db:changed')
+    return result
+  })
 
   ipcMain.handle('agent:wikiToMd', (_event, topic: string, lang?: string) =>
     getAgent().wikiToMd(topic, lang)
@@ -75,7 +97,9 @@ export function registerAgentHandlers(getAgent: () => AgentPipeline): void {
     getAgent().previewWebContext(input)
   )
 
-  ipcMain.handle('agent:importRawMarkdown', (_event, filename: string, content: string) =>
-    getAgent().importRawMarkdown(filename, content)
-  )
+  ipcMain.handle('agent:importRawMarkdown', async (event, filename: string, content: string) => {
+    const result = await getAgent().importRawMarkdown(filename, content)
+    event.sender.send('db:changed')
+    return result
+  })
 }

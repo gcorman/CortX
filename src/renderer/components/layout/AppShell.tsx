@@ -7,14 +7,16 @@ import { Toast } from '../common/Toast'
 import { UpdateBanner } from '../common/UpdateBanner'
 import { SettingsDialog } from '../settings/SettingsDialog'
 import { CreateFileDialog } from '../dialogs/CreateFileDialog'
+import { CommandPalette } from '../common/CommandPalette'
 import { PanelRightOpen } from 'lucide-react'
 import { useUIStore } from '../../stores/uiStore'
 import { useFileStore } from '../../stores/fileStore'
+import { useChatStore } from '../../stores/chatStore'
 import { registerDbChangedListener } from '../../stores/graphStore'
 import { useT } from '../../i18n'
 
 export function AppShell(): React.JSX.Element {
-  const { rightPanelVisible, toggleRightPanel, theme } = useUIStore()
+  const { rightPanelVisible, toggleRightPanel, theme, setTheme, addToast, openCommandPalette } = useUIStore()
   const t = useT()
   const loadFiles = useFileStore((s) => s.loadFiles)
 
@@ -24,10 +26,15 @@ export function AppShell(): React.JSX.Element {
   }, [theme])
 
   // Keep the file list loaded so wikilink resolution works everywhere.
+  // Event-driven: refresh on kb:changed, with 30s fallback for external edits.
   useEffect(() => {
     loadFiles()
-    const id = setInterval(loadFiles, 5000)
-    return () => clearInterval(id)
+    window.cortx.on('db:changed', loadFiles)
+    const id = setInterval(loadFiles, 30000)
+    return () => {
+      window.cortx.off('db:changed', loadFiles)
+      clearInterval(id)
+    }
   }, [loadFiles])
 
   // Register file-store reload callback so graphStore can trigger it
@@ -35,6 +42,46 @@ export function AppShell(): React.JSX.Element {
   useEffect(() => {
     registerDbChangedListener(loadFiles)
   }, [loadFiles])
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => {
+      const inInput = ['INPUT', 'TEXTAREA'].includes((e.target as Element)?.tagName ?? '')
+        || (e.target as HTMLElement)?.isContentEditable
+
+      // Ctrl+K → command palette
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        openCommandPalette()
+        return
+      }
+
+      // Ctrl+/ → toggle theme
+      if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+        e.preventDefault()
+        setTheme(theme === 'dark' ? 'light' : 'dark')
+        return
+      }
+
+      // Ctrl+Z → undo last agent commit (not in text inputs)
+      if (!inInput && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        const lastCommit = useChatStore.getState().lastExecutedCommit
+        if (lastCommit) {
+          e.preventDefault()
+          window.cortx.agent.undo(lastCommit)
+            .then(() => {
+              useChatStore.setState({ lastExecutedCommit: null })
+              addToast('Dernière action annulée', 'info')
+            })
+            .catch((err: unknown) => addToast(`Undo échoué : ${err}`, 'error'))
+        }
+        return
+      }
+
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [theme, setTheme, addToast, openCommandPalette])
 
   // Panel widths in pixels
   const containerRef = useRef<HTMLDivElement>(null)
@@ -94,6 +141,9 @@ export function AppShell(): React.JSX.Element {
 
       {/* Create File Dialog */}
       <CreateFileDialog />
+
+      {/* Command Palette */}
+      <CommandPalette />
     </div>
   )
 }

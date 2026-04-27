@@ -64,8 +64,12 @@ export function StatusBar(): React.JSX.Element {
 
   useEffect(() => {
     refresh()
-    const interval = setInterval(refresh, 5000)
-    return () => clearInterval(interval)
+    window.cortx.on('db:changed', refresh)
+    const interval = setInterval(refresh, 30000)
+    return () => {
+      window.cortx.off('db:changed', refresh)
+      clearInterval(interval)
+    }
   }, [refresh])
 
   // Also refresh when settings close
