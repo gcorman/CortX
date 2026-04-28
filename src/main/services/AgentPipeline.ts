@@ -506,21 +506,38 @@ export class AgentPipeline {
     const content = await this.fileService.readFile(filePath)
     if (!content) throw new Error(`Fichier introuvable : ${filePath}`)
 
-    const systemPrompt = [
-      'Tu es un expert en organisation de notes Markdown.',
-      'Reorganise proprement ce fichier Markdown SANS perdre la moindre information et SANS modifier les wikilinks [[...]].',
-      '',
-      'REGLES ABSOLUES :',
-      '1. Conserve TOUTES les informations existantes — rien ne doit disparaitre.',
-      '2. Ne modifie pas les wikilinks [[Nom]] — laisse-les exactement tels quels.',
-      '3. Conserve le frontmatter YAML tel quel (entre les --- markers), sauf mettre a jour le champ "modified" avec la date du jour.',
-      '4. Restructure le corps en sections logiques avec des titres ## clairs.',
-      '5. Elimine les doublons evidents, regroupe les informations liees, utilise des bullet points si pertinent.',
-      '6. Retourne UNIQUEMENT le contenu Markdown final, sans commentaire, sans explication, sans bloc de code.'
-    ].join('\n')
+    const systemPrompt = this.language === 'en'
+      ? [
+          'You are an expert Markdown notes organizer.',
+          'Reorganize this Markdown file WITHOUT losing any information and WITHOUT modifying [[wikilinks]].',
+          '',
+          'ABSOLUTE RULES:',
+          '1. Keep ALL existing information — nothing must disappear.',
+          '2. Do NOT modify wikilinks [[Name]] — leave them exactly as-is.',
+          '3. Keep YAML frontmatter unchanged (between --- markers), except update the "modified" field to today.',
+          '4. Restructure the body into logical sections with clear ## headings.',
+          '5. Remove obvious duplicates, group related info, use bullet points when relevant.',
+          '6. Return ONLY the final Markdown content, no commentary, no explanation, no code fence.'
+        ].join('\n')
+      : [
+          'Tu es un expert en organisation de notes Markdown.',
+          'Reorganise proprement ce fichier Markdown SANS perdre la moindre information et SANS modifier les wikilinks [[...]].',
+          '',
+          'REGLES ABSOLUES :',
+          '1. Conserve TOUTES les informations existantes — rien ne doit disparaitre.',
+          '2. Ne modifie pas les wikilinks [[Nom]] — laisse-les exactement tels quels.',
+          '3. Conserve le frontmatter YAML tel quel (entre les --- markers), sauf mettre a jour le champ "modified" avec la date du jour.',
+          '4. Restructure le corps en sections logiques avec des titres ## clairs.',
+          '5. Elimine les doublons evidents, regroupe les informations liees, utilise des bullet points si pertinent.',
+          '6. Retourne UNIQUEMENT le contenu Markdown final, sans commentaire, sans explication, sans bloc de code.'
+        ].join('\n')
+
+    const userContent = this.language === 'en'
+      ? `Here is the file to reorganize:\n\n${content.raw}`
+      : `Voici le fichier a reorganiser :\n\n${content.raw}`
 
     const raw = await this.llmService.sendMessage(
-      [{ role: 'user', content: `Voici le fichier a reorganiser :\n\n${content.raw}` }],
+      [{ role: 'user', content: userContent }],
       systemPrompt
     )
 

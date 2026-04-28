@@ -413,21 +413,40 @@ ${wikilinkLines}
   private async runSynthesis(lastNodeIds: string[]): Promise<void> {
     if (this.draftInsights.length < 2) { this.draftInsights = []; return }
 
-    const langNote = this.language === 'en'
-      ? '\nAlways write the "content" field in English.'
-      : '\nRédige toujours le champ "content" en français.'
-
-    const systemPrompt = `Tu es un analyste expert en bases de connaissances personnelles.
-Tu reçois des intuitions provisoires collectées sur le graphe de connaissances d'un utilisateur.
-Tu dois identifier AU MAXIMUM 1 insight vraiment remarquable et le réécrire de façon précise et percutante.
-Sois EXTRÊMEMENT sélectif. Réponds en JSON strict, rien d'autre.${langNote}`
-
     const draftList = this.draftInsights
       .sort((a, b) => b.confidence - a.confidence)
-      .map((d, i) => `${i + 1}. [${d.category}] "${d.content}" — entités: ${d.entityNames.join(', ')} (confiance brute: ${Math.round(d.confidence * 100)}%)`)
+      .map((d, i) => this.language === 'en'
+        ? `${i + 1}. [${d.category}] "${d.content}" — entities: ${d.entityNames.join(', ')} (raw confidence: ${Math.round(d.confidence * 100)}%)`
+        : `${i + 1}. [${d.category}] "${d.content}" — entités: ${d.entityNames.join(', ')} (confiance brute: ${Math.round(d.confidence * 100)}%)`)
       .join('\n')
 
-    const userMsg = `Voici ${this.draftInsights.length} intuitions provisoires collectées en explorant la base de connaissances :
+    const systemPrompt = this.language === 'en'
+      ? `You are an expert knowledge base analyst.\nYou receive provisional insights collected from a user's knowledge graph.\nIdentify AT MOST 1 truly remarkable insight and rewrite it precisely and sharply.\nBe EXTREMELY selective. Reply in strict JSON, nothing else.`
+      : `Tu es un analyste expert en bases de connaissances personnelles.\nTu reçois des intuitions provisoires collectées sur le graphe de connaissances d'un utilisateur.\nTu dois identifier AU MAXIMUM 1 insight vraiment remarquable et le réécrire de façon précise et percutante.\nSois EXTRÊMEMENT sélectif. Réponds en JSON strict, rien d'autre.`
+
+    const userMsg = this.language === 'en'
+      ? `Here are ${this.draftInsights.length} provisional insights collected from the knowledge base:
+
+${draftList}
+
+## SYNTHESIS MISSION
+Select 0 or 1 insight (never more) that truly deserves to be highlighted.
+
+Absolute priority for insights that:
+1. Reveal a **concrete opportunity** not yet exploited
+2. Point toward something **directly actionable**
+3. Are **surprising** — something the user would not know without this analysis
+
+Systematically discard:
+- Purely structural insights ("a link is missing", "expected connection")
+- Generic or obvious insights
+- Anything with raw confidence < 0.75
+
+Rewrite and refine the selected insight to make it more precise and impactful.
+
+If none qualifies: {"promoted": []}
+Otherwise (max 1): {"promoted": [{"category": "opportunity|development|pattern|contradiction|hidden_connection|gap|cluster", "content": "...", "confidence": 0.0, "entityNames": ["..."], "entityIds": ["..."]}]}`
+      : `Voici ${this.draftInsights.length} intuitions provisoires collectées en explorant la base de connaissances :
 
 ${draftList}
 
@@ -715,12 +734,39 @@ Sinon (max 1) : {"promoted": [{"category": "opportunity|development|pattern|cont
 
     const alreadyExplored = [...this.exploredPairs].slice(-30).join(', ')
 
-    const systemPrompt = `Tu es un analyste stratégique qui aide un utilisateur à explorer sa base de connaissances personnelle.
-Tu reçois le graphe complet (entités, relations, insights déjà trouvés).
-Ta mission : identifier les ${LLM_TARGET_BATCH} binômes ou groupes d'entités les PLUS PROMETTEURS à analyser en profondeur.
-Réponds UNIQUEMENT en JSON valide.`
+    const systemPrompt = this.language === 'en'
+      ? `You are a strategic analyst helping a user explore their personal knowledge base.\nYou receive the full graph (entities, relations, insights already found).\nYour mission: identify the ${LLM_TARGET_BATCH} most promising entity pairs or groups to analyze in depth.\nReply ONLY in valid JSON.`
+      : `Tu es un analyste stratégique qui aide un utilisateur à explorer sa base de connaissances personnelle.\nTu reçois le graphe complet (entités, relations, insights déjà trouvés).\nTa mission : identifier les ${LLM_TARGET_BATCH} binômes ou groupes d'entités les PLUS PROMETTEURS à analyser en profondeur.\nRéponds UNIQUEMENT en JSON valide.`
 
-    const userMsg = `${summary}
+    const userMsg = this.language === 'en'
+      ? `${summary}
+
+## INSIGHTS ALREADY FOUND (avoid redundancy)
+${existingInsightNames || '(none yet)'}
+
+## ALREADY EXPLORED PAIRS (IDs, avoid these)
+${alreadyExplored || '(none)'}
+
+## MISSION
+Select exactly ${LLM_TARGET_BATCH} entity pairs or groups to explore as a priority.
+
+Selection criteria — in order of priority:
+1. **Unexpected bridge**: two entities of different types, without a direct relation, that could reveal a hidden opportunity
+2. **Latent tension**: entities that seem to be in contradiction or competition in the graph
+3. **Under-exploited cluster**: group of strongly connected entities whose links haven't been explored yet
+4. **Orphan pivot entity**: highly connected entity whose neighbors don't know each other
+5. **Cross-domain pair**: entities from very different domains — the most surprising connections often come from here
+
+Provide a short reason for each selection (1 sentence).
+
+## STRICT JSON FORMAT
+{
+  "targets": [
+    { "entityIds": [1, 2], "reason": "..." },
+    { "entityIds": [3, 4, 5], "reason": "..." }
+  ]
+}`
+      : `${summary}
 
 ## INSIGHTS DÉJÀ TROUVÉS (éviter la redondance)
 ${existingInsightNames || '(aucun pour l\'instant)'}
@@ -936,16 +982,54 @@ Fournis un court motif pour chaque sélection (1 phrase).
     context: string,
     onThoughtUpdate?: (thought: string) => void
   ): Promise<{ content: string; confidence: number; category: IdleInsight['category'] } | null> {
-    const langNote = this.language === 'en'
-      ? '\nAlways write the "content" field in English.'
-      : '\nRédige toujours le champ "content" en français.'
+    const systemPrompt = this.language === 'en'
+      ? `You are a strategic analyst exploring a personal knowledge base.\nYour role is to FIND connections, tensions and opportunities — even speculative ones.\nYou MUST ALWAYS produce an observation if the content allows it.\nReply ONLY in valid JSON, nothing else.`
+      : `Tu es un analyste stratégique qui explore une base de connaissances personnelle.\nTon rôle est de TROUVER des connexions, tensions et opportunités — même spéculatives.\nTu dois TOUJOURS produire une observation si le contenu le permet.\nRéponds UNIQUEMENT en JSON valide, rien d'autre.`
 
-    const systemPrompt = `Tu es un analyste stratégique qui explore une base de connaissances personnelle.
-Ton rôle est de TROUVER des connexions, tensions et opportunités — même spéculatives.
-Tu dois TOUJOURS produire une observation si le contenu le permet.
-Réponds UNIQUEMENT en JSON valide, rien d'autre.${langNote}`
+    const userMessage = this.language === 'en'
+      ? `${context}
 
-    const userMessage = `${context}
+## MISSION
+Analyze these entities and produce ONE useful observation for the user.
+
+**A) IN-DEPTH ANALYSIS — high priority**
+- Unexploited business, strategic or intellectual opportunity?
+- Under-represented topic that deserves deeper exploration?
+- Convergence between subjects pointing in the same direction?
+- Risk, tension or contradiction in the documented ideas?
+- Concrete angle of action implicitly suggested by the content?
+- If web context present: recent info that changes the game for these entities?
+
+**B) STRUCTURAL ANALYSIS — if nothing better**
+- Undocumented indirect link between these entities?
+- Expected connection that is missing?
+- Pattern in how these entities are related?
+
+## RULES
+- Be concrete and actionable (1-3 sentences max)
+- No generic or obvious advice
+- {"found": false} only if truly NO lead exists (rare case)
+
+## CONFIDENCE GUIDE
+- 0.60-1.0: well-founded observation, directly useful
+- 0.40-0.60: interesting lead, plausible
+- 0.28-0.40: speculative but worth noting
+- < 0.28: too uncertain → {"found": false}
+
+## CATEGORIES
+- opportunity: business, strategic or intellectual opportunity
+- development: under-developed aspect to deepen
+- pattern: recurring convergence or trend
+- contradiction: tension or inconsistency in the ideas
+- hidden_connection: undocumented indirect link
+- gap: expected connection that is absent
+- cluster: revealing thematic grouping
+
+## STRICT JSON FORMAT (nothing else)
+{"found": false}
+OR
+{"found": true, "category": "opportunity|development|pattern|contradiction|hidden_connection|gap|cluster", "content": "...", "confidence": 0.0}`
+      : `${context}
 
 ## MISSION
 Analyse ces entités et produis UNE observation utile pour l'utilisateur.
