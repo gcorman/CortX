@@ -845,7 +845,7 @@ export class DatabaseService {
 
   getTimeline(limit = 80): import('../../shared/types').TimelineEntry[] {
     type AgentRow = { id: number; timestamp: string; input_text: string; commit_hash: string; status: string }
-    type JournalRow = { path: string; title: string; modified: string }
+    type JournalRow = { path: string; title: string; modified_at: string }
 
     const agentRows = this.db.prepare(
       `SELECT id, timestamp, input_text, commit_hash, status FROM agent_log
@@ -853,7 +853,7 @@ export class DatabaseService {
     ).all(limit) as AgentRow[]
 
     const journalRows = this.db.prepare(
-      `SELECT path, title, modified FROM files WHERE type = 'journal' ORDER BY modified DESC LIMIT ?`
+      `SELECT path, title, modified_at FROM files WHERE type = 'journal' ORDER BY modified_at DESC LIMIT ?`
     ).all(limit) as JournalRow[]
 
     const entries: import('../../shared/types').TimelineEntry[] = [
@@ -868,7 +868,7 @@ export class DatabaseService {
       })),
       ...journalRows.map((r) => ({
         id: `journal-${r.path}`,
-        timestamp: r.modified,
+        timestamp: r.modified_at,
         kind: 'journal' as const,
         title: r.title || r.path.split('/').pop()?.replace('.md', '') || r.path,
         body: '',
