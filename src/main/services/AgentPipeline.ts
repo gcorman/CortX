@@ -584,12 +584,19 @@ export class AgentPipeline {
     // Remove from DB immediately so the graph/FTS are clean before commit
     this.dbService.removeFile(filePath)
     await this.fileService.deleteFile(filePath)
+    let commitHash = ''
     try {
-      await this.gitService.commitAll(`Delete: ${filePath}`)
+      commitHash = await this.gitService.commitAll(`Delete: ${filePath}`)
     } catch (err) {
       console.error('[AgentPipeline] Git commit failed on deleteFile:', err)
     }
     // removeFile already cleaned entities/relations/FTS — just notify renderer
+    this.dbService.logAgentAction(
+      `Suppression fichier : ${filePath}`,
+      'delete_file',
+      JSON.stringify([{ action: 'delete', file: filePath }]),
+      commitHash
+    )
     this.updateKbEmbeddingsAsync().catch(() => {})
     this.notifyRenderer?.()
   }
@@ -603,11 +610,18 @@ export class AgentPipeline {
     }
     this.dbService.removeFile(filePath)
     await this.fileService.deleteFile(filePath)
+    let commitHash = ''
     try {
-      await this.gitService.commitAll(`Delete fiche: ${filePath}`)
+      commitHash = await this.gitService.commitAll(`Delete fiche: ${filePath}`)
     } catch (err) {
       console.error('[AgentPipeline] Git commit failed on deleteFiche:', err)
     }
+    this.dbService.logAgentAction(
+      `Suppression fiche : ${filePath}`,
+      'delete_fiche',
+      JSON.stringify([{ action: 'delete', file: filePath }]),
+      commitHash
+    )
     this.notifyRenderer?.()
   }
 

@@ -826,6 +826,26 @@ export class DatabaseService {
     return lines.join('\n') || 'Aucune entite connue.'
   }
 
+  getFilesByTag(tag: string): CortxFile[] {
+    const rows = this.db.prepare(`
+      SELECT f.* FROM files f
+      WHERE EXISTS (SELECT 1 FROM json_each(f.tags) WHERE value = ?)
+      ORDER BY f.modified_at DESC
+    `).all(tag) as Array<{
+      path: string; type: string; title: string; tags: string; created_at: string; modified_at: string; status: string
+    }>
+    return rows.map((r) => ({
+      path: r.path,
+      type: r.type as CortxFile['type'],
+      title: r.title,
+      tags: JSON.parse(r.tags || '[]'),
+      created: r.created_at,
+      modified: r.modified_at,
+      related: [],
+      status: r.status as CortxFile['status']
+    }))
+  }
+
   getTopTags(limit = 10): string {
     const tags = this.getTags()
     return tags.slice(0, limit).map((t) => t.tag).join(', ') || 'Aucun tag.'
@@ -844,11 +864,14 @@ export class DatabaseService {
   // --- Agent Log ---
 
   getTimeline(limit = 80): import('../../shared/types').TimelineEntry[] {
-    type AgentRow = { id: number; timestamp: string; input_text: string; commit_hash: string; status: string }
+    type AgentRow = {
+      id: number; timestamp: string; input_text: string; input_type: string
+      actions_json: string; commit_hash: string; status: string
+    }
     type JournalRow = { path: string; title: string; modified_at: string }
 
     const agentRows = this.db.prepare(
-      `SELECT id, timestamp, input_text, commit_hash, status FROM agent_log
+      `SELECT id, timestamp, input_text, input_type, actions_json, commit_hash, status FROM agent_log
        WHERE status = 'success' ORDER BY timestamp DESC LIMIT ?`
     ).all(limit) as AgentRow[]
 
@@ -857,22 +880,51 @@ export class DatabaseService {
     ).all(limit) as JournalRow[]
 
     const entries: import('../../shared/types').TimelineEntry[] = [
-      ...agentRows.map((r) => ({
-        id: `agent-${r.id}`,
-        timestamp: r.timestamp,
-        kind: 'agent' as const,
-        title: r.input_text?.substring(0, 100) || 'Action agent',
-        body: r.input_text || '',
-        commitHash: r.commit_hash,
-        status: r.status
-      })),
+      ...agentRows.map((r) => {
+        let actionCount = 0
+        const actionVerbs: string[] = []
+        let smartTitle = r.input_text?.substring(0, 120) || 'Action agent'
+
+        try {
+          const acts = JSON.parse(r.actions_json || '[]') as Array<{ action?: string; file?: string }>
+          if (Array.isArray(acts) && acts.length > 0) {
+            actionCount = acts.length
+            const verbSet = new Set(acts.map((a) => a.action || 'modify'))
+            actionVerbs.push(...verbSet)
+
+            // Build smart title for 'execute' actions only (others already have good input_text)
+            if (r.input_type === 'execute' && (!r.input_text || r.input_text === 'CortX: actions validées')) {
+              const first = acts[0]
+              const fileName = (first.file || '').split('/').pop()?.replace('.md', '') || first.file || ''
+              const verb = first.action === 'create' ? 'Créé' : 'Modifié'
+              smartTitle = acts.length === 1
+                ? `${verb} ${fileName}`
+                : `${verb} ${fileName} +${acts.length - 1} autre${acts.length > 2 ? 's' : ''}`
+            }
+          }
+        } catch { /* keep defaults */ }
+
+        return {
+          id: `agent-${r.id}`,
+          timestamp: r.timestamp,
+          kind: 'agent' as const,
+          title: smartTitle,
+          body: r.input_text || '',
+          commitHash: r.commit_hash,
+          status: r.status,
+          inputType: r.input_type || 'execute',
+          actionCount,
+          actionVerbs
+        }
+      }),
       ...journalRows.map((r) => ({
         id: `journal-${r.path}`,
         timestamp: r.modified_at,
         kind: 'journal' as const,
         title: r.title || r.path.split('/').pop()?.replace('.md', '') || r.path,
         body: '',
-        filePath: r.path
+        filePath: r.path,
+        inputType: 'journal'
       }))
     ]
 

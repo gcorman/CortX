@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { BookOpen, Zap, RefreshCw } from 'lucide-react'
+import { BookOpen, RefreshCw, Pencil, Trash2, FileText, RotateCcw, Zap, FilePlus, Plus } from 'lucide-react'
 import { useUIStore } from '../../stores/uiStore'
 import type { TimelineEntry } from '../../../shared/types'
 
@@ -26,6 +26,88 @@ function groupByDay(entries: TimelineEntry[]): Array<{ day: string; label: strin
   return Array.from(map.entries())
     .sort((a, b) => b[0].localeCompare(a[0]))
     .map(([day, items]) => ({ day, label: formatDay(items[0].timestamp), items }))
+}
+
+type EntryMeta = {
+  icon: React.ReactNode
+  bg: string
+  text: string
+  badge: string
+  badgeBg: string
+}
+
+function getEntryMeta(entry: TimelineEntry): EntryMeta {
+  const t = entry.inputType
+
+  if (t === 'journal' || entry.kind === 'journal') return {
+    icon: <BookOpen size={11} />,
+    bg: 'bg-cortx-accent/15',
+    text: 'text-cortx-accent',
+    badge: 'Journal',
+    badgeBg: 'bg-cortx-accent/10 text-cortx-accent'
+  }
+  if (t === 'manual_edit') return {
+    icon: <Pencil size={11} />,
+    bg: 'bg-sky-500/15',
+    text: 'text-sky-400',
+    badge: 'Édition',
+    badgeBg: 'bg-sky-500/10 text-sky-400'
+  }
+  if (t === 'brief') return {
+    icon: <FileText size={11} />,
+    bg: 'bg-violet-500/15',
+    text: 'text-violet-400',
+    badge: 'Fiche',
+    badgeBg: 'bg-violet-500/10 text-violet-400'
+  }
+  if (t === 'rewrite') return {
+    icon: <RotateCcw size={11} />,
+    bg: 'bg-teal-500/15',
+    text: 'text-teal-400',
+    badge: 'Réécriture',
+    badgeBg: 'bg-teal-500/10 text-teal-400'
+  }
+  if (t === 'delete_file' || t === 'delete_fiche') return {
+    icon: <Trash2 size={11} />,
+    bg: 'bg-rose-500/15',
+    text: 'text-rose-400',
+    badge: 'Suppression',
+    badgeBg: 'bg-rose-500/10 text-rose-400'
+  }
+  // execute — distinguish create-only vs mixed vs modify-only
+  if (t === 'execute' || !t) {
+    const verbs = entry.actionVerbs ?? []
+    const allCreate = verbs.length > 0 && verbs.every((v) => v === 'create')
+    const allModify = verbs.length > 0 && verbs.every((v) => v === 'modify')
+    if (allCreate) return {
+      icon: <FilePlus size={11} />,
+      bg: 'bg-emerald-500/15',
+      text: 'text-emerald-400',
+      badge: 'Création',
+      badgeBg: 'bg-emerald-500/10 text-emerald-400'
+    }
+    if (allModify) return {
+      icon: <Pencil size={11} />,
+      bg: 'bg-amber-500/15',
+      text: 'text-amber-400',
+      badge: 'Modification',
+      badgeBg: 'bg-amber-500/10 text-amber-400'
+    }
+    return {
+      icon: <Zap size={11} />,
+      bg: 'bg-cortx-cta/15',
+      text: 'text-cortx-cta',
+      badge: 'Agent',
+      badgeBg: 'bg-cortx-cta/10 text-cortx-cta'
+    }
+  }
+  return {
+    icon: <Plus size={11} />,
+    bg: 'bg-cortx-cta/15',
+    text: 'text-cortx-cta',
+    badge: 'Action',
+    badgeBg: 'bg-cortx-cta/10 text-cortx-cta'
+  }
 }
 
 export function TimelineView(): React.JSX.Element {
@@ -82,14 +164,12 @@ export function TimelineView(): React.JSX.Element {
 
         {groups.map((group) => (
           <div key={group.day} className="mb-6">
-            {/* Day header */}
             <div className="flex items-center gap-3 mb-3">
               <span className="text-xs font-semibold text-cortx-text-secondary/70 capitalize">{group.label}</span>
               <div className="flex-1 h-px bg-cortx-border/50" />
             </div>
 
-            {/* Entries */}
-            <div className="space-y-1.5 pl-2 border-l border-cortx-border/40">
+            <div className="space-y-1 pl-2 border-l border-cortx-border/40">
               {group.items.map((entry) => (
                 <TimelineItem key={entry.id} entry={entry} onOpenFile={openFilePreview} />
               ))}
@@ -108,48 +188,45 @@ function TimelineItem({
   entry: TimelineEntry
   onOpenFile: (path: string) => void
 }): React.JSX.Element {
-  const isJournal = entry.kind === 'journal'
+  const meta = getEntryMeta(entry)
+  const isClickable = entry.kind === 'journal' && !!entry.filePath
 
   return (
     <button
-      onClick={() => { if (isJournal && entry.filePath) onOpenFile(entry.filePath) }}
-      disabled={!isJournal || !entry.filePath}
-      className={`w-full text-left flex items-start gap-2.5 px-3 py-2 rounded-lg transition-colors group ${
-        isJournal && entry.filePath
-          ? 'hover:bg-cortx-elevated cursor-pointer'
-          : 'cursor-default'
+      onClick={() => { if (isClickable && entry.filePath) onOpenFile(entry.filePath) }}
+      disabled={!isClickable}
+      className={`w-full text-left flex items-start gap-2.5 px-2.5 py-2 rounded-lg transition-colors group ${
+        isClickable ? 'hover:bg-cortx-elevated cursor-pointer' : 'cursor-default'
       }`}
     >
       {/* Icon */}
-      <div className={`mt-0.5 flex-shrink-0 p-1 rounded-md ${
-        isJournal
-          ? 'bg-cortx-accent/15 text-cortx-accent'
-          : 'bg-cortx-cta/15 text-cortx-cta'
-      }`}>
-        {isJournal
-          ? <BookOpen size={11} />
-          : <Zap size={11} />
-        }
+      <div className={`mt-0.5 flex-shrink-0 p-1.5 rounded-md ${meta.bg} ${meta.text}`}>
+        {meta.icon}
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 pt-0.5">
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <span className={`text-2xs font-medium px-1.5 py-0.5 rounded-full ${meta.badgeBg}`}>
+            {meta.badge}
+          </span>
+          {entry.actionCount !== undefined && entry.actionCount > 1 && (
+            <span className="text-2xs text-cortx-text-secondary/50">
+              {entry.actionCount} fichiers
+            </span>
+          )}
+        </div>
         <p className={`text-xs font-medium truncate ${
-          isJournal && entry.filePath
-            ? 'text-cortx-text-primary group-hover:text-cortx-accent transition-colors'
-            : 'text-cortx-text-primary/80'
+          isClickable
+            ? `${meta.text} group-hover:opacity-80 transition-opacity`
+            : 'text-cortx-text-primary/90'
         }`}>
           {entry.title}
         </p>
-        {!isJournal && entry.body.length > entry.title.length && (
-          <p className="text-2xs text-cortx-text-secondary/60 truncate mt-0.5">
-            {entry.body.substring(0, 120)}
-          </p>
-        )}
       </div>
 
       {/* Time */}
-      <span className="text-2xs text-cortx-text-secondary/40 flex-shrink-0 mt-0.5">
+      <span className="text-2xs text-cortx-text-secondary/40 flex-shrink-0 mt-1">
         {formatTime(entry.timestamp)}
       </span>
     </button>

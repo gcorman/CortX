@@ -312,6 +312,11 @@ export interface T {
   tags: {
     noTags: string
     noTagsHint: string
+    filter: string
+    filesWithTag: string
+    topTag: string
+    uniqueTags: string
+    clickHint: string
   }
   importMdModal: {
     title: string
@@ -703,7 +708,12 @@ const fr: T = {
   },
   tags: {
     noTags: 'Aucun tag',
-    noTagsHint: 'Les tags apparaîtront ici au fur et à mesure que tu enrichis ta base de connaissances.'
+    noTagsHint: 'Les tags apparaîtront ici au fur et à mesure que tu enrichis ta base de connaissances.',
+    filter: 'Filtrer les tags…',
+    filesWithTag: 'fichier(s)',
+    topTag: 'Top',
+    uniqueTags: 'tags uniques',
+    clickHint: 'Clique sur un tag pour voir les fichiers associés'
   },
   createFile: {
     title: 'Créer une nouvelle fiche',
@@ -1095,7 +1105,12 @@ const en: T = {
   },
   tags: {
     noTags: 'No tags',
-    noTagsHint: 'Tags will appear here as you enrich your knowledge base.'
+    noTagsHint: 'Tags will appear here as you enrich your knowledge base.',
+    filter: 'Filter tags…',
+    filesWithTag: 'file(s)',
+    topTag: 'Top',
+    uniqueTags: 'unique tags',
+    clickHint: 'Click a tag to see related files'
   },
   createFile: {
     title: 'Create a new card',

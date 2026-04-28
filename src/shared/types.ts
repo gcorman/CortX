@@ -303,6 +303,9 @@ export interface TimelineEntry {
   commitHash?: string
   status?: string
   filePath?: string
+  inputType?: string
+  actionCount?: number
+  actionVerbs?: string[]
 }
 
 // --- Implicit backlinks ---
@@ -403,6 +406,7 @@ export interface CortxAPI {
     search(query: string): Promise<CortxFile[]>
     getGraphData(): Promise<GraphData>
     getTags(): Promise<Array<{ tag: string; count: number }>>
+    getFilesByTag(tag: string): Promise<CortxFile[]>
     getImplicitBacklinks(filePath: string, limit?: number, threshold?: number): Promise<ImplicitBacklink[]>
     getTimeline(limit?: number): Promise<TimelineEntry[]>
   }
