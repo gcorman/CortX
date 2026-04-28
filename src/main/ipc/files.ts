@@ -2,9 +2,10 @@ import { ipcMain, dialog, BrowserWindow } from 'electron'
 import * as fs from 'fs'
 import type { FileService } from '../services/FileService'
 import type { DatabaseService } from '../services/DatabaseService'
+import type { ExportService } from '../services/ExportService'
 import type { EntityType } from '../../shared/types'
 
-export function registerFileHandlers(getFiles: () => FileService, getDatabase?: () => DatabaseService): void {
+export function registerFileHandlers(getFiles: () => FileService, getDatabase?: () => DatabaseService, getExport?: () => ExportService): void {
   ipcMain.handle('files:read', (_event, path: string) => getFiles().readFile(path))
   ipcMain.handle('files:write', (_event, path: string, content: string) => getFiles().writeFile(path, content))
   ipcMain.handle('files:list', (_event, dir?: string) => getFiles().listMarkdownFiles(dir))
@@ -68,5 +69,10 @@ export function registerFileHandlers(getFiles: () => FileService, getDatabase?: 
       }
     }
     return { updatedLinks: modifiedFiles.length }
+  })
+
+  ipcMain.handle('files:export', (_event, format: 'html' | 'json') => {
+    if (!getExport) return { success: false, error: 'Export service not available' }
+    return getExport().exportInteractive(format)
   })
 }

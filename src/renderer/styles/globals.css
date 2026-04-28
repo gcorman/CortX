@@ -39,6 +39,11 @@
   --scrollbar-hover:    #94A3B8;
 }
 
+/* Smooth theme transitions */
+:root, [data-theme="dark"], [data-theme="light"] {
+  transition: background-color 250ms ease, color 250ms ease, border-color 250ms ease;
+}
+
 @layer base {
   * {
     @apply border-cortx-border;

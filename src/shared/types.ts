@@ -410,6 +410,7 @@ export interface CortxAPI {
     readExternal(absolutePath: string): Promise<{ path: string; filename: string; content: string } | null>
     create(type: EntityType, title: string): Promise<{ path: string }>
     updateTitle(filePath: string, newTitle: string): Promise<{ updatedLinks: number }>
+    export(format: 'html' | 'json'): Promise<{ success: boolean; path?: string; error?: string }>
   }
   llm: {
     send(messages: Array<{ role: string; content: string }>, systemPrompt?: string): Promise<string>

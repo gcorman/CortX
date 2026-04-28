@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { FileText, Hash, LayoutGrid, Network, BookOpen, Settings, Moon, Sun, Zap, ZapOff, Globe, Square } from 'lucide-react'
+import { FileText, Hash, LayoutGrid, Network, BookOpen, Settings, Moon, Sun, Zap, ZapOff, Globe, Square, Download } from 'lucide-react'
 import { useUIStore } from '../../stores/uiStore'
 import { useFileStore } from '../../stores/fileStore'
 import { useIdleStore } from '../../stores/idleStore'
@@ -26,7 +26,7 @@ export function CommandPalette(): React.JSX.Element | null {
   const {
     commandPaletteOpen, closeCommandPalette,
     openFilePreview, setActiveCenterView, toggleSettings,
-    theme, setTheme, language, setLanguage
+    theme, setTheme, language, setLanguage, addToast
   } = useUIStore()
   const files = useFileStore((s) => s.files)
   const idleActive = useIdleStore((s) => s.isActive)
@@ -99,6 +99,28 @@ export function CommandPalette(): React.JSX.Element | null {
       {
         id: 'action:canvas', label: 'Canvas', sublabel: 'Vue', icon: <Square size={14} />,
         category: 'vue', onSelect: () => { setActiveCenterView('canvas'); closeCommandPalette() }
+      },
+      {
+        id: 'action:export-html', label: 'Exporter en HTML', sublabel: 'Export',
+        icon: <Download size={14} />, category: 'action',
+        onSelect: () => {
+          closeCommandPalette()
+          window.cortx.files.export('html').then((r) => {
+            if (r.success) addToast(`Exporté : ${r.path}`, 'success')
+            else if (r.error) addToast(`Erreur export : ${r.error}`, 'error')
+          })
+        }
+      },
+      {
+        id: 'action:export-json', label: 'Exporter en JSON', sublabel: 'Export',
+        icon: <Download size={14} />, category: 'action',
+        onSelect: () => {
+          closeCommandPalette()
+          window.cortx.files.export('json').then((r) => {
+            if (r.success) addToast(`Exporté : ${r.path}`, 'success')
+            else if (r.error) addToast(`Erreur export : ${r.error}`, 'error')
+          })
+        }
       }
     ]
 
@@ -126,7 +148,7 @@ export function CommandPalette(): React.JSX.Element | null {
     }
 
     return [...fileItems, ...filteredActions]
-  }, [query, files, theme, language, idleActive, t, setActiveCenterView, openFilePreview, closeCommandPalette, toggleSettings, setTheme, setLanguage])
+  }, [query, files, theme, language, idleActive, t, setActiveCenterView, openFilePreview, closeCommandPalette, toggleSettings, setTheme, setLanguage, addToast])
 
   const items = buildItems()
 

@@ -85,7 +85,7 @@ export function CreateFileDialog(): React.JSX.Element | null {
           className="absolute inset-0 bg-cortx-bg/80 backdrop-blur-sm"
           onClick={handleCancel}
         />
-        <div className="relative bg-cortx-surface border border-cortx-border rounded-lg w-full max-w-md mx-4 shadow-2xl animate-in fade-in duration-200">
+        <div className="relative bg-cortx-surface/90 backdrop-blur-xl border border-cortx-border/50 rounded-2xl w-full max-w-md mx-4 shadow-2xl animate-in fade-in duration-200">
           <div className="flex items-center justify-between px-6 py-4 border-b border-cortx-border">
             <h2 className="text-lg font-semibold text-cortx-text-primary">{t.createFile.title}</h2>
             <button
@@ -128,7 +128,7 @@ export function CreateFileDialog(): React.JSX.Element | null {
         className="absolute inset-0 bg-cortx-bg/80 backdrop-blur-sm"
         onClick={handleCancel}
       />
-      <div className="relative bg-cortx-surface border border-cortx-border rounded-lg w-full max-w-md mx-4 shadow-2xl animate-in fade-in duration-200">
+      <div className="relative bg-cortx-surface/90 backdrop-blur-xl border border-cortx-border/50 rounded-2xl w-full max-w-md mx-4 shadow-2xl animate-in fade-in duration-200">
         <div className="flex items-center justify-between px-6 py-4 border-b border-cortx-border">
           <h2 className="text-lg font-semibold text-cortx-text-primary">
             {t.createFile.titleLabel(TYPE_LABELS[createFileType].toLowerCase())}

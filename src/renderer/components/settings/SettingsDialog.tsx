@@ -214,12 +214,12 @@ export function SettingsDialog(): React.JSX.Element {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={toggleSettings} />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={toggleSettings} />
 
       {/* Dialog */}
-      <div className="relative bg-cortx-surface border border-cortx-border rounded-panel w-full max-w-lg mx-4 shadow-2xl max-h-[85vh] overflow-y-auto">
+      <div className="relative bg-cortx-surface/90 backdrop-blur-xl border border-cortx-border/50 rounded-panel w-full max-w-lg mx-4 shadow-2xl max-h-[85vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-cortx-border sticky top-0 bg-cortx-surface z-10">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-cortx-border/50 sticky top-0 bg-cortx-surface/90 backdrop-blur-sm z-10">
           <div className="flex items-center gap-2">
             <Server size={18} className="text-cortx-accent" />
             <h2 className="text-base font-semibold text-cortx-text-primary">{t.settings.title}</h2>
@@ -562,7 +562,7 @@ export function SettingsDialog(): React.JSX.Element {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-cortx-border sticky bottom-0 bg-cortx-surface">
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-cortx-border/50 sticky bottom-0 bg-cortx-surface/90 backdrop-blur-sm">
           <button
             onClick={toggleSettings}
             className="px-4 py-2 rounded-card text-sm text-cortx-text-secondary hover:text-cortx-text-primary hover:bg-cortx-elevated transition-colors cursor-pointer"

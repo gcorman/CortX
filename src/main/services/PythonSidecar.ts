@@ -59,6 +59,7 @@ export class PythonSidecar extends EventEmitter {
   private lineBuffer = ''
   private _ready = false
   private _starting = false
+  private _crashCount = 0
 
   // -----------------------------------------------------------------------
   // Public API
@@ -82,14 +83,25 @@ export class PythonSidecar extends EventEmitter {
 
     await this._start()
 
-    try {
-      await this.send({ cmd: 'health' }, HEALTH_TIMEOUT_MS)
-      this._ready = true
-      return true
-    } catch {
-      return false
+    // Two attempts: first try may fail if the process just crashed and needs a moment.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        await this.send({ cmd: 'health' }, HEALTH_TIMEOUT_MS)
+        this._ready = true
+        return true
+      } catch (err) {
+        if (attempt === 0) {
+          console.warn('[PythonSidecar] Health check failed, retrying after 2s:', err)
+          this._ready = false
+          await new Promise((r) => setTimeout(r, 2000))
+          await this._start()
+        }
+      }
     }
+    return false
   }
+
+  get crashCount(): number { return this._crashCount }
 
   /**
    * Send a command to the sidecar and await the response.
@@ -171,9 +183,15 @@ export class PythonSidecar extends EventEmitter {
     })
 
     this.proc.on('exit', (code, signal) => {
-      console.warn(`[PythonSidecar] Process exited (code=${code}, signal=${signal})`)
+      const wasReady = this._ready
       this._ready = false
       this._starting = false
+      if (wasReady && code !== 0) {
+        this._crashCount++
+        console.error(`[PythonSidecar] Crash #${this._crashCount} (code=${code}, signal=${signal}) — will auto-respawn on next request`)
+      } else {
+        console.warn(`[PythonSidecar] Process exited (code=${code}, signal=${signal})`)
+      }
       // Reject all pending requests
       for (const [id, pending] of this.pending) {
         clearTimeout(pending.timer)

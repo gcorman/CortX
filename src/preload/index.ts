@@ -20,7 +20,8 @@ const api: CortxAPI = {
     openMarkdownDialog: () => ipcRenderer.invoke('files:openMarkdownDialog'),
     readExternal: (absolutePath: string) => ipcRenderer.invoke('files:readExternal', absolutePath),
     create: (type: string, title: string) => ipcRenderer.invoke('files:create', { type, title }),
-    updateTitle: (path: string, newTitle: string) => ipcRenderer.invoke('files:updateTitle', { path, newTitle })
+    updateTitle: (path: string, newTitle: string) => ipcRenderer.invoke('files:updateTitle', { path, newTitle }),
+    export: (format: 'html' | 'json') => ipcRenderer.invoke('files:export', format)
   },
   llm: {
     send: (messages, systemPrompt?) => ipcRenderer.invoke('llm:send', messages, systemPrompt),

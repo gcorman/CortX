@@ -339,4 +339,37 @@ export class LLMService {
   getConfig(): LLMConfig {
     return { ...this.config, apiKey: this.config.apiKey ? '***' : '' }
   }
+
+  // --- Retry helper (non-streaming paths only) ---
+
+  private static isRetryable(err: unknown): boolean {
+    if (!(err instanceof Error)) return false
+    const msg = err.message
+    // Never retry auth/quota/config errors
+    if (/401|403|api key|not configured|invalid key/i.test(msg)) return false
+    if (/429|rate.?limit/i.test(msg)) return false
+    // Retry network errors, timeouts, 5xx
+    return true
+  }
+
+  async sendWithRetry(
+    messages: Array<{ role: string; content: string }>,
+    systemPrompt?: string,
+    signal?: AbortSignal,
+    maxAttempts = 3
+  ): Promise<string> {
+    let lastErr: unknown
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        return await this.sendMessage(messages, systemPrompt, undefined, signal)
+      } catch (err) {
+        lastErr = err
+        if (!LLMService.isRetryable(err) || attempt === maxAttempts - 1) throw err
+        const delay = 1000 * Math.pow(2, attempt)
+        console.warn(`[LLMService] Attempt ${attempt + 1} failed, retrying in ${delay}ms:`, (err as Error).message)
+        await new Promise((r) => setTimeout(r, delay))
+      }
+    }
+    throw lastErr
+  }
 }

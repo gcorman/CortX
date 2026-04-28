@@ -179,8 +179,8 @@ export function ActionPreview({ action, onClose }: ActionPreviewProps): React.JS
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-cortx-surface border border-cortx-border rounded-panel w-full max-w-4xl mx-4 shadow-2xl h-[85vh] max-h-[85vh] flex flex-col overflow-hidden">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-cortx-surface/90 backdrop-blur-xl border border-cortx-border/50 rounded-2xl w-full max-w-4xl mx-4 shadow-2xl h-[85vh] max-h-[85vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-cortx-border flex-shrink-0">
           <div className="flex items-center gap-2">

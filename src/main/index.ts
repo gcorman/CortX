@@ -16,6 +16,7 @@ import { LLMService } from './services/LLMService'
 import { AgentPipeline } from './services/AgentPipeline'
 import { IdleService } from './services/IdleService'
 import { CanvasService } from './services/CanvasService'
+import { ExportService } from './services/ExportService'
 import { libraryService } from './services/LibraryService'
 import { pythonSidecar } from './services/PythonSidecar'
 import type { AppConfig } from '../shared/types'
@@ -143,6 +144,7 @@ let llmService: LLMService
 let agentPipeline: AgentPipeline
 let idleService: IdleService
 let canvasService: CanvasService
+let exportService: ExportService
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -212,6 +214,8 @@ async function initializeServices(): Promise<void> {
 
   // Canvas service (spatial canvas persistence + agent-suggest)
   canvasService = new CanvasService(config.basePath, dbService, llmService)
+
+  exportService = new ExportService(fileService, config.basePath)
 
   // Index existing files
   await indexAllFiles()
@@ -376,7 +380,7 @@ app.whenReady().then(async () => {
 
   registerAppHandlers()
   registerDatabaseHandlers(() => dbService)
-  registerFileHandlers(() => fileService, () => dbService)
+  registerFileHandlers(() => fileService, () => dbService, () => exportService)
   registerLLMHandlers(llmService)
   registerGitHandlers(() => gitService)
   registerAgentHandlers(() => agentPipeline)

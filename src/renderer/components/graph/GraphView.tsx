@@ -203,6 +203,22 @@ function buildCyStyle(theme: Theme): cytoscape.StylesheetStyle[] {
       style: { opacity: 0.04 } as cytoscape.Css.Edge
     },
 
+    // --- Hover glow ---
+    {
+      selector: 'node:hover',
+      style: {
+        width: 24,
+        height: 24,
+        'border-width': 2,
+        'border-opacity': 0.9,
+        'overlay-color': '#14B8A6',
+        'overlay-opacity': 0.15,
+        'overlay-padding': 4,
+        'transition-property': 'overlay-opacity, width, height, border-width',
+        'transition-duration': 120
+      } as unknown as cytoscape.Css.Node
+    },
+
     // --- Labels hidden when zoomed out ---
     {
       selector: 'node.labels-hidden',
