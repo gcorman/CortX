@@ -35,7 +35,10 @@
         "from": "resources/python-sidecar",
         "to": "python-sidecar",
         "filter": [
-          "**/*"
+          "**/*",
+          "!_internal/torch/include/**",
+          "!_internal/torch/share/**",
+          "!_internal/torch/bin/**"
         ]
       }
     ],
