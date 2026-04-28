@@ -11,4 +11,5 @@ export function registerDatabaseHandlers(getDb: () => DatabaseService): void {
   ipcMain.handle('db:getImplicitBacklinks', (_event, filePath: string, limit?: number, threshold?: number) =>
     getDb().getImplicitBacklinks(filePath, limit, threshold)
   )
+  ipcMain.handle('db:getTimeline', (_event, limit?: number) => getDb().getTimeline(limit))
 }

@@ -71,6 +71,7 @@ export interface T {
     tags: string
     library: string
     canvas: string
+    timeline: string
     disableIdle: string
     enableIdle: string
     idle: string
@@ -463,6 +464,7 @@ const fr: T = {
     tags: 'Tags',
     library: 'Bibliothèque',
     canvas: 'Canvas',
+    timeline: 'Timeline',
     disableIdle: 'Désactiver le mode Idle',
     enableIdle: "Activer le mode Idle — l'agent médite sur le graphe",
     idle: 'Idle',
@@ -854,6 +856,7 @@ const en: T = {
     tags: 'Tags',
     library: 'Library',
     canvas: 'Canvas',
+    timeline: 'Timeline',
     disableIdle: 'Disable Idle mode',
     enableIdle: 'Enable Idle mode — agent meditates on the graph',
     idle: 'Idle',

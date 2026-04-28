@@ -292,6 +292,19 @@ export interface IdleConfig {
   confidenceThreshold: number
 }
 
+// --- Timeline ---
+
+export interface TimelineEntry {
+  id: string
+  timestamp: string
+  kind: 'agent' | 'journal'
+  title: string
+  body: string
+  commitHash?: string
+  status?: string
+  filePath?: string
+}
+
 // --- Implicit backlinks ---
 
 export interface ImplicitBacklink {
@@ -391,6 +404,7 @@ export interface CortxAPI {
     getGraphData(): Promise<GraphData>
     getTags(): Promise<Array<{ tag: string; count: number }>>
     getImplicitBacklinks(filePath: string, limit?: number, threshold?: number): Promise<ImplicitBacklink[]>
+    getTimeline(limit?: number): Promise<TimelineEntry[]>
   }
   canvas: {
     list(): Promise<CanvasSummary[]>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { FileText, Hash, LayoutGrid, Network, BookOpen, Settings, Moon, Sun, Zap, ZapOff, Globe, Square, Download } from 'lucide-react'
+import { FileText, Hash, LayoutGrid, Network, BookOpen, Settings, Moon, Sun, Zap, ZapOff, Globe, Square, Download, Clock } from 'lucide-react'
 import { useUIStore } from '../../stores/uiStore'
 import { useFileStore } from '../../stores/fileStore'
 import { useIdleStore } from '../../stores/idleStore'
@@ -99,6 +99,10 @@ export function CommandPalette(): React.JSX.Element | null {
       {
         id: 'action:canvas', label: 'Canvas', sublabel: 'Vue', icon: <Square size={14} />,
         category: 'vue', onSelect: () => { setActiveCenterView('canvas'); closeCommandPalette() }
+      },
+      {
+        id: 'action:timeline', label: 'Timeline', sublabel: 'Vue', icon: <Clock size={14} />,
+        category: 'vue', onSelect: () => { setActiveCenterView('timeline'); closeCommandPalette() }
       },
       {
         id: 'action:export-html', label: 'Exporter en HTML', sublabel: 'Export',

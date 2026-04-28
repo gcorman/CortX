@@ -843,6 +843,42 @@ export class DatabaseService {
 
   // --- Agent Log ---
 
+  getTimeline(limit = 80): import('../../shared/types').TimelineEntry[] {
+    type AgentRow = { id: number; timestamp: string; input_text: string; commit_hash: string; status: string }
+    type JournalRow = { path: string; title: string; modified: string }
+
+    const agentRows = this.db.prepare(
+      `SELECT id, timestamp, input_text, commit_hash, status FROM agent_log
+       WHERE status = 'success' ORDER BY timestamp DESC LIMIT ?`
+    ).all(limit) as AgentRow[]
+
+    const journalRows = this.db.prepare(
+      `SELECT path, title, modified FROM files WHERE type = 'journal' ORDER BY modified DESC LIMIT ?`
+    ).all(limit) as JournalRow[]
+
+    const entries: import('../../shared/types').TimelineEntry[] = [
+      ...agentRows.map((r) => ({
+        id: `agent-${r.id}`,
+        timestamp: r.timestamp,
+        kind: 'agent' as const,
+        title: r.input_text?.substring(0, 100) || 'Action agent',
+        body: r.input_text || '',
+        commitHash: r.commit_hash,
+        status: r.status
+      })),
+      ...journalRows.map((r) => ({
+        id: `journal-${r.path}`,
+        timestamp: r.modified,
+        kind: 'journal' as const,
+        title: r.title || r.path.split('/').pop()?.replace('.md', '') || r.path,
+        body: '',
+        filePath: r.path
+      }))
+    ]
+
+    return entries.sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, limit)
+  }
+
   logAgentAction(inputText: string, inputType: string, actionsJson: string, commitHash: string, status = 'success'): void {
     this.db.prepare(
       'INSERT INTO agent_log (input_text, input_type, actions_json, commit_hash, status) VALUES (?, ?, ?, ?, ?)'

@@ -10,7 +10,8 @@ const api: CortxAPI = {
     getGraphData: () => ipcRenderer.invoke('db:getGraphData'),
     getTags: () => ipcRenderer.invoke('db:getTags'),
     getImplicitBacklinks: (filePath: string, limit?: number, threshold?: number) =>
-      ipcRenderer.invoke('db:getImplicitBacklinks', filePath, limit, threshold)
+      ipcRenderer.invoke('db:getImplicitBacklinks', filePath, limit, threshold),
+    getTimeline: (limit?: number) => ipcRenderer.invoke('db:getTimeline', limit)
   },
   files: {
     read: (path: string) => ipcRenderer.invoke('files:read', path),

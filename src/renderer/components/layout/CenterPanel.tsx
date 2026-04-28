@@ -5,7 +5,8 @@ import { TagBrowser } from '../tags/TagBrowser'
 import { FilePreview } from '../files/FilePreview'
 import { LibraryPanel } from '../library/LibraryPanel'
 import { CanvasView } from '../canvas/CanvasView'
-import { Network, Hash, Search, X, Library, Brain, Plus, Sparkles } from 'lucide-react'
+import { TimelineView } from '../timeline/TimelineView'
+import { Network, Hash, Search, X, Library, Brain, Plus, Sparkles, Clock } from 'lucide-react'
 import { useState } from 'react'
 import { useT } from '../../i18n'
 
@@ -21,7 +22,8 @@ export function CenterPanel(): React.JSX.Element {
     { id: 'graph' as const, label: t.centerPanel.graph, icon: Network },
     { id: 'canvas' as const, label: t.centerPanel.canvas, icon: Sparkles },
     { id: 'tags' as const, label: t.centerPanel.tags, icon: Hash },
-    { id: 'library' as const, label: t.centerPanel.library, icon: Library }
+    { id: 'library' as const, label: t.centerPanel.library, icon: Library },
+    { id: 'timeline' as const, label: t.centerPanel.timeline, icon: Clock }
   ]
 
   return (
@@ -81,8 +83,8 @@ export function CenterPanel(): React.JSX.Element {
           </button>
         )}
 
-        {/* Search — hidden in library + canvas view (they have their own UX) */}
-        {activeCenterView !== 'library' && activeCenterView !== 'canvas' && (
+        {/* Search — hidden in library, canvas, timeline views (they have their own UX) */}
+        {activeCenterView !== 'library' && activeCenterView !== 'canvas' && activeCenterView !== 'timeline' && (
           <div className="flex-1 relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-cortx-text-secondary" />
             <input
@@ -110,6 +112,7 @@ export function CenterPanel(): React.JSX.Element {
         {activeCenterView === 'canvas' && <CanvasView />}
         {activeCenterView === 'tags' && <TagBrowser />}
         {activeCenterView === 'library' && <LibraryPanel />}
+        {activeCenterView === 'timeline' && <TimelineView />}
       </div>
 
       {/* File Preview Overlay */}
