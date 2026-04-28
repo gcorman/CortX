@@ -43,6 +43,7 @@ jobs:
           gh release download ${{ steps.tag.outputs.name }} \
             --pattern cortx-extractor-darwin-arm64.zip \
             --dir sidecar-dl
+          mkdir -p resources/python-sidecar
           unzip sidecar-dl/cortx-extractor-darwin-arm64.zip -d resources/python-sidecar
           chmod +x resources/python-sidecar/cortx-extractor
         env:
