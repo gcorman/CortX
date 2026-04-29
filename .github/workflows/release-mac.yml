@@ -67,7 +67,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GODEBUG: http2client=0
-
+      - name: Remove signatures from nested frameworks
+        run: |
+          find resources/python-sidecar -name "*.framework" -o -name "*.dylib" | while read -r framework; do
+            codesign --remove-signature "$framework" || true
+          done
+          
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
