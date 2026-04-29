@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Server, Cloud, Cpu, Check, AlertCircle, FolderOpen, Sun, Moon, Trash2, Globe, Lock, Wifi } from 'lucide-react'
+import { X, Server, Cloud, Cpu, Check, AlertCircle, FolderOpen, Sun, Moon, Trash2, Globe, Lock, Wifi, Send } from 'lucide-react'
 import { useUIStore } from '../../stores/uiStore'
 import { useGraphStore } from '../../stores/graphStore'
 import { useFileStore } from '../../stores/fileStore'
@@ -42,6 +42,11 @@ export function SettingsDialog(): React.JSX.Element {
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [resetConfirm, setResetConfirm] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
+
+  const [telegramToken, setTelegramToken] = useState('')
+  const [telegramChatIds, setTelegramChatIds] = useState('')
+  const [telegramEnabled, setTelegramEnabled] = useState(false)
+  const [telegramRunning, setTelegramRunning] = useState(false)
 
   const PROVIDER_PRESETS: ProviderPreset[] = [
     {
@@ -88,6 +93,13 @@ export function SettingsDialog(): React.JSX.Element {
       setBaseUrl(config.llm.baseUrl || '')
       setBasePath(config.basePath)
       setConnectionStatus('idle')
+      if (config.telegram) {
+        setTelegramToken(config.telegram.token === '***' ? '' : config.telegram.token)
+        setTelegramChatIds(config.telegram.allowedChatIds.join('\n'))
+        setTelegramEnabled(config.telegram.enabled)
+      }
+      const status = await window.cortx.telegram.getStatus()
+      setTelegramRunning(status.running)
     } catch {
       // ignore
     }
@@ -103,7 +115,15 @@ export function SettingsDialog(): React.JSX.Element {
         model,
         ...(provider === 'openai-compatible' ? { baseUrl } : {})
       }
-      await window.cortx.app.setConfig({ llm: llmConfig, language })
+      const parsedChatIds = telegramChatIds
+        .split(/[\n,]+/)
+        .map(s => parseInt(s.trim(), 10))
+        .filter(n => !isNaN(n))
+      await window.cortx.app.setConfig({
+        llm: llmConfig,
+        language,
+        telegram: { token: telegramToken, allowedChatIds: parsedChatIds, enabled: telegramEnabled }
+      })
 
       const currentBasePath = await window.cortx.app.getBasePath()
       if (trimmedBasePath && trimmedBasePath !== currentBasePath) {
@@ -527,6 +547,62 @@ export function SettingsDialog(): React.JSX.Element {
                 </button>
               )}
             </div>
+          </div>
+
+          {/* Telegram Bot */}
+          <div className="border-t border-cortx-border" />
+          <div className="space-y-3">
+            <label className="text-xs font-medium text-cortx-text-secondary uppercase tracking-wider flex items-center gap-1.5">
+              <Send size={12} />
+              {t.telegram.title}
+            </label>
+
+            <div className="space-y-1.5">
+              <label className="text-xs text-cortx-text-secondary">{t.telegram.token}</label>
+              <input
+                type="password"
+                value={telegramToken}
+                onChange={(e) => setTelegramToken(e.target.value)}
+                placeholder={t.telegram.tokenPlaceholder}
+                className="w-full bg-cortx-bg border border-cortx-border rounded-input px-3 py-2 text-sm text-cortx-text-primary placeholder:text-cortx-text-secondary/40 focus:outline-none focus:border-cortx-accent transition-colors font-mono"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs text-cortx-text-secondary">{t.telegram.chatIds}</label>
+              <textarea
+                value={telegramChatIds}
+                onChange={(e) => setTelegramChatIds(e.target.value)}
+                placeholder="123456789"
+                rows={2}
+                className="w-full bg-cortx-bg border border-cortx-border rounded-input px-3 py-2 text-sm text-cortx-text-primary placeholder:text-cortx-text-secondary/40 focus:outline-none focus:border-cortx-accent transition-colors font-mono resize-none"
+              />
+              <p className="text-2xs text-cortx-text-secondary/50">{t.telegram.chatIdsHint}</p>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setTelegramEnabled(!telegramEnabled)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-card border text-sm transition-all cursor-pointer ${
+                  telegramEnabled
+                    ? 'border-cortx-accent bg-cortx-accent/10 text-cortx-accent'
+                    : 'border-cortx-border text-cortx-text-secondary hover:border-cortx-elevated hover:text-cortx-text-primary'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${telegramEnabled ? 'bg-cortx-accent' : 'bg-cortx-text-secondary/40'}`} />
+                {t.telegram.enable}
+              </button>
+
+              <span className={`flex items-center gap-1.5 text-xs ${telegramRunning ? 'text-cortx-success' : 'text-cortx-text-secondary/50'}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${telegramRunning ? 'bg-cortx-success' : 'bg-cortx-text-secondary/30'}`} />
+                {telegramRunning ? t.telegram.statusRunning : t.telegram.statusStopped}
+              </span>
+            </div>
+
+            <p className="text-2xs text-cortx-text-secondary/50 flex items-center gap-1">
+              <Wifi size={10} />
+              {t.telegram.privacyNote}
+            </p>
           </div>
 
           {/* Connection test */}

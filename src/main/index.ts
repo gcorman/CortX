@@ -10,6 +10,7 @@ import { registerLibraryHandlers } from './ipc/library'
 import { registerIdleHandlers } from './ipc/idle'
 import { registerCanvasHandlers } from './ipc/canvas'
 import { registerGalaxyHandlers } from './ipc/galaxy'
+import { registerTelegramHandlers } from './ipc/telegram'
 import { DatabaseService } from './services/DatabaseService'
 import { FileService } from './services/FileService'
 import { GitService } from './services/GitService'
@@ -19,6 +20,7 @@ import { IdleService } from './services/IdleService'
 import { CanvasService } from './services/CanvasService'
 import { ExportService } from './services/ExportService'
 import { GalaxyService } from './services/GalaxyService'
+import { TelegramService } from './services/TelegramService'
 import { libraryService } from './services/LibraryService'
 import { pythonSidecar } from './services/PythonSidecar'
 import type { AppConfig } from '../shared/types'
@@ -118,7 +120,8 @@ function loadConfig(): AppConfig {
           baseUrl: saved.llm?.baseUrl
         },
         validationMode: saved.validationMode || defaults.validationMode,
-        language: saved.language || defaults.language
+        language: saved.language || defaults.language,
+        telegram: saved.telegram
       }
     }
   } catch (err) {
@@ -148,6 +151,7 @@ let idleService: IdleService
 let canvasService: CanvasService
 let exportService: ExportService
 let galaxyService: GalaxyService
+let telegramService: TelegramService
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -221,6 +225,18 @@ async function initializeServices(): Promise<void> {
   exportService = new ExportService(fileService, config.basePath)
 
   galaxyService = new GalaxyService(dbService, fileService, config.basePath)
+
+  const notifyRenderer = (): void => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('db:changed')
+  }
+  telegramService = new TelegramService(
+    config.telegram ?? { token: '', allowedChatIds: [], enabled: false },
+    () => agentPipeline,
+    notifyRenderer
+  )
+  if (config.telegram?.enabled && config.telegram.token) {
+    await telegramService.start()
+  }
 
   // Index existing files
   await indexAllFiles()
@@ -312,7 +328,10 @@ function registerAppHandlers(): void {
   // back and setConfig below preserves the real key unchanged.
   ipcMain.handle('app:getConfig', () => ({
     ...config,
-    llm: { ...config.llm, apiKey: config.llm.apiKey ? '***' : '' }
+    llm: { ...config.llm, apiKey: config.llm.apiKey ? '***' : '' },
+    telegram: config.telegram
+      ? { ...config.telegram, token: config.telegram.token ? '***' : '' }
+      : undefined
   }))
 
   ipcMain.handle('app:resetBase', async () => {
@@ -376,6 +395,15 @@ function registerAppHandlers(): void {
       agentPipeline.setLanguage(config.language)
       idleService.setLanguage(config.language)
     }
+    if (partial.telegram) {
+      // Preserve real token when renderer sends '***' placeholder
+      const incoming = partial.telegram
+      if (incoming.token === '***' || incoming.token === '') {
+        incoming.token = config.telegram?.token ?? ''
+      }
+      config.telegram = { ...(config.telegram ?? { token: '', allowedChatIds: [], enabled: false }), ...incoming }
+      void telegramService.updateConfig(config.telegram)
+    }
     saveConfig(config)
   })
 }
@@ -394,11 +422,13 @@ app.whenReady().then(async () => {
   registerIdleHandlers(() => idleService, () => agentPipeline)
   registerCanvasHandlers(() => canvasService)
   registerGalaxyHandlers(() => galaxyService)
+  registerTelegramHandlers(() => telegramService)
   setIdleServiceForAgent(idleService)
 
   createWindow()
-  // Give IdleService access to the main window for IPC events
+  // Give IdleService and TelegramService access to the main window for IPC events
   if (mainWindow) idleService.setWindow(mainWindow)
+  telegramService.setWindow(mainWindow)
 
   // Check for new GitHub release after window is ready
   mainWindow?.webContents.once('did-finish-load', () => {
@@ -413,6 +443,7 @@ app.whenReady().then(async () => {
 })
 
 app.on('before-quit', async () => {
+  telegramService?.stop()
   await pythonSidecar.shutdown()
 })
 

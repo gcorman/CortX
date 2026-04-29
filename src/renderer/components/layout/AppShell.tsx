@@ -11,7 +11,7 @@ import { CommandPalette } from '../common/CommandPalette'
 import { PanelRightOpen } from 'lucide-react'
 import { useUIStore } from '../../stores/uiStore'
 import { useFileStore } from '../../stores/fileStore'
-import { useChatStore } from '../../stores/chatStore'
+import { useChatStore, setNextTelegramChatId } from '../../stores/chatStore'
 import { registerDbChangedListener } from '../../stores/graphStore'
 import { useT } from '../../i18n'
 
@@ -42,6 +42,39 @@ export function AppShell(): React.JSX.Element {
   useEffect(() => {
     registerDbChangedListener(loadFiles)
   }, [loadFiles])
+
+  // ── Telegram relay listeners ──────────────────────────────────────────────
+  useEffect(() => {
+    const handleIncoming = (payload: unknown): void => {
+      const { chatId, text } = payload as { chatId: number; text: string }
+      if (isProcessing) {
+        // Bot busy — TelegramService will show ⏳, we can still queue
+        // by sending immediately (chatStore will buffer if needed)
+      }
+      setNextTelegramChatId(chatId)
+      void sendMessage(text)
+    }
+
+    const handleTriggerAccept = (payload: unknown): void => {
+      const { chatMessageId } = payload as { chatMessageId: string }
+      void acceptActions(chatMessageId)
+    }
+
+    const handleTriggerReject = (payload: unknown): void => {
+      const { chatMessageId } = payload as { chatMessageId: string }
+      rejectActions(chatMessageId)
+    }
+
+    window.cortx.on('telegram:incoming', handleIncoming)
+    window.cortx.on('telegram:triggerAccept', handleTriggerAccept)
+    window.cortx.on('telegram:triggerReject', handleTriggerReject)
+
+    return () => {
+      window.cortx.off('telegram:incoming', handleIncoming)
+      window.cortx.off('telegram:triggerAccept', handleTriggerAccept)
+      window.cortx.off('telegram:triggerReject', handleTriggerReject)
+    }
+  }, [sendMessage, acceptActions, rejectActions, isProcessing])
 
   // Global keyboard shortcuts
   useEffect(() => {

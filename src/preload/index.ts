@@ -111,6 +111,16 @@ const api: CortxAPI = {
     setConfig: (config: { intervalSeconds?: number; confidenceThreshold?: number }) =>
       ipcRenderer.invoke('idle:setConfig', config)
   },
+  telegram: {
+    getStatus: () => ipcRenderer.invoke('telegram:getStatus'),
+    setConfig: (partial: unknown) => ipcRenderer.invoke('telegram:setConfig', partial),
+    sendReply: (chatId: number, chatMessageId: string, data: unknown) =>
+      ipcRenderer.invoke('telegram:sendReply', chatId, chatMessageId, data),
+    notifyExecuted: (chatId: number, chatMessageId: string, commitHash: string, files: string[]) =>
+      ipcRenderer.invoke('telegram:notifyExecuted', chatId, chatMessageId, commitHash, files),
+    notifyRejected: (chatId: number, chatMessageId: string) =>
+      ipcRenderer.invoke('telegram:notifyRejected', chatId, chatMessageId)
+  },
   on: (channel: string, callback: (...args: unknown[]) => void) => {
     ipcRenderer.on(channel, (_event, ...args) => callback(...args))
   },

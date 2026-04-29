@@ -185,11 +185,26 @@ export interface LLMConfig {
 
 export type AppLanguage = 'fr' | 'en'
 
+export interface TelegramConfig {
+  token: string
+  allowedChatIds: number[]
+  enabled: boolean
+}
+
+export interface TelegramReplyData {
+  inputType: InputType
+  summary: string
+  response?: string
+  sources?: string[]
+  actions: Array<{ action: 'create' | 'modify'; file: string }>
+}
+
 export interface AppConfig {
   basePath: string
   llm: LLMConfig
   validationMode: 'always' | 'creations-only' | 'automatic'
   language: AppLanguage
+  telegram?: TelegramConfig
 }
 
 // --- Library ---
@@ -555,6 +570,13 @@ export interface CortxAPI {
     promoteDraft(id: string): Promise<IdleInsight | null>
     getConfig(): Promise<IdleConfig>
     setConfig(config: Partial<IdleConfig>): Promise<void>
+  }
+  telegram: {
+    getStatus(): Promise<{ running: boolean }>
+    setConfig(partial: Partial<TelegramConfig>): Promise<void>
+    sendReply(chatId: number, chatMessageId: string, data: TelegramReplyData): Promise<void>
+    notifyExecuted(chatId: number, chatMessageId: string, commitHash: string, files: string[]): Promise<void>
+    notifyRejected(chatId: number, chatMessageId: string): Promise<void>
   }
   on(channel: string, callback: (...args: unknown[]) => void): void
   off(channel: string, callback: (...args: unknown[]) => void): void

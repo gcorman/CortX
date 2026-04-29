@@ -397,6 +397,18 @@ export interface T {
     download: string
     dismiss: string
   }
+  telegram: {
+    title: string
+    token: string
+    tokenPlaceholder: string
+    chatIds: string
+    chatIdsHint: string
+    enable: string
+    statusRunning: string
+    statusStopped: string
+    privacyNote: string
+    saveFirst: string
+  }
 }
 
 const fr: T = {
@@ -794,6 +806,18 @@ const fr: T = {
     newVersion: 'Nouvelle version disponible',
     download: 'Télécharger',
     dismiss: 'Ignorer'
+  },
+  telegram: {
+    title: 'Bot Telegram',
+    token: 'Token du bot',
+    tokenPlaceholder: '123456789:ABC-...',
+    chatIds: 'Chat IDs autorisés',
+    chatIdsHint: 'Votre ID Telegram (un par ligne). Obtenez-le via @userinfobot.',
+    enable: 'Activer le bot',
+    statusRunning: 'Bot actif',
+    statusStopped: 'Bot inactif',
+    privacyNote: 'Les messages transitent par Telegram Cloud. Le traitement reste local.',
+    saveFirst: 'Sauvegardez pour appliquer les changements Telegram.'
   }
 }
 
@@ -1192,6 +1216,18 @@ const en: T = {
     newVersion: 'New version available',
     download: 'Download',
     dismiss: 'Dismiss'
+  },
+  telegram: {
+    title: 'Telegram Bot',
+    token: 'Bot token',
+    tokenPlaceholder: '123456789:ABC-...',
+    chatIds: 'Allowed Chat IDs',
+    chatIdsHint: 'Your Telegram ID (one per line). Get it via @userinfobot.',
+    enable: 'Enable bot',
+    statusRunning: 'Bot active',
+    statusStopped: 'Bot inactive',
+    privacyNote: 'Messages pass through Telegram Cloud. Processing stays local.',
+    saveFirst: 'Save to apply Telegram changes.'
   }
 }
 

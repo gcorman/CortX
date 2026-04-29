@@ -89,6 +89,16 @@ interface SlashRewrite {
 
 type StreamMode = 'default' | 'brief' | 'synthese' | 'digest'
 
+// ── Telegram relay state (module-level, ephemeral) ────────────────────────────
+// Set by AppShell before calling sendMessage for an incoming Telegram message.
+let _telegramChatId: number | null = null
+// Maps chatMessageId → telegramChatId for pending accept/reject notifications.
+const _telegramChatMap = new Map<string, number>()
+
+export function setNextTelegramChatId(chatId: number): void {
+  _telegramChatId = chatId
+}
+
 let streamBuffer = ''
 let streamResetTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -457,6 +467,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       set((s) => ({ messages: [...s.messages, agentMessage], isProcessing: false }))
 
+      // ── Telegram relay: notify TelegramService with formatted reply ──────
+      if (_telegramChatId !== null) {
+        const chatId = _telegramChatId
+        _telegramChatId = null
+        _telegramChatMap.set(agentMessage.id, chatId)
+        void window.cortx.telegram.sendReply(chatId, agentMessage.id, {
+          inputType: response.inputType,
+          summary: response.summary,
+          response: response.response,
+          sources: response.sources,
+          actions: response.actions.map(a => ({ action: a.action, file: a.file }))
+        })
+      }
+
       // Update agent store with proposals
       if (response.actions.length > 0) {
         useAgentStore.getState().addActions(response)
@@ -625,6 +649,19 @@ input_type="information"`
       )
       if (commitHash) set({ lastExecutedCommit: commitHash })
       useUIStore.getState().addToast(`${toAccept.length} action(s) appliquée(s)`, 'success')
+
+      // ── Telegram relay: notify executed ──────────────────────────────────
+      const tgChatIdAccept = _telegramChatMap.get(messageId)
+      if (tgChatIdAccept !== undefined) {
+        _telegramChatMap.delete(messageId)
+        void window.cortx.telegram.notifyExecuted(
+          tgChatIdAccept,
+          messageId,
+          commitHash ?? '',
+          actionsToExecute.map(a => a.file)
+        )
+      }
+
       useGraphStore.getState().loadGraph()
       useFileStore.getState().loadFiles()
     } catch (error) {
@@ -673,6 +710,13 @@ input_type="information"`
       [...rejectSet].map((id) => ({ id, status: 'rejected' as const }))
     )
     useUIStore.getState().addToast('Actions refusées', 'info')
+
+    // ── Telegram relay: notify rejected ──────────────────────────────────
+    const tgChatIdReject = _telegramChatMap.get(messageId)
+    if (tgChatIdReject !== undefined) {
+      _telegramChatMap.delete(messageId)
+      void window.cortx.telegram.notifyRejected(tgChatIdReject, messageId)
+    }
   },
 
   answerClarification: async (messageId: string, optionIndex: number) => {
