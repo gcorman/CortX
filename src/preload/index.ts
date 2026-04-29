@@ -1,6 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { CortxAPI } from '../shared/types'
 
+// Maps (channel, userCallback) → ipcRenderer wrapper so off() can correctly remove it
+const _wrappers = new Map<string, Map<(...args: unknown[]) => void, (...args: unknown[]) => void>>()
+
 const api: CortxAPI = {
   db: {
     getFiles: () => ipcRenderer.invoke('db:getFiles'),
@@ -122,10 +125,20 @@ const api: CortxAPI = {
       ipcRenderer.invoke('telegram:notifyRejected', chatId, chatMessageId)
   },
   on: (channel: string, callback: (...args: unknown[]) => void) => {
-    ipcRenderer.on(channel, (_event, ...args) => callback(...args))
+    // Store the wrapper so off() can remove the correct function
+    if (!_wrappers.has(channel)) _wrappers.set(channel, new Map())
+    const existing = _wrappers.get(channel)!.get(callback)
+    if (existing) return // already registered — prevent duplicate listeners
+    const wrapper = (_event: Electron.IpcRendererEvent, ...args: unknown[]) => callback(...args)
+    _wrappers.get(channel)!.set(callback, wrapper)
+    ipcRenderer.on(channel, wrapper)
   },
   off: (channel: string, callback: (...args: unknown[]) => void) => {
-    ipcRenderer.removeListener(channel, callback)
+    const wrapper = _wrappers.get(channel)?.get(callback)
+    if (wrapper) {
+      ipcRenderer.removeListener(channel, wrapper)
+      _wrappers.get(channel)!.delete(callback)
+    }
   }
 }
 

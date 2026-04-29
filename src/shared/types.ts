@@ -170,6 +170,10 @@ export interface ChatMessage {
   content: string
   timestamp: string
   agentResponse?: AgentResponse
+  /** Message originated from a Telegram user */
+  telegramSource?: boolean
+  /** Agent reply was forwarded to Telegram */
+  telegramReplied?: boolean
 }
 
 // --- LLM Config ---

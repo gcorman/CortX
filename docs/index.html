@@ -176,7 +176,7 @@
 <section id="interact" class="py-24 px-6 border-t border-border/30">
   <div class="max-w-7xl mx-auto">
     <div class="text-center mb-16">
-      <div class="text-xs font-mono text-accent mb-3">// 5 WAYS TO INTERACT</div>
+      <div class="text-xs font-mono text-accent mb-3">// 6 WAYS TO INTERACT</div>
       <h2 class="text-4xl sm:text-5xl font-bold tracking-tight">One base, many entry points</h2>
       <p class="mt-4 text-slate-400 text-lg max-w-2xl mx-auto">Markdown stays the source of truth. Pick how you want to talk to it today.</p>
     </div>
@@ -188,6 +188,7 @@
         <button class="tab-btn" data-tab="graph" role="tab">🕸️ Explore the graph</button>
         <button class="tab-btn" data-tab="library" role="tab">📚 Drop in documents</button>
         <button class="tab-btn" data-tab="web" role="tab">🌐 Pull from the web</button>
+        <button class="tab-btn" data-tab="telegram" role="tab">📱 Telegram bot</button>
       </div>
 
       <div class="tabs-panels">
@@ -337,6 +338,57 @@
                 <div class="text-slate-300 pl-3 border-l border-accent/30">[3] ministry-of-defense.example/q2 ✓</div>
                 <div class="text-slate-300 pl-3 border-l border-accent/30">[4] industrial-press.example/dassault ✓</div>
                 <div class="text-slate-500 mt-2">▸ proposing patch to <strong class="text-white">Domaines/SCAF.md</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-panel" data-panel="telegram">
+          <div class="grid md:grid-cols-2 gap-6 items-start">
+            <div>
+              <h3 class="text-2xl font-bold mb-3">Send a note. Get a proposal. Without opening the app.</h3>
+              <p class="text-slate-400 mb-5">Connect a Telegram bot token once, whitelist your chat ID, and CortX becomes reachable from anywhere. Type a raw thought, paste meeting notes, or use a command — the agent processes it through the same pipeline as the desktop chat, then sends back a structured proposal with inline ✔ / ✗ buttons. Validate remotely. Your base gets a commit.</p>
+              <ul class="space-y-2 text-slate-300 text-sm">
+                <li class="flex gap-2"><span class="text-accent">›</span> Plain text → agent pipeline → proposed file diff sent back to Telegram</li>
+                <li class="flex gap-2"><span class="text-accent">›</span> <code class="tag-inline">/ask &lt;question&gt;</code> — Q&amp;A against your base, citations in reply</li>
+                <li class="flex gap-2"><span class="text-accent">›</span> <code class="tag-inline">/note &lt;text&gt;</code> — force-capture mode, skips Q&amp;A detection</li>
+                <li class="flex gap-2"><span class="text-accent">›</span> <code class="tag-inline">/status</code> — short KB summary (file count, last action)</li>
+                <li class="flex gap-2"><span class="text-accent">›</span> Rapid messages are debounced &amp; batched — no duplicate proposals</li>
+                <li class="flex gap-2"><span class="text-accent">›</span> Accept/reject also works from the desktop app — both stay in sync</li>
+              </ul>
+            </div>
+            <div class="space-y-4">
+              <div class="mock-window">
+                <div class="mock-bar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span><span class="ml-3 text-xs text-slate-500 font-mono">Telegram · @CortXBot</span></div>
+                <div class="mock-body space-y-3 text-sm">
+                  <div class="flex justify-end">
+                    <div class="bg-accent/20 border border-accent/30 text-slate-200 rounded-xl rounded-br-sm px-3 py-2 max-w-[80%]">Lunch avec Marc Dupont. Quitte Airbus pour monter une startup IA défense, lève en série A.</div>
+                  </div>
+                  <div class="flex items-start gap-2">
+                    <div class="w-6 h-6 rounded-full bg-accent/30 flex items-center justify-center text-xs font-bold text-accent flex-shrink-0 mt-1">C</div>
+                    <div class="bg-elevated border border-border/60 rounded-xl rounded-bl-sm px-3 py-2 max-w-[85%] space-y-1.5">
+                      <div class="text-xs text-slate-500 font-mono">📥 CortX — 2 fichier(s) à valider :</div>
+                      <div class="text-slate-300 text-xs pl-1">✨ Reseau/Marc_Dupont.md</div>
+                      <div class="text-slate-300 text-xs pl-1">✨ Entreprises/Startup_IA_Defense.md</div>
+                      <div class="text-xs text-slate-500 mt-1">💡 Valide ou refuse via les boutons ci-dessous.</div>
+                      <div class="flex gap-2 mt-2">
+                        <button class="btn-mini btn-mini-accent text-xs">✔ Valider</button>
+                        <button class="btn-mini text-xs">✗ Refuser</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flex items-start gap-2">
+                    <div class="w-6 h-6 rounded-full bg-accent/30 flex items-center justify-center text-xs font-bold text-accent flex-shrink-0 mt-1">C</div>
+                    <div class="bg-elevated border border-border/60 rounded-xl rounded-bl-sm px-3 py-2 max-w-[85%]">
+                      <div class="text-xs text-emerald-400 font-mono">✅ Appliqué !</div>
+                      <div class="text-slate-300 text-xs mt-1">✔ Reseau/Marc_Dupont.md<br>✔ Entreprises/Startup_IA_Defense.md</div>
+                      <div class="text-xs text-slate-500 mt-1">🔗 Commit : a3f9c12</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="rounded-xl overflow-hidden border border-border/60 shadow-lg">
+                <img src="screenshots/05-Telegram.png" alt="CortX Telegram bot — proposal with inline accept/reject buttons" class="w-full h-auto block" loading="lazy">
               </div>
             </div>
           </div>
@@ -497,6 +549,14 @@
         </div>
         <h3 class="feature-title">EN / FR bilingual</h3>
         <p class="feature-desc">Full UI in English and French. Web search and Wikipedia run in the active language with English fallback. Idle insights generated in your language.</p>
+      </article>
+
+      <article class="feature-card">
+        <div class="feature-icon">
+          <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"/></svg>
+        </div>
+        <h3 class="feature-title">Telegram bot</h3>
+        <p class="feature-desc">Send a note from anywhere — the bot relays it through the full agent pipeline and returns a proposal with inline ✔ / ✗ buttons. Accept remotely, get a commit hash back. No app needed.</p>
       </article>
 
     </div>

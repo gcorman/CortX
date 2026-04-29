@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   User, Brain, FilePlus, FileEdit, Copy, Check, Eye, HelpCircle, Lightbulb, X,
-  Pencil, ChevronDown, ChevronUp
+  Pencil, ChevronDown, ChevronUp, Send, MessageCircle
 } from 'lucide-react'
 import { ActionButtons } from './ActionButtons'
 import { ActionPreview } from './ActionPreview'
@@ -11,6 +11,61 @@ import { useChatStore } from '../../stores/chatStore'
 import type { ActionEdit } from '../../stores/chatStore'
 import { useT } from '../../i18n'
 import type { ChatMessage as ChatMessageType, AgentAction } from '../../../shared/types'
+
+// ---------------------------------------------------------------------------
+// Telegram tile helpers
+// ---------------------------------------------------------------------------
+
+interface TelegramMeta { date?: string; user?: string; intent?: string; text: string }
+
+function parseTelegramContent(content: string): TelegramMeta | null {
+  if (!content.startsWith('[Telegram]')) return null
+  const lines = content.split('\n')
+  let date: string | undefined
+  let user: string | undefined
+  let intent: string | undefined
+  let bodyStart = 1
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i]
+    if (line.startsWith('Date: '))    { date   = line.slice(6);  bodyStart = i + 1 }
+    else if (line.startsWith('User: '))   { user   = line.slice(6);  bodyStart = i + 1 }
+    else if (line.startsWith('Intent: ')) { intent = line.slice(8); bodyStart = i + 1 }
+    else if (line === '')              { bodyStart = i + 1; break }
+  }
+
+  return { date, user, intent, text: lines.slice(bodyStart).join('\n').trim() }
+}
+
+const INTENT_CLS: Record<string, string> = {
+  question:  'bg-blue-500/15 text-blue-400 border-blue-500/25',
+  capture:   'bg-green-500/15 text-green-400 border-green-500/25',
+  commande:  'bg-orange-500/15 text-orange-400 border-orange-500/25',
+  réflexion: 'bg-purple-500/15 text-purple-400 border-purple-500/25',
+}
+
+function TelegramTile({ meta }: { meta: TelegramMeta }): React.JSX.Element {
+  const { date, user, intent, text } = meta
+  const intentCls = intent
+    ? (INTENT_CLS[intent] ?? 'bg-cortx-elevated text-cortx-text-secondary border-cortx-border')
+    : ''
+
+  return (
+    <div className="rounded-card border border-[#229ED9]/25 bg-[#229ED9]/5 overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[#229ED9]/15 bg-[#229ED9]/8">
+        <MessageCircle size={11} className="text-[#229ED9] flex-shrink-0" />
+        {user && <span className="text-xs font-medium text-[#229ED9]">{user}</span>}
+        {intent && (
+          <span className={`text-2xs px-1.5 py-0.5 rounded-full border ${intentCls}`}>{intent}</span>
+        )}
+        {date && <span className="ml-auto text-2xs text-cortx-text-secondary/50">{date}</span>}
+      </div>
+      <div className="px-3 py-2.5">
+        <p className="text-sm text-cortx-text-primary leading-relaxed whitespace-pre-wrap">{text}</p>
+      </div>
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Helpers — extract display info from action content
@@ -163,7 +218,7 @@ export function ChatMessage({ message }: ChatMessageProps): React.JSX.Element {
 
   function handleCopy(): void {
     const text = isUser
-      ? message.content
+      ? (message.telegramSource ? (parseTelegramContent(message.content)?.text ?? message.content) : message.content)
       : response?.summary || response?.response || message.content
     navigator.clipboard.writeText(text)
     setCopied(true)
@@ -202,15 +257,22 @@ export function ChatMessage({ message }: ChatMessageProps): React.JSX.Element {
 
   // ── User message ──────────────────────────────────────────────────────────
   if (isUser) {
+    const telegramMeta = message.telegramSource ? parseTelegramContent(message.content) : null
+
     return (
       <div className="group flex gap-2.5">
         <div className="flex-shrink-0 w-6 h-6 rounded-full bg-cortx-elevated flex items-center justify-center">
           <User size={13} className="text-cortx-text-secondary" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-cortx-text-primary leading-relaxed whitespace-pre-wrap">
-            <WikiText text={message.content} />
-          </p>
+          {telegramMeta
+            ? <TelegramTile meta={telegramMeta} />
+            : (
+              <p className="text-sm text-cortx-text-primary leading-relaxed whitespace-pre-wrap">
+                <WikiText text={message.content} />
+              </p>
+            )
+          }
           <div className="flex items-center gap-2 mt-1">
             <span className="text-2xs text-cortx-text-secondary/40">
               {new Date(message.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
@@ -486,6 +548,12 @@ export function ChatMessage({ message }: ChatMessageProps): React.JSX.Element {
           <span className="text-2xs text-cortx-text-secondary/40">
             {new Date(message.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
           </span>
+          {message.telegramReplied && (
+            <span className="inline-flex items-center gap-1 text-2xs px-1.5 py-0.5 rounded-full bg-[#229ED9]/15 text-[#229ED9] border border-[#229ED9]/30 font-medium">
+              <Send size={9} />
+              Envoyé sur Telegram
+            </span>
+          )}
           <button
             onClick={handleCopy}
             className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-cortx-elevated text-cortx-text-secondary/40 hover:text-cortx-text-secondary transition-all cursor-pointer"

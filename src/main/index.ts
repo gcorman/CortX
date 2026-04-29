@@ -216,6 +216,13 @@ async function initializeServices(): Promise<void> {
   // Initialise library service (creates Bibliotheque/ if needed)
   libraryService.initialize(dbService.getDb(), config.basePath)
 
+  // Warm up sidecar in background so it's ready before the first library import
+  if (pythonSidecar.isAvailable()) {
+    pythonSidecar.ensureReady().catch((err) => {
+      console.warn('[PythonSidecar] Eager warm-up failed:', err)
+    })
+  }
+
   // Initialise idle service
   idleService = new IdleService(dbService, fileService, llmService, config.basePath, config.language)
 
@@ -231,7 +238,6 @@ async function initializeServices(): Promise<void> {
   }
   telegramService = new TelegramService(
     config.telegram ?? { token: '', allowedChatIds: [], enabled: false },
-    () => agentPipeline,
     notifyRenderer
   )
   if (config.telegram?.enabled && config.telegram.token) {

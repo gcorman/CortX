@@ -38,7 +38,8 @@ const BACKOFF_MS = 5000
 function formatReply(data: TelegramReplyData): string {
   const { inputType, actions, summary, response, sources } = data
 
-  if (inputType === 'question' || (actions.length === 0 && response)) {
+  // Pure Q&A — no file modifications proposed
+  if (actions.length === 0) {
     const body = response || summary || '(aucune réponse)'
     const srcLine = sources?.length
       ? `\n\n📚 Sources : ${sources.join(', ')}`
@@ -46,18 +47,26 @@ function formatReply(data: TelegramReplyData): string {
     return `💬 Réponse CortX :\n\n${body}${srcLine}`
   }
 
-  if (actions.length === 0) {
-    return `ℹ️ ${summary || 'Aucune action nécessaire.'}`
-  }
-
+  // Has actions (create/modify) — show file list with validate/reject buttons.
+  // If the LLM also produced a Q&A answer (inputType === 'question'), prepend
+  // a truncated excerpt so the user gets both the answer and the action list.
   const fileLines = actions
     .slice(0, 10)
     .map(a => `  ${a.action === 'create' ? '✨' : '✏️'} ${a.file}`)
     .join('\n')
   const more = actions.length > 10 ? `\n  …et ${actions.length - 10} autres` : ''
   const summaryLine = summary ? `\n\n💭 ${summary}` : ''
+  const srcLine = sources?.length
+    ? `\n\n📚 Sources : ${sources.join(', ')}`
+    : ''
 
-  return `📥 CortX — ${actions.length} fichier(s) à valider :\n\n${fileLines}${more}${summaryLine}\n\n💡 Valide ou refuse depuis l'app CortX, ou via les boutons ci-dessous.`
+  let prefix = ''
+  if (inputType === 'question' && response) {
+    const excerpt = response.length > 400 ? response.slice(0, 400) + '…' : response
+    prefix = `💬 ${excerpt}${srcLine}\n\n`
+  }
+
+  return `${prefix}📥 CortX — ${actions.length} fichier(s) à valider :\n\n${fileLines}${more}${summaryLine}\n\n💡 Valide ou refuse via les boutons ci-dessous.`
 }
 
 function formatExecuted(commitHash: string, files: string[]): string {
@@ -77,6 +86,7 @@ function formatRejected(): string {
 
 export class TelegramService {
   private polling = false
+  private pollGeneration = 0
   private offset = 0
   private mainWindow: BrowserWindow | null = null
 
@@ -102,8 +112,9 @@ export class TelegramService {
     if (this.polling || !this.cfg.token) return
     this.polling = true
     this.offset = 0
+    const gen = ++this.pollGeneration
     console.log('[Telegram] Bot started (relay mode)')
-    void this.pollLoop()
+    void this.pollLoop(gen)
   }
 
   stop(): void {
@@ -132,7 +143,7 @@ export class TelegramService {
     const text = formatReply(data)
     const pending = this.activeRequests.get(chatId)
 
-    if (data.actions.length > 0 && data.inputType !== 'question') {
+    if (data.actions.length > 0) {
       const key = `${chatId}:${chatMessageId}`
       this.pendingCallbacks.set(key, { chatId, chatMessageId })
 
@@ -180,21 +191,22 @@ export class TelegramService {
 
   // ── Polling loop ──────────────────────────────────────────────────────────
 
-  private async pollLoop(): Promise<void> {
-    while (this.polling) {
+  private async pollLoop(gen: number): Promise<void> {
+    while (this.polling && this.pollGeneration === gen) {
       try {
         const updates = await this.callApi<TgUpdate[]>('getUpdates', {
           offset: this.offset,
           timeout: POLL_TIMEOUT_SEC,
           allowed_updates: ['message', 'callback_query']
         })
+        if (this.pollGeneration !== gen) break
         for (const update of updates) {
           this.offset = update.update_id + 1
           if (update.message) this.onMessage(update.message)
           if (update.callback_query) void this.onCallbackQuery(update.callback_query)
         }
       } catch (err) {
-        if (this.polling) {
+        if (this.polling && this.pollGeneration === gen) {
           console.error('[Telegram] Poll error:', err instanceof Error ? err.message : err)
           await sleep(BACKOFF_MS)
         }

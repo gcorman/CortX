@@ -44,37 +44,35 @@ export function AppShell(): React.JSX.Element {
   }, [loadFiles])
 
   // ── Telegram relay listeners ──────────────────────────────────────────────
+  // useCallback gives stable refs across StrictMode double-invocations so the
+  // preload dedup guard (cortx.on) blocks re-registration if cleanup hasn't fired.
+  const handleTelegramIncoming = useCallback((payload: unknown): void => {
+    const { chatId, text } = payload as { chatId: number; text: string }
+    setNextTelegramChatId(chatId)
+    void useChatStore.getState().sendMessage(text)
+  }, [])
+
+  const handleTelegramAccept = useCallback((payload: unknown): void => {
+    const { chatMessageId } = payload as { chatMessageId: string }
+    void useChatStore.getState().acceptActions(chatMessageId)
+  }, [])
+
+  const handleTelegramReject = useCallback((payload: unknown): void => {
+    const { chatMessageId } = payload as { chatMessageId: string }
+    useChatStore.getState().rejectActions(chatMessageId)
+  }, [])
+
   useEffect(() => {
-    const handleIncoming = (payload: unknown): void => {
-      const { chatId, text } = payload as { chatId: number; text: string }
-      if (isProcessing) {
-        // Bot busy — TelegramService will show ⏳, we can still queue
-        // by sending immediately (chatStore will buffer if needed)
-      }
-      setNextTelegramChatId(chatId)
-      void sendMessage(text)
-    }
-
-    const handleTriggerAccept = (payload: unknown): void => {
-      const { chatMessageId } = payload as { chatMessageId: string }
-      void acceptActions(chatMessageId)
-    }
-
-    const handleTriggerReject = (payload: unknown): void => {
-      const { chatMessageId } = payload as { chatMessageId: string }
-      rejectActions(chatMessageId)
-    }
-
-    window.cortx.on('telegram:incoming', handleIncoming)
-    window.cortx.on('telegram:triggerAccept', handleTriggerAccept)
-    window.cortx.on('telegram:triggerReject', handleTriggerReject)
+    window.cortx.on('telegram:incoming', handleTelegramIncoming)
+    window.cortx.on('telegram:triggerAccept', handleTelegramAccept)
+    window.cortx.on('telegram:triggerReject', handleTelegramReject)
 
     return () => {
-      window.cortx.off('telegram:incoming', handleIncoming)
-      window.cortx.off('telegram:triggerAccept', handleTriggerAccept)
-      window.cortx.off('telegram:triggerReject', handleTriggerReject)
+      window.cortx.off('telegram:incoming', handleTelegramIncoming)
+      window.cortx.off('telegram:triggerAccept', handleTelegramAccept)
+      window.cortx.off('telegram:triggerReject', handleTelegramReject)
     }
-  }, [sendMessage, acceptActions, rejectActions, isProcessing])
+  }, [handleTelegramIncoming, handleTelegramAccept, handleTelegramReject])
 
   // Global keyboard shortcuts
   useEffect(() => {

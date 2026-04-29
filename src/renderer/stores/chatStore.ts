@@ -322,6 +322,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   lastExecutedCommit: null,
 
   sendMessage: async (content: string) => {
+    if (get().isProcessing) return
+
     // Stop idle mode when user interacts — agent focuses on the conversation
     const idleState = useIdleStore.getState()
     if (idleState.isActive) {
@@ -332,7 +334,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       id: Date.now().toString(36) + 'u',
       role: 'user',
       content,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      telegramSource: _telegramChatId !== null ? true : undefined
     }
 
     set((s) => ({ messages: [...s.messages, userMessage], isProcessing: true }))
@@ -462,7 +465,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         role: 'agent',
         content: chatContent,
         timestamp: new Date().toISOString(),
-        agentResponse: { ...response, response: rewrite.ficheKind ? undefined : response.response }
+        agentResponse: { ...response, response: rewrite.ficheKind ? undefined : response.response },
+        telegramReplied: _telegramChatId !== null ? true : undefined
       }
 
       set((s) => ({ messages: [...s.messages, agentMessage], isProcessing: false }))

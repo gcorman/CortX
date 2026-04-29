@@ -265,8 +265,8 @@ export class AgentPipeline {
     console.log('[AgentPipeline] Raw LLM response length:', rawResponse.length)
 
     const parsed = this.parseResponse(rawResponse)
-    const normalizedActions = this.normalizeActions(parsed.actions || [])
-    const inputType = parsed.input_type || parsed.type || 'question'
+    const normalizedActions = this.deduplicateSameFileActions(this.normalizeActions(parsed.actions || []))
+    const inputType = parsed.input_type || parsed.type || 'capture'
 
     console.log('[AgentPipeline] Proposed', normalizedActions.length, 'actions:', normalizedActions.map((a) => `${a.action}:${a.file}`))
 
@@ -804,6 +804,39 @@ export class AgentPipeline {
     return normalizeActions(rawActions)
   }
 
+  /**
+   * Merge multiple actions targeting the same file into one.
+   * LLMs frequently emit 2-3 partial actions for the same path — e.g. one with
+   * the frontmatter block and another with body sections. Merging them keeps the
+   * proposal UI clean and prevents the user from having to accept the same file
+   * twice. Content blocks are joined with a blank line separator so smartMerge
+   * can distribute them correctly under their respective headings.
+   */
+  private deduplicateSameFileActions(
+    actions: ReturnType<typeof normalizeActions>
+  ): ReturnType<typeof normalizeActions> {
+    const order: string[] = []
+    const map = new Map<string, (typeof actions)[number]>()
+
+    for (const action of actions) {
+      const key = action.file.toLowerCase()
+      const existing = map.get(key)
+      if (!existing) {
+        order.push(key)
+        map.set(key, { ...action })
+      } else {
+        // Prefer 'create' over 'modify' so a create + modify pair produces a create
+        const mergedAction = existing.action === 'create' ? 'create' : action.action
+        const mergedContent = [existing.content, action.content]
+          .filter(Boolean)
+          .join('\n\n')
+        map.set(key, { ...existing, action: mergedAction, content: mergedContent })
+      }
+    }
+
+    return order.map(k => map.get(k)!)
+  }
+
   private async retrieveLibraryContext(input: string): Promise<LibraryChunkResult[]> {
     try {
       return await libraryService.getContextChunks(input, 6)
@@ -1246,7 +1279,7 @@ export class AgentPipeline {
     )
 
     const parsed = this.parseResponse(rawResponse)
-    const normalizedActions = this.normalizeActions(parsed.actions || [])
+    const normalizedActions = this.deduplicateSameFileActions(this.normalizeActions(parsed.actions || []))
 
     const actions: AgentAction[] = normalizedActions.map((a, i) => ({
       id: `wiki-${Date.now().toString(36)}-${i}`,
