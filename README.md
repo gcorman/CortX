@@ -1,4 +1,4 @@
-
+go check the website insteed ! : https://gcorman.github.io/CortX/
 # CortX
 <img width="350" height="350" alt="CortX_logo" src="https://github.com/user-attachments/assets/111a3923-a2d0-47ea-8e2f-50ff7c3aaa50" />
 
