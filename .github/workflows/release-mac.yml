@@ -39,15 +39,34 @@ jobs:
           ref: ${{ steps.tag.outputs.name }}
 
       - name: Download macOS sidecar from release
+        shell: bash
         run: |
-          gh release download ${{ steps.tag.outputs.name }} \
-            --pattern cortx-extractor-darwin-arm64.zip \
-            --dir sidecar-dl
+          for attempt in 1 2 3 4 5; do
+            echo "Download attempt ${attempt}/5"
+            rm -rf sidecar-dl
+            mkdir -p sidecar-dl
+
+            if gh release download "${{ steps.tag.outputs.name }}" \
+              --pattern cortx-extractor-darwin-arm64.zip \
+              --dir sidecar-dl; then
+              break
+            fi
+
+            if [ "$attempt" -eq 5 ]; then
+              echo "Failed to download macOS sidecar after 5 attempts."
+              exit 1
+            fi
+
+            sleep $((attempt * 15))
+          done
+
+          test -f sidecar-dl/cortx-extractor-darwin-arm64.zip
           mkdir -p resources/python-sidecar
           unzip sidecar-dl/cortx-extractor-darwin-arm64.zip -d resources/python-sidecar
           chmod +x resources/python-sidecar/cortx-extractor
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GODEBUG: http2client=0
 
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
@@ -76,6 +95,7 @@ jobs:
         run: npm run dist:mac
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload DMG to GitHub Release
         uses: softprops/action-gh-release@v2
