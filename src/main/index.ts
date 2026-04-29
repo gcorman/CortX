@@ -9,6 +9,7 @@ import { registerAgentHandlers, setIdleServiceForAgent } from './ipc/agent'
 import { registerLibraryHandlers } from './ipc/library'
 import { registerIdleHandlers } from './ipc/idle'
 import { registerCanvasHandlers } from './ipc/canvas'
+import { registerGalaxyHandlers } from './ipc/galaxy'
 import { DatabaseService } from './services/DatabaseService'
 import { FileService } from './services/FileService'
 import { GitService } from './services/GitService'
@@ -17,6 +18,7 @@ import { AgentPipeline } from './services/AgentPipeline'
 import { IdleService } from './services/IdleService'
 import { CanvasService } from './services/CanvasService'
 import { ExportService } from './services/ExportService'
+import { GalaxyService } from './services/GalaxyService'
 import { libraryService } from './services/LibraryService'
 import { pythonSidecar } from './services/PythonSidecar'
 import type { AppConfig } from '../shared/types'
@@ -145,6 +147,7 @@ let agentPipeline: AgentPipeline
 let idleService: IdleService
 let canvasService: CanvasService
 let exportService: ExportService
+let galaxyService: GalaxyService
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -217,6 +220,8 @@ async function initializeServices(): Promise<void> {
 
   exportService = new ExportService(fileService, config.basePath)
 
+  galaxyService = new GalaxyService(dbService, fileService, config.basePath)
+
   // Index existing files
   await indexAllFiles()
 }
@@ -288,6 +293,7 @@ function registerAppHandlers(): void {
     await gitService.initialize()
     agentPipeline = new AgentPipeline(fileService, dbService, gitService, llmService, normalizedPath, config.language)
     canvasService = new CanvasService(normalizedPath, dbService, llmService)
+    galaxyService = new GalaxyService(dbService, fileService, normalizedPath)
     await indexAllFiles()
     startFileWatcher(normalizedPath)
   })
@@ -387,6 +393,7 @@ app.whenReady().then(async () => {
   registerLibraryHandlers(() => libraryService, () => mainWindow)
   registerIdleHandlers(() => idleService, () => agentPipeline)
   registerCanvasHandlers(() => canvasService)
+  registerGalaxyHandlers(() => galaxyService)
   setIdleServiceForAgent(idleService)
 
   createWindow()

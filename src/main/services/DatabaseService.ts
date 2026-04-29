@@ -447,7 +447,17 @@ export class DatabaseService {
   }
 
   getRelations(): Relation[] {
-    return this.db.prepare('SELECT * FROM relations').all() as Relation[]
+    const rows = this.db.prepare('SELECT * FROM relations').all() as Array<{
+      id: number; source_entity_id: number; target_entity_id: number
+      relation_type: string; source_file: string
+    }>
+    return rows.map((r) => ({
+      id: r.id,
+      sourceEntityId: r.source_entity_id,
+      targetEntityId: r.target_entity_id,
+      relationType: r.relation_type,
+      sourceFile: r.source_file
+    }))
   }
 
   findEntity(name: string): Entity | null {

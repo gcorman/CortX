@@ -92,6 +92,11 @@ const api: CortxAPI = {
     agentSuggest: (canvasId: string, prompt: string, useInternet?: boolean) =>
       ipcRenderer.invoke('canvas:agentSuggest', canvasId, prompt, useInternet ?? false)
   },
+  galaxy: {
+    getData: () => ipcRenderer.invoke('galaxy:getData'),
+    renameCluster: (topMemberLabel: string, newLabel: string) =>
+      ipcRenderer.invoke('galaxy:renameCluster', topMemberLabel, newLabel)
+  },
   idle: {
     start: () => ipcRenderer.invoke('idle:start'),
     stop: () => ipcRenderer.invoke('idle:stop'),

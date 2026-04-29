@@ -54,7 +54,12 @@
     },
     "mac": {
       "target": [
-        { "target": "dmg", "arch": ["arm64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
       ],
       "category": "public.app-category.productivity"
     },
@@ -105,6 +110,8 @@
     "gray-matter": "^4.0.3",
     "isomorphic-git": "^1.37.4",
     "lucide-react": "^1.7.0",
+    "pixi-filters": "^6.1.5",
+    "pixi.js": "^8.18.1",
     "react": "^19.2.4",
     "react-cytoscapejs": "^2.0.0",
     "react-dom": "^19.2.4",

@@ -6,7 +6,8 @@ import { FilePreview } from '../files/FilePreview'
 import { LibraryPanel } from '../library/LibraryPanel'
 import { CanvasView } from '../canvas/CanvasView'
 import { TimelineView } from '../timeline/TimelineView'
-import { Network, Hash, Search, X, Library, Brain, Plus, Sparkles, Clock } from 'lucide-react'
+import { GalaxyView } from '../galaxy/GalaxyView'
+import { Network, Hash, Search, X, Library, Brain, Plus, Sparkles, Clock, Orbit } from 'lucide-react'
 import { useState } from 'react'
 import { useT } from '../../i18n'
 
@@ -20,6 +21,7 @@ export function CenterPanel(): React.JSX.Element {
 
   const tabs = [
     { id: 'graph' as const, label: t.centerPanel.graph, icon: Network },
+    { id: 'galaxy' as const, label: t.centerPanel.galaxy, icon: Orbit },
     { id: 'canvas' as const, label: t.centerPanel.canvas, icon: Sparkles },
     { id: 'tags' as const, label: t.centerPanel.tags, icon: Hash },
     { id: 'library' as const, label: t.centerPanel.library, icon: Library },
@@ -84,7 +86,7 @@ export function CenterPanel(): React.JSX.Element {
         )}
 
         {/* Search — hidden in library, canvas, timeline views (they have their own UX) */}
-        {activeCenterView !== 'library' && activeCenterView !== 'canvas' && activeCenterView !== 'timeline' && (
+        {activeCenterView !== 'library' && activeCenterView !== 'canvas' && activeCenterView !== 'timeline' && activeCenterView !== 'galaxy' && (
           <div className="flex-1 relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-cortx-text-secondary" />
             <input
@@ -109,6 +111,7 @@ export function CenterPanel(): React.JSX.Element {
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         {activeCenterView === 'graph' && <GraphView searchQuery={searchQuery} onClearSearch={() => setSearchQuery('')} />}
+        {activeCenterView === 'galaxy' && <GalaxyView />}
         {activeCenterView === 'canvas' && <CanvasView />}
         {activeCenterView === 'tags' && <TagBrowser />}
         {activeCenterView === 'library' && <LibraryPanel />}

@@ -68,6 +68,7 @@ export interface T {
   }
   centerPanel: {
     graph: string
+    galaxy: string
     tags: string
     library: string
     canvas: string
@@ -466,6 +467,7 @@ const fr: T = {
   },
   centerPanel: {
     graph: 'Graphe',
+    galaxy: 'Galaxie',
     tags: 'Tags',
     library: 'Bibliothèque',
     canvas: 'Canvas',
@@ -863,6 +865,7 @@ const en: T = {
   },
   centerPanel: {
     graph: 'Graph',
+    galaxy: 'Galaxy',
     tags: 'Tags',
     library: 'Library',
     canvas: 'Canvas',

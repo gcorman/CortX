@@ -308,6 +308,64 @@ export interface TimelineEntry {
   actionVerbs?: string[]
 }
 
+// --- Galaxy (cosmic view of the KB) ---
+
+export interface GalaxyNode {
+  id: string
+  label: string
+  type: 'personne' | 'entreprise' | 'domaine' | 'projet' | 'note' | 'journal'
+  filePath: string
+  degree: number
+  clusterId: number
+  modifiedAt: string
+  createdAt: string
+}
+
+export interface GalaxyEdge {
+  source: string
+  target: string
+  label: string
+  createdAt: string
+}
+
+export interface GalaxyCluster {
+  id: number
+  /** Default label = name of the most-connected member (unique per cluster) */
+  label: string
+  /** Human-readable category of the dominant entity type (e.g. "Entreprises") */
+  typeLabel: string
+  /** User override label, persisted to galaxy-clusters.json */
+  customLabel: string | null
+  color: string
+  memberIds: string[]
+  /** Fraction of members modified in last 90 days */
+  activity: number
+}
+
+export interface GalaxyComet {
+  id: string
+  label: string
+  filePath: string
+  addedAt: string
+  targetEntityIds: string[]
+}
+
+export interface GalaxyConstellation {
+  filePath: string
+  label: string
+  createdAt: string
+  entityIds: string[]
+}
+
+export interface GalaxyData {
+  nodes: GalaxyNode[]
+  edges: GalaxyEdge[]
+  clusters: GalaxyCluster[]
+  comets: GalaxyComet[]
+  constellations: GalaxyConstellation[]
+  timeRange: { min: string; max: string }
+}
+
 // --- Implicit backlinks ---
 
 export interface ImplicitBacklink {
@@ -480,6 +538,10 @@ export interface CortxAPI {
     reindexAll(): Promise<{ added: number; updated: number; removed: number }>
     getStatus(): Promise<{ sidecarReady: boolean; queueLength: number }>
     openImportDialog(): Promise<string[]>
+  }
+  galaxy: {
+    getData(): Promise<GalaxyData>
+    renameCluster(topMemberLabel: string, newLabel: string): Promise<void>
   }
   idle: {
     start(): Promise<void>
