@@ -45,6 +45,20 @@ Every action proposed by the agent is previewable (diff before/after) and requir
 ### Interactive Knowledge Graph
 Real-time Cytoscape · cose-bilkent visualization of all entities and their relations. Nodes colored by type (person, company, domain, project, note, journal, fiche), filtering, search, double-click exploration. Library documents appear as graph nodes alongside KB entities — bidirectional auto-links via `[[wikilinks]]` show as edges. Idle Mode highlights the nodes/edges currently being explored.
 
+### Galaxy View
+Alternative PixiJS-powered spatial visualization of the knowledge graph:
+- **Louvain clustering** automatically groups entities into thematic clusters, labeled by dominant entity type
+- **User-renameable cluster labels** persisted to `_System/galaxy-clusters.json`
+- **Comets** — recently modified nodes rendered with a bloom glow so new activity stands out
+- **Constellations** — isolated nodes (no edges) segregated visually
+- **Time Scrubber** — drag to filter nodes by creation / modification date range
+- **Filter panel** — toggle entity types, comets, constellations, and pulsation animations
+- **Hover card** on mouse-over + **Focus card** on click with file metadata
+- **Search** within the galaxy; double-click opens file preview
+
+### Tag Browser
+Enhanced tag panel with search, tag pills ranked by count, per-tag file list, and aggregate stats. Replaces the old tag cloud.
+
 ![Interactive knowledge graph rendered with Cytoscape · cose-bilkent layout](docs/screenshots/03-graph.svg)
 
 ### Hybrid Search (RAG) with Multi-hop Expansion
@@ -69,10 +83,21 @@ Fetch live web content directly from the chat — no API key, no third-party acc
 ### Automatic Git Versioning
 Every accepted action = a Git commit (via isomorphic-git). Full history, one-click undo (`git revert`), and built-in `agent_log` audit table tying every commit to the original input.
 
+### Timeline View
+Chronological audit log of all agent activity in the center panel. Entries are grouped by date and show action counts, action verbs (create / modify), input type, and icons. Refreshes automatically on any KB change.
+
 ### Briefs & Fiches Archive
 - `/brief [topic]` and `/synthese` generate structured briefs the agent saves to `Fiches/YYYY-MM-DD_HH-MM_slug.md` with frontmatter
 - LLM output is sanitized (strips leading frontmatter, duplicate H1, code fences)
 - Browse, preview, and delete fiches from a dedicated tab
+
+### Telegram Bot Integration
+Capture notes and query your knowledge base from anywhere via Telegram:
+- Configure a bot token + authorized chat ID in Settings
+- Messages sent to the bot go through the full agent pipeline (capture / question / reflection)
+- Agent proposals are sent back with inline **Validate / Reject** buttons; accepted validations write files and reply with a commit summary
+- Pure Q&A responses include answer text + cited sources
+- Messages originating from Telegram are flagged with a badge in the app UI
 
 ### Idle Mode — Passive Insights
 Background loop that explores your graph and generates insights without prompting:
@@ -174,7 +199,9 @@ On first launch, open Settings and configure:
 | Database           | SQLite (better-sqlite3) + FTS5 + embeddings |
 | Versioning         | isomorphic-git                      |
 | Graph              | Cytoscape.js (fcose + cose-bilkent) |
+| Galaxy View        | PixiJS + pixi-filters (Louvain clustering, bloom effects) |
 | LLM                | Anthropic SDK + OpenAI-compatible (fetch) |
+| Telegram           | node-telegram-bot-api (long-poll) |
 | Web fetch          | Node.js built-in fetch + Wikipedia REST API + DuckDuckGo HTML SERP |
 | Documents          | Python sidecar (docling + sentence-transformers / e5-small) |
 
@@ -275,6 +302,9 @@ Each Markdown file follows a standardized format with YAML frontmatter (type, ta
 | `/wiki` and `/internet` web enrichment               | ✅ |
 | Internationalization (FR / EN)                       | ✅ |
 | Update check + release banner                        | ✅ |
+| Galaxy View (PixiJS, Louvain clustering, time scrub) | ✅ |
+| Timeline View (agent activity log)                   | ✅ |
+| Telegram bot integration                             | ✅ |
 | Windows installer (NSIS)                             | ✅ |
 | macOS DMG release                                    | ✅ |
 | Global quick capture (system shortcut)               | 🔜 |
