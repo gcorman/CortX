@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { SendHorizontal, Slash, AtSign, Plus, FileText, BookOpen, Globe, X, Loader2 } from 'lucide-react'
+import { SendHorizontal, Slash, AtSign, Plus, FileText, BookOpen, Globe, X, Loader2, Square } from 'lucide-react'
 import { useFileStore } from '../../stores/fileStore'
 import { useLibraryStore } from '../../stores/libraryStore'
 import { useUIStore } from '../../stores/uiStore'
@@ -17,10 +17,11 @@ const SLASH_COMMANDS = [
 
 interface ChatInputProps {
   onSend: (message: string) => void
+  onStop?: () => void
   disabled: boolean
 }
 
-export function ChatInput({ onSend, disabled }: ChatInputProps): React.JSX.Element {
+export function ChatInput({ onSend, onStop, disabled }: ChatInputProps): React.JSX.Element {
   const [value, setValue] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
   const [webPreview, setWebPreview] = useState<string | null>(null)
@@ -492,14 +493,25 @@ export function ChatInput({ onSend, disabled }: ChatInputProps): React.JSX.Eleme
               className="flex-1 bg-transparent text-sm text-cortx-text-primary placeholder:text-cortx-text-secondary/40 py-2 resize-none focus:outline-none disabled:opacity-50"
             />
 
-            <button
-              onClick={handleSubmit}
-              disabled={disabled || !value.trim()}
-              className="flex-shrink-0 p-1.5 rounded-md text-cortx-text-secondary hover:text-cortx-accent hover:bg-cortx-accent/10 disabled:opacity-30 disabled:hover:text-cortx-text-secondary disabled:hover:bg-transparent transition-colors cursor-pointer mb-0.5"
-              title={t.chat.sendTooltip}
-            >
-              <SendHorizontal size={16} />
-            </button>
+            {disabled ? (
+              <button
+                type="button"
+                onClick={onStop}
+                className="flex-shrink-0 p-1.5 rounded-md text-red-400 hover:text-red-300 hover:bg-red-400/10 transition-colors cursor-pointer mb-0.5"
+                title="Arrêter la génération"
+              >
+                <Square size={16} />
+              </button>
+            ) : (
+              <button
+                onClick={handleSubmit}
+                disabled={!value.trim()}
+                className="flex-shrink-0 p-1.5 rounded-md text-cortx-text-secondary hover:text-cortx-accent hover:bg-cortx-accent/10 disabled:opacity-30 disabled:hover:text-cortx-text-secondary disabled:hover:bg-transparent transition-colors cursor-pointer mb-0.5"
+                title={t.chat.sendTooltip}
+              >
+                <SendHorizontal size={16} />
+              </button>
+            )}
           </div>
         </div>
       </div>

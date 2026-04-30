@@ -57,7 +57,8 @@ const api: CortxAPI = {
     wikiToMd: (topic: string, lang?: string) => ipcRenderer.invoke('agent:wikiToMd', topic, lang),
     previewWebContext: (input: string) => ipcRenderer.invoke('agent:previewWebContext', input),
     importRawMarkdown: (filename: string, content: string) =>
-      ipcRenderer.invoke('agent:importRawMarkdown', filename, content)
+      ipcRenderer.invoke('agent:importRawMarkdown', filename, content),
+    abort: (requestId: string) => ipcRenderer.invoke('agent:abort', requestId)
   },
   app: {
     getBasePath: () => ipcRenderer.invoke('app:getBasePath'),

@@ -1,4 +1,6 @@
-import type { BrowserWindow } from 'electron'
+import { app, type BrowserWindow } from 'electron'
+import { join } from 'path'
+import * as fs from 'fs'
 import type { TelegramConfig, TelegramReplyData } from '../../shared/types'
 
 // ── Minimal Telegram Bot API types ───────────────────────────────────────────
@@ -89,6 +91,7 @@ export class TelegramService {
   private pollGeneration = 0
   private offset = 0
   private mainWindow: BrowserWindow | null = null
+  private offsetFilePath: string
 
   // chatId → { waitMsgId } for the ⏳ message sent while renderer processes
   private activeRequests = new Map<number, { waitMsgId: number }>()
@@ -99,10 +102,32 @@ export class TelegramService {
   // chatId → debounce state
   private batchTimers = new Map<number, { timer: ReturnType<typeof setTimeout>; lines: string[]; username: string }>()
 
+  // Dedup: track processed message_ids to prevent double-processing
+  private processedMessageIds = new Set<number>()
+
   constructor(
     private cfg: TelegramConfig,
     private notifyRenderer: () => void
-  ) {}
+  ) {
+    this.offsetFilePath = join(app.getPath('userData'), 'telegram-offset.json')
+    this.loadOffset()
+  }
+
+  private loadOffset(): void {
+    try {
+      if (fs.existsSync(this.offsetFilePath)) {
+        const raw = fs.readFileSync(this.offsetFilePath, 'utf-8')
+        const data = JSON.parse(raw) as { offset?: number }
+        if (typeof data.offset === 'number') this.offset = data.offset
+      }
+    } catch { /* ignore — start from 0 */ }
+  }
+
+  private saveOffset(): void {
+    try {
+      fs.writeFileSync(this.offsetFilePath, JSON.stringify({ offset: this.offset }), 'utf-8')
+    } catch { /* ignore */ }
+  }
 
   setWindow(mw: BrowserWindow | null): void {
     this.mainWindow = mw
@@ -111,7 +136,8 @@ export class TelegramService {
   async start(): Promise<void> {
     if (this.polling || !this.cfg.token) return
     this.polling = true
-    this.offset = 0
+    // Don't reset this.offset — preserve position across restarts so
+    // updateConfig() doesn't cause old messages to be redelivered.
     const gen = ++this.pollGeneration
     console.log('[Telegram] Bot started (relay mode)')
     void this.pollLoop(gen)
@@ -205,6 +231,9 @@ export class TelegramService {
           if (update.message) this.onMessage(update.message)
           if (update.callback_query) void this.onCallbackQuery(update.callback_query)
         }
+        // Persist offset so a main-process restart (e.g. dev HMR) resumes
+        // from where we left off instead of re-fetching old updates.
+        if (updates.length > 0) this.saveOffset()
       } catch (err) {
         if (this.polling && this.pollGeneration === gen) {
           console.error('[Telegram] Poll error:', err instanceof Error ? err.message : err)
@@ -220,6 +249,14 @@ export class TelegramService {
     const chatId = msg.chat.id
     const text = msg.text?.trim() ?? ''
     if (!this.isAllowed(chatId) || !text) return
+
+    // Skip already-processed messages (guards against offset reset or duplicate updates)
+    if (this.processedMessageIds.has(msg.message_id)) return
+    this.processedMessageIds.add(msg.message_id)
+    if (this.processedMessageIds.size > 500) {
+      const first = this.processedMessageIds.values().next().value as number
+      this.processedMessageIds.delete(first)
+    }
 
     const username = msg.from?.username ?? msg.from?.first_name ?? String(chatId)
 
@@ -273,7 +310,10 @@ export class TelegramService {
   private async relayToRenderer(chatId: number, text: string): Promise<void> {
     const waitMsg = await this.send(chatId, '⏳ Traitement en cours…')
     if (waitMsg) this.activeRequests.set(chatId, { waitMsgId: waitMsg.message_id })
-    this.mainWindow?.webContents.send('telegram:incoming', { chatId, text })
+    // Include a unique relayId so the renderer can dedup if the IPC listener
+    // happens to fire more than once (HMR / StrictMode edge cases).
+    const relayId = `${chatId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    this.mainWindow?.webContents.send('telegram:incoming', { chatId, text, relayId })
   }
 
   // ── Callback query (✔/✗ buttons) ─────────────────────────────────────────

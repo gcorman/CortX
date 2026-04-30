@@ -182,7 +182,8 @@ export class AgentPipeline {
   async process(
     input: string,
     onStreamDelta?: (delta: string) => void,
-    onEvent?: (ev: StreamEvent) => void
+    onEvent?: (ev: StreamEvent) => void,
+    signal?: AbortSignal
   ): Promise<AgentResponse> {
     const emit = (ev: StreamEvent): void => { try { onEvent?.(ev) } catch { /* swallow */ } }
 
@@ -257,7 +258,8 @@ export class AgentPipeline {
     const rawResponseStream = await this.llmService.sendMessage(
       messages,
       systemPrompt,
-      wrappedOnDelta
+      wrappedOnDelta,
+      signal
     )
     const rawResponse = usesPrefill ? '{' + rawResponseStream : rawResponseStream
 

@@ -79,6 +79,10 @@ interface ChatState {
   answerClarification: (messageId: string, optionIndex: number) => Promise<void>
   dismissSuggestion: (text: string) => void
   acceptSuggestion: (text: string) => Promise<void>
+  /** Abort the in-flight LLM request and reset processing state. */
+  stopProcessing: () => Promise<void>
+  /** Remove a message from the chat history. */
+  deleteMessage: (messageId: string) => void
 }
 
 interface SlashRewrite {
@@ -94,6 +98,9 @@ type StreamMode = 'default' | 'brief' | 'synthese' | 'digest'
 let _telegramChatId: number | null = null
 // Maps chatMessageId → telegramChatId for pending accept/reject notifications.
 const _telegramChatMap = new Map<string, number>()
+
+// ── Active stream tracking ────────────────────────────────────────────────────
+let _activeRequestId: string | null = null
 
 export function setNextTelegramChatId(chatId: number): void {
   _telegramChatId = chatId
@@ -439,6 +446,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       : rewrite.prompt
 
     const requestId = Date.now().toString(36) + 'r'
+    _activeRequestId = requestId
     const streamMode: StreamMode =
       rewrite.ficheKind === 'brief'
         ? 'brief'
@@ -514,6 +522,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set((s) => ({ messages: [...s.messages, errorMessage], isProcessing: false }))
       useUIStore.getState().addToast('Erreur lors du traitement', 'error')
     } finally {
+      _activeRequestId = null
       stopStream()
     }
   },
@@ -884,5 +893,18 @@ input_type="information"`
     } catch {
       useUIStore.getState().addToast('Erreur lors de l\'annulation', 'error')
     }
+  },
+
+  stopProcessing: async () => {
+    const reqId = _activeRequestId
+    _activeRequestId = null
+    if (reqId) {
+      try { await window.cortx.agent.abort(reqId) } catch { /* ignore */ }
+    }
+    set({ isProcessing: false, streamActive: false, streamPhase: null, streamProgress: 0, streamText: '' })
+  },
+
+  deleteMessage: (messageId: string) => {
+    set((s) => ({ messages: s.messages.filter((m) => m.id !== messageId) }))
   }
 }))

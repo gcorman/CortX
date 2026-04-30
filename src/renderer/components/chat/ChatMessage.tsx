@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   User, Brain, FilePlus, FileEdit, Copy, Check, Eye, HelpCircle, Lightbulb, X,
-  Pencil, ChevronDown, ChevronUp, Send, MessageCircle
+  Pencil, ChevronDown, ChevronUp, Send, MessageCircle, Trash2
 } from 'lucide-react'
 import { ActionButtons } from './ActionButtons'
 import { ActionPreview } from './ActionPreview'
@@ -174,6 +174,7 @@ export function ChatMessage({ message }: ChatMessageProps): React.JSX.Element {
   const dismissSuggestion = useChatStore((s) => s.dismissSuggestion)
   const acceptSuggestion = useChatStore((s) => s.acceptSuggestion)
   const dismissedSuggestions = useChatStore((s) => s.dismissedSuggestions)
+  const deleteMessage = useChatStore((s) => s.deleteMessage)
   const t = useT()
 
   const response = message.agentResponse
@@ -283,6 +284,13 @@ export function ChatMessage({ message }: ChatMessageProps): React.JSX.Element {
               title={t.chat.copy}
             >
               {copied ? <Check size={11} className="text-cortx-success" /> : <Copy size={11} />}
+            </button>
+            <button
+              onClick={() => deleteMessage(message.id)}
+              className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-red-400/10 text-cortx-text-secondary/40 hover:text-red-400 transition-all cursor-pointer"
+              title="Supprimer ce message"
+            >
+              <Trash2 size={11} />
             </button>
           </div>
         </div>
@@ -560,6 +568,13 @@ export function ChatMessage({ message }: ChatMessageProps): React.JSX.Element {
             title={t.chat.copy}
           >
             {copied ? <Check size={11} className="text-cortx-success" /> : <Copy size={11} />}
+          </button>
+          <button
+            onClick={() => deleteMessage(message.id)}
+            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-red-400/10 text-cortx-text-secondary/40 hover:text-red-400 transition-all cursor-pointer"
+            title="Supprimer ce message"
+          >
+            <Trash2 size={11} />
           </button>
         </div>
       </div>

@@ -532,6 +532,7 @@ export interface CortxAPI {
     deleteFile(filePath: string): Promise<void>
     wikiToMd(topic: string, lang?: string): Promise<AgentResponse>
     previewWebContext(input: string): Promise<string>
+    abort(requestId: string): Promise<void>
     importRawMarkdown(filename: string, content: string): Promise<{ path: string }>
   }
   app: {

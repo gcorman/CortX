@@ -4,6 +4,7 @@ import type { IdleService } from '../services/IdleService'
 import type { AgentAction, StreamEvent } from '../../shared/types'
 
 let _idleService: IdleService | null = null
+const _controllers = new Map<string, AbortController>()
 
 export function setIdleServiceForAgent(idle: IdleService): void {
   _idleService = idle
@@ -17,6 +18,8 @@ export function registerAgentHandlers(getAgent: () => AgentPipeline): void {
 
   ipcMain.handle('agent:processStream', async (event, input: string, requestId: string) => {
     _idleService?.pause()
+    const controller = new AbortController()
+    _controllers.set(requestId, controller)
     // Legacy `delta` field kept for backwards-compat with older renderer code;
     // the new `event` field carries structured StreamEvent payloads.
     const onDelta = (delta: string) => {
@@ -27,17 +30,29 @@ export function registerAgentHandlers(getAgent: () => AgentPipeline): void {
       event.sender.send('agent:stream', { requestId, event: ev })
     }
     try {
-      const response = await getAgent().process(input, onDelta, onEvent)
+      const response = await getAgent().process(input, onDelta, onEvent, controller.signal)
       event.sender.send('agent:stream', { requestId, event: { kind: 'done' } as StreamEvent })
       event.sender.send('agent:stream', { requestId, done: true })
       return response
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
+      const aborted = controller.signal.aborted
       event.sender.send('agent:stream', { requestId, event: { kind: 'error', message } as StreamEvent })
-      event.sender.send('agent:stream', { requestId, error: message })
-      throw err
+      event.sender.send('agent:stream', { requestId, error: aborted ? 'aborted' : message })
+      if (!aborted) throw err
+      // Aborted — return empty response so IPC resolves cleanly
+      return null
     } finally {
+      _controllers.delete(requestId)
       _idleService?.resume()
+    }
+  })
+
+  ipcMain.handle('agent:abort', (_event, requestId: string) => {
+    const controller = _controllers.get(requestId)
+    if (controller) {
+      controller.abort()
+      _controllers.delete(requestId)
     }
   })
 

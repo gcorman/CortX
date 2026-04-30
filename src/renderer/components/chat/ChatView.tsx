@@ -9,7 +9,7 @@ import { Brain, Sparkles, FileText } from 'lucide-react'
 import { useT } from '../../i18n'
 
 export function ChatView(): React.JSX.Element {
-  const { messages, isProcessing, sendMessage } = useChatStore()
+  const { messages, isProcessing, sendMessage, stopProcessing } = useChatStore()
   const streamActive = useChatStore((s) => s.streamActive)
   const streamText = useChatStore((s) => s.streamText)
   const { addToast, showMdImportModal } = useUIStore()
@@ -98,6 +98,7 @@ export function ChatView(): React.JSX.Element {
       {/* Input */}
       <ChatInput
         onSend={sendMessage}
+        onStop={() => void stopProcessing()}
         disabled={isProcessing}
       />
 

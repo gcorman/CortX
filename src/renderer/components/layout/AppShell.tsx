@@ -19,6 +19,23 @@ export function AppShell(): React.JSX.Element {
   const { rightPanelVisible, toggleRightPanel, theme, setTheme, addToast, openCommandPalette } = useUIStore()
   const t = useT()
   const loadFiles = useFileStore((s) => s.loadFiles)
+  const isProcessing = useChatStore((s) => s.isProcessing)
+
+  // Queue for Telegram messages that arrive while the agent is busy
+  const telegramQueueRef = useRef<Array<{ chatId: number; text: string }>>([])
+
+  // Dedup: relayIds already processed (defends against duplicate IPC listener firings
+  // from HMR / StrictMode edge cases where the listener could be registered twice).
+  const seenRelayIdsRef = useRef<Set<string>>(new Set())
+
+  // Drain queue when processing finishes
+  useEffect(() => {
+    if (!isProcessing && telegramQueueRef.current.length > 0) {
+      const next = telegramQueueRef.current.shift()!
+      setNextTelegramChatId(next.chatId)
+      void useChatStore.getState().sendMessage(next.text)
+    }
+  }, [isProcessing])
 
   // Apply theme attribute to <html> on mount and whenever it changes
   useEffect(() => {
@@ -47,9 +64,25 @@ export function AppShell(): React.JSX.Element {
   // useCallback gives stable refs across StrictMode double-invocations so the
   // preload dedup guard (cortx.on) blocks re-registration if cleanup hasn't fired.
   const handleTelegramIncoming = useCallback((payload: unknown): void => {
-    const { chatId, text } = payload as { chatId: number; text: string }
-    setNextTelegramChatId(chatId)
-    void useChatStore.getState().sendMessage(text)
+    const { chatId, text, relayId } = payload as { chatId: number; text: string; relayId?: string }
+
+    // Dedup by relayId — if the same IPC event reaches us twice, ignore the second.
+    if (relayId) {
+      if (seenRelayIdsRef.current.has(relayId)) return
+      seenRelayIdsRef.current.add(relayId)
+      // Bound the set so it doesn't grow forever
+      if (seenRelayIdsRef.current.size > 200) {
+        const first = seenRelayIdsRef.current.values().next().value as string
+        seenRelayIdsRef.current.delete(first)
+      }
+    }
+
+    if (useChatStore.getState().isProcessing) {
+      telegramQueueRef.current.push({ chatId, text })
+    } else {
+      setNextTelegramChatId(chatId)
+      void useChatStore.getState().sendMessage(text)
+    }
   }, [])
 
   const handleTelegramAccept = useCallback((payload: unknown): void => {
