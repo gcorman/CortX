@@ -61,7 +61,10 @@
           ]
         }
       ],
-      "category": "public.app-category.productivity"
+      "category": "public.app-category.productivity",
+      "signIgnore": [
+        "python-sidecar/_internal/Python\\.framework"
+      ]
     },
     "dmg": {
       "title": "CortX"
